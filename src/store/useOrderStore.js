@@ -216,6 +216,10 @@ const useOrderStore = create(
             title: 'طلب جديد',
             message: `تم إنشاء طلب جديد بواسطة ${nextOrder?.userName || nextOrder?.userId || 'عميل'}`,
             type: 'info',
+            targetType: 'order',
+            targetId: nextOrder?.id,
+            orderId: nextOrder?.id,
+            targetUrl: nextOrder?.id ? `/admin/orders?orderId=${encodeURIComponent(nextOrder.id)}` : '/admin/orders',
           });
 
           return created || { order: nextOrder };
@@ -272,18 +276,30 @@ const useOrderStore = create(
             title: 'قبول طلب',
             message: `تم قبول الطلب ${target?.id || id}`,
             type: 'success',
+            targetType: 'order',
+            targetId: target?.id || id,
+            orderId: target?.id || id,
+            targetUrl: `/orders?orderId=${encodeURIComponent(target?.id || id)}`,
           });
         } else if (normalizedStatus === 'rejected') {
           useNotificationStore.getState().addNotification({
             title: 'رفض طلب',
             message: `تم رفض الطلب ${target?.id || id}`,
             type: 'warning',
+            targetType: 'order',
+            targetId: target?.id || id,
+            orderId: target?.id || id,
+            targetUrl: `/orders?orderId=${encodeURIComponent(target?.id || id)}`,
           });
         } else {
           useNotificationStore.getState().addNotification({
             title: 'تحديث حالة الطلب',
             message: `تم تحديث الطلب ${target?.id || id} إلى ${getManualOrderStatusLabel(normalizedStatus)}`,
             type: 'info',
+            targetType: 'order',
+            targetId: target?.id || id,
+            orderId: target?.id || id,
+            targetUrl: `/orders?orderId=${encodeURIComponent(target?.id || id)}`,
           });
         }
 

@@ -1,13 +1,14 @@
 import React from 'react';
+import logoImage from '../../assets/ms-removebg-preview.png';
 
 const Loader = () => {
   return (
-    <div className="flex items-center justify-center p-8 w-full h-full min-h-[200px]">
-      <div className="flex flex-row gap-2">
-        <div className="h-3.5 w-3.5 rounded-full bg-[var(--color-primary)] animate-bounce"></div>
-        <div className="h-3.5 w-3.5 rounded-full bg-[var(--color-primary-soft)] animate-bounce [animation-delay:-.3s]"></div>
-        <div className="h-3.5 w-3.5 rounded-full bg-[var(--color-primary)] animate-bounce [animation-delay:-.5s]"></div>
-      </div>
+    <div className="flex min-h-[220px] w-full items-center justify-center p-8">
+      <img
+        src={logoImage}
+        alt="MS STORE"
+        className="h-24 w-24 object-contain drop-shadow-[0_8px_20px_rgb(var(--color-primary-rgb)/0.35)] animate-[logo-soft-spin_1.7s_cubic-bezier(0.4,0,0.2,1)_infinite] sm:h-28 sm:w-28"
+      />
     </div>
   );
 };

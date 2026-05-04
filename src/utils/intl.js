@@ -47,6 +47,7 @@ export const getNumericLocale = (locale = 'en-US') => (
 export const formatNumber = (value, locale = 'en-US', options = {}) => toEnglishDigits(
   new Intl.NumberFormat(getNumericLocale(locale), {
     numberingSystem: 'latn',
+    useGrouping: true,
     ...options,
   }).format(asFiniteNumber(value))
 );

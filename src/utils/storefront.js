@@ -1,7 +1,7 @@
 import buyCardsImage from '../assets/buyCards.webp';
 import chatAppsImage from '../assets/chatApps.webp';
 import gamesChargingImage from '../assets/gamesCharging.webp';
-import brandIconImage from '../assets/logo.png';
+import brandIconImage from '../assets/ms-removebg-preview.png';
 import { calculateProductPrice } from './pricing';
 import { formatNumber } from './intl';
 import { getMoneyFormatOptions, toFiniteMoneyNumber } from './money';
@@ -12,8 +12,8 @@ const CATEGORY_DISPLAY_CONFIG = {
     image: brandIconImage,
     titleAr: 'كل الأقسام',
     titleEn: 'All Collections',
-    subtitleAr: 'واجهة فاخرة لجميع المنتجات',
-    subtitleEn: 'Luxury storefront overview',
+    subtitleAr: '',
+    subtitleEn: '',
   },
   apps: {
     image: chatAppsImage,
@@ -26,8 +26,8 @@ const CATEGORY_DISPLAY_CONFIG = {
     image: gamesChargingImage,
     titleAr: 'شحن الألعاب',
     titleEn: 'Game Topups',
-    subtitleAr: 'تنفيذ سريع وآمن',
-    subtitleEn: 'Fast secure delivery',
+    subtitleAr: '',
+    subtitleEn: '',
   },
   cards: {
     image: buyCardsImage,

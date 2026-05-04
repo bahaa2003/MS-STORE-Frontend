@@ -65,3 +65,24 @@
   opacity: 1;
   transform: translateX(0);
 }
+
+/* Light-mode specific: warm beige shell with polished gold accents. */
+:root:not(.dark) .sidebar {
+  background-color: var(--color-card);
+  box-shadow: 2px 0 14px rgba(105, 74, 24, 0.12);
+  color: var(--color-text);
+}
+
+:root:not(.dark) .sidebar-item {
+  color: var(--color-text);
+}
+
+:root:not(.dark) .sidebar-item:hover {
+  background-color: rgb(var(--color-primary-rgb) / 0.08);
+}
+
+:root:not(.dark) .sidebar-item.active {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: var(--color-button-text);
+  box-shadow: 0 14px 28px -20px rgba(185, 133, 44, 0.42);
+}

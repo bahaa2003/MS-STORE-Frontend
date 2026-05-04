@@ -513,12 +513,20 @@ const useAdminStore = create(
             title: 'تمت الموافقة على الحساب',
             message: `تمت الموافقة على حساب ${target?.name || userId}`,
             type: 'success',
+            targetType: 'user',
+            targetId: userId,
+            userId,
+            targetUrl: '/admin/users',
           });
         } else if (nextStatus === 'rejected') {
           useNotificationStore.getState().addNotification({
             title: 'تم رفض الحساب',
             message: `تم رفض حساب ${target?.name || userId}`,
             type: 'warning',
+            targetType: 'user',
+            targetId: userId,
+            userId,
+            targetUrl: '/admin/users',
           });
         }
 
@@ -611,13 +619,26 @@ const useAdminStore = create(
       },
 
       updateUserRole: async (userId, newRole, actor = null) => {
-        await apiClient.users.updateRole(userId, newRole, actor);
+        const updatedUser = await apiClient.users.updateRole(userId, newRole, actor);
         set((state) => ({
           users: state.users.map((entry) => (
-            entry.id === userId ? { ...entry, role: newRole } : entry
+            entry.id === userId ? { ...entry, ...(updatedUser || {}), role: updatedUser?.role || String(newRole || '').toLowerCase() } : entry
           )),
           usersLastLoadedAt: Date.now(),
         }));
+        return updatedUser;
+      },
+
+      updateUserPermissions: async (userId, permissions = [], actor = null) => {
+        const updated = await apiClient.users.updatePermissions(userId, permissions, actor);
+        const nextPermissions = Array.isArray(updated?.permissions) ? updated.permissions : permissions;
+        set((state) => ({
+          users: state.users.map((entry) => (
+            entry.id === userId ? { ...entry, ...(updated || {}), permissions: nextPermissions } : entry
+          )),
+          usersLastLoadedAt: Date.now(),
+        }));
+        return updated;
       },
 
       updateUserCurrency: async (userId, currencyCode, actor = null) => {

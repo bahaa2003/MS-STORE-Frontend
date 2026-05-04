@@ -1,6 +1,8 @@
 export const ADMIN_ROLES = ['admin', 'super_admin'];
+export const SUPERVISOR_ROLES = ['supervisor', 'manager', 'moderator'];
 
 export const isAdminRole = (role) => ADMIN_ROLES.includes(String(role || '').trim().toLowerCase());
+export const isSupervisorRole = (role) => SUPERVISOR_ROLES.includes(String(role || '').trim().toLowerCase());
 
 export const hasRequiredRole = (userRole, allowedRoles = []) => {
   if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) {
@@ -23,11 +25,11 @@ export const hasRequiredRole = (userRole, allowedRoles = []) => {
 
 export const getDefaultRouteForRole = (role) => {
   if (isAdminRole(role)) {
-    return '/dashboard';
+    return '/admin/dashboard';
   }
 
-  if (String(role || '').trim().toLowerCase() === 'manager') {
-    return '/manager/dashboard';
+  if (isSupervisorRole(role)) {
+    return '/admin/dashboard';
   }
 
   return '/dashboard';

@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, ShoppingBag, TrendingUp } from 'lucide-react';
-import Button from '../ui/Button';
+import Button, { cn } from '../ui/Button';
 
 const TopSellingCarousel = ({
   products,
@@ -14,6 +14,7 @@ const TopSellingCarousel = ({
   trendingLabel,
 }) => {
   const trackRef = useRef(null);
+  const unavailableLabel = isRTL ? 'غير متاح' : 'Unavailable';
 
   const handleScroll = (direction) => {
     const track = trackRef.current;
@@ -61,51 +62,65 @@ const TopSellingCarousel = ({
         ref={trackRef}
         className="scrollbar-hide flex gap-3 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-1"
       >
-        {products.map((product, index) => (
-          <article
-            key={product.id}
-            className="product-led-card snap-start min-w-[82%] p-3 sm:min-w-[48%] sm:p-4 lg:min-w-[31%]"
-          >
-            <div className="relative overflow-hidden rounded-[1.4rem]">
-              <img
-                src={product.image}
-                alt={product.displayName}
-                className="aspect-[1.14] w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(11,11,11,0.08)_0%,rgba(11,11,11,0.22)_38%,rgba(11,11,11,0.86)_100%)]" />
+        {products.map((product, index) => {
+          const isUnavailable = product.storefrontStatus?.isPurchasable === false;
 
-              <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
-                <span className="max-w-[60%] truncate rounded-full border border-white/12 bg-black/28 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/78 backdrop-blur-md">
-                  {categoryResolver(product)}
-                </span>
-                <span className="rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.28)] bg-[color:rgb(var(--color-primary-rgb)/0.16)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-primary-hover)]">
-                  {product.salesCount > 0 ? `${product.salesCount} ${soldLabel}` : trendingLabel}
-                </span>
-              </div>
+          return (
+            <article
+              key={product.id}
+              className="product-led-card snap-start min-w-[82%] p-3 sm:min-w-[48%] sm:p-4 lg:min-w-[31%]"
+            >
+              <div className="relative overflow-hidden rounded-[1.4rem]">
+                <img
+                  src={product.image}
+                  alt={product.displayName}
+                  className={cn(
+                    'aspect-[1.14] w-full object-cover transition duration-500',
+                    isUnavailable && 'brightness-[0.42] grayscale-[0.18]'
+                  )}
+                />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(11,11,11,0.08)_0%,rgba(11,11,11,0.22)_38%,rgba(11,11,11,0.86)_100%)]" />
+                {isUnavailable && (
+                  <div className="absolute inset-0 grid place-items-center bg-black/20 px-3">
+                    <span className="rounded-full border border-white/22 bg-black/60 px-3 py-1.5 text-xs font-black text-white shadow-[0_10px_28px_-18px_rgb(0_0_0/0.9)] backdrop-blur-md">
+                      {unavailableLabel}
+                    </span>
+                  </div>
+                )}
 
-              <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-white/58">#{index + 1}</p>
-                  <p className="mt-1 text-xl font-semibold gold-gradient-text">{product.formattedPrice}</p>
+                <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
+                  <span className="max-w-[60%] truncate rounded-full border border-white/12 bg-black/28 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/78 backdrop-blur-md">
+                    {categoryResolver(product)}
+                  </span>
+                  <span className="rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.28)] bg-[color:rgb(var(--color-primary-rgb)/0.16)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-primary-hover)]">
+                    {product.salesCount > 0 ? `${product.salesCount} ${soldLabel}` : trendingLabel}
+                  </span>
+                </div>
+
+                <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-white/58">#{index + 1}</p>
+                    <p className="mt-1 text-xl font-semibold gold-gradient-text">{product.formattedPrice}</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="pt-4">
-              <h3 className="line-clamp-2 text-base font-semibold text-[var(--color-text)] sm:text-lg">
-                {product.displayName}
-              </h3>
+              <div className="pt-4">
+                <h3 className="line-clamp-2 text-base font-semibold text-[var(--color-text)] sm:text-lg">
+                  {product.displayName}
+                </h3>
 
-              <Link
-                to={`/products/${product.id}`}
-                className="glow-button mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--color-primary),var(--color-primary-soft)_48%,var(--color-primary-hover))] px-4 text-sm font-semibold text-[var(--color-button-text)] shadow-[var(--shadow-gold)] transition-all hover:-translate-y-0.5"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                {buyLabel}
-              </Link>
-            </div>
-          </article>
-        ))}
+                <Link
+                  to={`/products/${product.id}`}
+                  className="glow-button mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--color-primary),var(--color-primary-soft)_48%,var(--color-primary-hover))] px-4 text-sm font-semibold text-[var(--color-button-text)] shadow-[var(--shadow-gold)] transition-all hover:-translate-y-0.5"
+                >
+                  <ShoppingBag className="h-4 w-4" />
+                  {buyLabel}
+                </Link>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </div>
   );

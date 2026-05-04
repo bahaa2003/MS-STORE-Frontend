@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import Button, { cn } from '../ui/Button';
+import { textareaClassName } from '../ui/Input';
 import {
   createManualOrderStatusOptions,
   getManualOrderStatusLabel,
@@ -17,9 +18,11 @@ const ManualOrderStatusControl = ({
 }) => {
   const language = isArabic ? 'ar' : 'en';
   const [selectedStatus, setSelectedStatus] = useState(normalizeManualOrderStatus(order?.status));
+  const [rejectionReason, setRejectionReason] = useState('');
 
   useEffect(() => {
     setSelectedStatus(normalizeManualOrderStatus(order?.status));
+    setRejectionReason('');
   }, [order?.id, order?.status]);
 
   const options = useMemo(
@@ -29,6 +32,7 @@ const ManualOrderStatusControl = ({
 
   const currentStatus = normalizeManualOrderStatus(order?.status);
   const isDirty = selectedStatus !== currentStatus;
+  const isRejected = selectedStatus === 'rejected';
 
   return (
     <div className={cn(
@@ -74,16 +78,40 @@ const ManualOrderStatusControl = ({
         </div>
       </div>
 
+      {isRejected ? (
+        <div className="rounded-xl border border-[color:rgb(var(--color-warning-rgb)/0.28)] bg-[color:rgb(var(--color-warning-rgb)/0.1)] p-2.5 text-right">
+          <div className="mb-2 flex flex-row-reverse items-start gap-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[color:rgb(var(--color-warning-rgb)/0.14)] text-[var(--color-warning)]">
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-xs font-black text-[var(--color-text)]">
+                {isArabic ? 'سبب الرفض اختياري' : 'Optional rejection reason'}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-4 text-[var(--color-text-secondary)]">
+                {isArabic ? 'اكتب سبب الرفض لو حابب يظهر في تفاصيل الطلب.' : 'Write a reason if you want it to appear in order details.'}
+              </p>
+            </div>
+          </div>
+          <textarea
+            value={rejectionReason}
+            onChange={(event) => setRejectionReason(event.target.value)}
+            className={`${textareaClassName} min-h-20 rounded-xl text-xs sm:min-h-20`}
+            placeholder={isArabic ? 'مثال: بيانات الطلب غير صحيحة' : 'Example: The order details are incorrect'}
+          />
+        </div>
+      ) : null}
+
       <Button
         type="button"
-        variant={selectedStatus === 'completed' ? 'primary' : selectedStatus === 'rejected' ? 'danger' : 'secondary'}
+        variant={selectedStatus === 'completed' ? 'primary' : isRejected ? 'danger' : 'secondary'}
         className={cn(
           compact
             ? 'h-9 w-full shrink-0 rounded-lg px-3 text-xs sm:w-auto sm:min-w-[132px]'
             : 'h-11 w-full shrink-0 rounded-[1rem] px-4 sm:w-auto'
         )}
         disabled={isLoading || !isDirty}
-        onClick={() => onSubmit(order, selectedStatus)}
+        onClick={() => onSubmit(order, selectedStatus, isRejected ? rejectionReason.trim() : undefined)}
       >
         <span>
           {compact

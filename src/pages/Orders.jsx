@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Clock3,
+  Coins,
   ShoppingCart,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -15,19 +16,25 @@ import useAuthStore from '../store/useAuthStore';
 import useOrderStore from '../store/useOrderStore';
 import useMediaStore from '../store/useMediaStore';
 import useSystemStore from '../store/useSystemStore';
-import { filterOrders, enrichOrders, summarizeOrders } from '../utils/orders';
+import {
+  filterOrders,
+  enrichOrders,
+  getOrderAmountValue,
+  getOrderCurrencyCode,
+  summarizeOrders,
+} from '../utils/orders';
 import { formatNumber } from '../utils/intl';
+import { formatCurrencyAmount } from '../utils/pricing';
 
 const SummaryCard = ({ icon: Icon, label, value, note }) => (
-  <Card variant="flat" className="p-2.5 sm:p-3">
-    <div className="flex items-start gap-2">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.85rem] border border-[color:rgb(var(--color-primary-rgb)/0.16)] bg-[color:rgb(var(--color-primary-rgb)/0.07)] text-[var(--color-primary)]">
-        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+  <Card variant="flat" className="p-2">
+    <div className="flex items-center gap-2">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[0.7rem] border border-[color:rgb(var(--color-primary-rgb)/0.16)] bg-[color:rgb(var(--color-primary-rgb)/0.07)] text-[var(--color-primary)]">
+        <Icon className="h-3.5 w-3.5" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] leading-4 text-[var(--color-text-secondary)] sm:text-xs">{label}</p>
-        <p className="mt-0.5 text-lg font-semibold leading-none text-[var(--color-text)] sm:text-xl">{value}</p>
-        <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[var(--color-muted)] sm:text-[11px]">{note}</p>
+        <p className="truncate text-[10px] leading-3 text-[var(--color-text-secondary)]">{label}</p>
+        <p className="mt-0.5 truncate text-sm font-semibold leading-none text-[var(--color-text)]" title={String(value)}>{value}</p>
       </div>
     </div>
   </Card>
@@ -44,7 +51,7 @@ const Orders = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('today');
+  const [dateFilter, setDateFilter] = useState('custom');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
@@ -114,7 +121,22 @@ const Orders = () => {
     [customEndDate, customStartDate, dateFilter, enrichedOrders, searchTerm, sortOrder, statusFilter]
   );
 
-  const summary = useMemo(() => summarizeOrders(enrichedOrders), [enrichedOrders]);
+  const summary = useMemo(() => summarizeOrders(filteredOrders), [filteredOrders]);
+
+  const totalRechargeAmount = useMemo(() => {
+    const totalsByCurrency = filteredOrders.reduce((map, order) => {
+      const currencyCode = getOrderCurrencyCode(order);
+      const amount = getOrderAmountValue(order);
+      map.set(currencyCode, (map.get(currencyCode) || 0) + amount);
+      return map;
+    }, new Map());
+
+    const totals = Array.from(totalsByCurrency.entries())
+      .filter(([, amount]) => amount > 0)
+      .map(([currencyCode, amount]) => formatCurrencyAmount(amount, currencyCode, currencies, locale));
+
+    return totals.length ? totals.join(' + ') : formatCurrencyAmount(0, user?.currency || 'USD', currencies, locale);
+  }, [currencies, enrichedOrders, locale, user?.currency]);
 
   const selectedOrder = useMemo(
     () => enrichedOrders.find((order) => order.id === selectedOrderId) || null,
@@ -133,25 +155,20 @@ const Orders = () => {
 
   return (
     <div className="min-w-0 space-y-4 pb-3">
-      <section className="premium-card relative overflow-hidden p-3 sm:p-4">
-        <div className="pointer-events-none absolute -top-16 right-4 h-28 w-28 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.14)] blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-0 h-20 w-20 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.08)] blur-3xl" />
+      <section className="premium-card relative overflow-hidden p-2.5 sm:p-3">
+        <div className="pointer-events-none absolute -top-14 right-4 h-20 w-20 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.12)] blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 left-0 h-14 w-14 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.07)] blur-3xl" />
 
         <div className="relative min-w-0">
-          <span className="section-kicker">
+          <span className="section-kicker px-3 py-1 text-[0.62rem]">
             {isArabic ? 'Orders Overview' : 'Orders Overview'}
           </span>
-          <h1 className="page-heading mt-3 max-w-3xl">
+          <h1 className="mt-2 text-2xl font-black leading-none tracking-[-0.03em] text-[var(--color-text)] sm:text-3xl">
             {isArabic ? 'طلباتي' : 'My Orders'}
           </h1>
-          <p className="page-subtitle mt-2 max-w-3xl">
-            {isArabic
-              ? 'كل طلباتك في مكان واحد، مع حالة واضحة وتفاصيل منظمة تساعدك تتابع التنفيذ بسهولة من الهاتف أو الديسكتوب.'
-              : 'All your orders in one place, with clear statuses and organized details that are easy to follow on mobile and desktop.'}
-          </p>
         </div>
 
-        <div className="relative mt-4 grid grid-cols-2 gap-2.5">
+        <div className="relative mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
           <SummaryCard
             icon={ShoppingCart}
             label={isArabic ? 'إجمالي الطلبات' : 'Total orders'}
@@ -170,6 +187,12 @@ const Orders = () => {
             value={formatCount(summary.completed)}
             note={isArabic ? 'طلبات انتهى تنفيذها' : 'Orders that were fulfilled successfully'}
           />
+          <SummaryCard
+            icon={Coins}
+            label={isArabic ? 'إجمالي مبلغ الشحن' : 'Total recharge'}
+            value={totalRechargeAmount}
+            note={isArabic ? 'إجمالي مبالغ طلباتك' : 'Total order amounts'}
+          />
         </div>
       </section>
 
@@ -184,23 +207,23 @@ const Orders = () => {
         sortOrder={sortOrder}
         onSortChange={setSortOrder}
         showTypeFilter={false}
-        showDateFilter
+        showDateFilter={false}
         resultCount={filteredOrders.length}
         searchPlaceholder={isArabic
           ? 'ابحث باسم المنتج أو رقم الطلب'
           : 'Search by product name or order number'}
         helperText={isArabic
-          ? 'تظهر طلباتك حسب المدة التي تحددها فقط بدون حذف أي بيانات من النظام.'
-          : 'Your orders are displayed by the selected period only, without deleting any data.'}
-        customRange={dateFilter === 'custom' ? {
+          ? 'اختار مدة البحث من تاريخ إلى تاريخ، أو اتركها فارغة لعرض كل الطلبات.'
+          : 'Choose a from-to date range, or leave it empty to show all orders.'}
+        customRange={{
           startDate: customStartDate,
           endDate: customEndDate,
           onStartDateChange: setCustomStartDate,
           onEndDateChange: setCustomEndDate,
           helperText: isArabic
-            ? 'فلترة إضافية مخصصة من تاريخ إلى تاريخ.'
-            : 'Custom date filtering from one date to another.',
-        } : null}
+            ? 'فلترة الطلبات حسب تاريخ الإنشاء من بداية اليوم الأول لنهاية اليوم الأخير.'
+            : 'Filters orders by creation date from the start date through the end date.',
+        }}
         compact
       />
 

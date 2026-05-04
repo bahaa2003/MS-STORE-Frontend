@@ -2,72 +2,72 @@ import i18n from '../i18n';
 
 const COPY = {
   loginGeneric: {
-    ar: 'تعذر تسجيل الدخول الآن. يرجى المحاولة مرة أخرى.',
-    en: 'Unable to sign in right now. Please try again.',
+    ar: 'تعذر تسجيل الدخول: تأكد من بيانات الحساب ثم حاول مرة أخرى.',
+    en: 'Could not sign in. Check your account details and try again.',
   },
   registerGeneric: {
-    ar: 'تعذر إنشاء الحساب الآن. يرجى المحاولة مرة أخرى.',
-    en: 'Unable to create the account right now. Please try again.',
+    ar: 'تعذر إنشاء الحساب: راجع البيانات المطلوبة ثم حاول مرة أخرى.',
+    en: 'Could not create the account. Review the required details and try again.',
   },
   googleGeneric: {
-    ar: 'تعذر المتابعة عبر Google الآن. يرجى المحاولة مرة أخرى.',
-    en: 'Unable to continue with Google right now. Please try again.',
+    ar: 'تعذر تسجيل الدخول عبر Google: أعد المحاولة أو استخدم البريد وكلمة المرور.',
+    en: 'Could not sign in with Google. Try again or use email and password.',
   },
   invalidCredentials: {
-    ar: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
-    en: 'Email or password is incorrect.',
+    ar: 'بيانات الدخول غير صحيحة: راجع البريد الإلكتروني وكلمة المرور ثم حاول مرة أخرى.',
+    en: 'The sign-in details are incorrect. Check your email and password, then try again.',
   },
   accountNotFound: {
-    ar: 'لا يوجد حساب مطابق لهذه البيانات.',
-    en: 'No account matches these details.',
+    ar: 'الأكونت غير مسجل: تأكد من البريد أو أنشئ حسابًا جديدًا.',
+    en: 'No account exists with this email. Check the address or create a new account.',
   },
   emailExists: {
-    ar: 'هذا البريد الإلكتروني مستخدم بالفعل.',
-    en: 'This email address is already in use.',
+    ar: 'هذا البريد مستخدم بالفعل: سجّل الدخول به أو استخدم بريدًا آخر.',
+    en: 'This email is already in use. Sign in with it or use another email.',
   },
   usernameExists: {
-    ar: 'اسم المستخدم مستخدم بالفعل.',
-    en: 'This username is already taken.',
+    ar: 'اسم المستخدم مستخدم بالفعل: اختر اسمًا مختلفًا لإكمال التسجيل.',
+    en: 'This username is already taken. Choose a different one to continue.',
   },
   invalidEmail: {
-    ar: 'صيغة البريد الإلكتروني غير صحيحة.',
-    en: 'The email address format is invalid.',
+    ar: 'صيغة البريد غير صحيحة: اكتب بريدًا مثل name@example.com.',
+    en: 'The email format is invalid. Use an address like name@example.com.',
   },
   weakPassword: {
-    ar: 'كلمة المرور لا تستوفي الشروط المطلوبة.',
-    en: 'The password does not meet the required rules.',
+    ar: 'كلمة المرور ضعيفة: استخدم 8 أحرف على الأقل مع أرقام أو رموز.',
+    en: 'The password is too weak. Use at least 8 characters with numbers or symbols.',
   },
   pendingApproval: {
-    ar: 'الحساب مسجل لكنه ما زال بانتظار موافقة الإدارة.',
-    en: 'The account is registered but still waiting for admin approval.',
+    ar: 'حسابك قيد المراجعة: تم تسجيله بنجاح لكنه ينتظر موافقة الإدارة قبل الدخول.',
+    en: 'Your account is under review. It was created successfully but needs admin approval before sign-in.',
   },
   verifyEmail: {
-    ar: 'يجب تأكيد البريد الإلكتروني قبل تسجيل الدخول.',
-    en: 'You need to verify your email before signing in.',
+    ar: 'البريد غير مؤكد: افتح رسالة التفعيل واضغط رابط التأكيد قبل تسجيل الدخول.',
+    en: 'Your email is not verified. Open the activation email and confirm it before signing in.',
   },
   accountRejected: {
-    ar: 'تم تقييد هذا الحساب. يرجى التواصل مع الإدارة.',
-    en: 'This account is restricted. Please contact the administrator.',
+    ar: 'لا يمكن الدخول بهذا الحساب: الحساب مرفوض أو غير مفعّل، تواصل مع الدعم.',
+    en: 'This account cannot sign in. It is rejected or inactive; contact support.',
   },
   tooManyRequests: {
-    ar: 'تمت عدة محاولات متتالية. انتظر قليلًا ثم أعد المحاولة.',
-    en: 'Too many attempts were made. Please wait a moment and try again.',
+    ar: 'محاولات كثيرة خلال وقت قصير: انتظر دقيقة ثم جرّب مرة أخرى.',
+    en: 'Too many attempts in a short time. Wait a minute, then try again.',
   },
   network: {
-    ar: 'تعذر الاتصال بالخادم. تحقق من الإنترنت ثم أعد المحاولة.',
-    en: 'Could not reach the server. Check your connection and try again.',
+    ar: 'تعذر الاتصال بالخادم: تحقق من الإنترنت أو تشغيل الباك إند ثم حاول مرة أخرى.',
+    en: 'Could not reach the server. Check your connection or backend, then try again.',
   },
   server: {
-    ar: 'حدث خطأ من جهة الخادم. يرجى المحاولة لاحقًا.',
-    en: 'A server error occurred. Please try again later.',
+    ar: 'الخادم لم يكمل طلب الدخول: حاول بعد قليل، وإذا استمرت المشكلة تواصل مع الدعم.',
+    en: 'The server could not complete sign-in. Try again later, or contact support if it continues.',
   },
   emailRequired: {
-    ar: 'البريد الإلكتروني مطلوب.',
-    en: 'Email is required.',
+    ar: 'البريد الإلكتروني مطلوب: اكتب البريد المسجل به حسابك.',
+    en: 'Email is required. Enter the email registered to your account.',
   },
   passwordRequired: {
-    ar: 'كلمة المرور مطلوبة.',
-    en: 'Password is required.',
+    ar: 'كلمة المرور مطلوبة: اكتب كلمة مرور الحساب.',
+    en: 'Password is required. Enter your account password.',
   },
 };
 
@@ -145,21 +145,32 @@ export const formatAuthErrorMessage = (error, { action = 'login' } = {}) => {
     return pick('usernameExists');
   }
 
-  if (includesAny(message, ['invalid email', 'email is invalid', 'must be a valid email'])) {
+  if (
+    includesAny(message, ['invalid email or password', 'invalid credentials', 'wrong password', 'incorrect password', 'bad credentials', 'authentication failed', 'login failed'])
+    || (status === 401 && action !== 'register')
+  ) {
+    return pick('invalidCredentials');
+  }
+
+  if (includesAny(message, ['user not found', 'account not found', 'no user found', 'user does not exist', 'email not found', 'not registered'])) {
+    return pick('accountNotFound');
+  }
+
+  if (includesAny(message, ['invalid email', 'email is invalid', 'must be a valid email', 'email format'])) {
     return pick('invalidEmail');
   }
 
-  if (includesAny(message, ['password must', 'password should', 'password too short', 'minimum 8', 'min 8'])) {
+  if (includesAny(message, ['password must', 'password should', 'password too short', 'minimum 8', 'min 8', 'weak password'])) {
     return pick('weakPassword');
   }
 
   if (
-    includesAny(message, ['verify your email', 'verify your email address', 'please verify your email', 'confirm your email', 'verification email'])
+    includesAny(message, ['verify your email', 'verify your email address', 'please verify your email', 'confirm your email', 'verification email', 'email not verified', 'email unverified'])
   ) {
     return pick('verifyEmail');
   }
 
-  if (includesAny(message, ['pending approval', 'awaiting approval', 'under review', 'await admin approval'])) {
+  if (includesAny(message, ['pending approval', 'awaiting approval', 'under review', 'await admin approval', 'pending account approval'])) {
     return pick('pendingApproval');
   }
 
@@ -167,18 +178,7 @@ export const formatAuthErrorMessage = (error, { action = 'login' } = {}) => {
     return pick('accountRejected');
   }
 
-  if (
-    includesAny(message, ['invalid email or password', 'invalid credentials', 'wrong password', 'incorrect password'])
-    || (status === 401 && action !== 'register')
-  ) {
-    return pick('invalidCredentials');
-  }
-
-  if (includesAny(message, ['user not found', 'account not found', 'no user found'])) {
-    return pick('accountNotFound');
-  }
-
-  if (includesAny(message, ['too many requests', 'rate limit', 'too many attempts'])) {
+  if (status === 429 || includesAny(message, ['too many requests', 'rate limit', 'too many attempts'])) {
     return pick('tooManyRequests');
   }
 

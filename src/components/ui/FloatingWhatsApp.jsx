@@ -18,8 +18,8 @@ const FloatingWhatsApp = () => {
     .startsWith('ar');
 
   const message = isArabic
-    ? 'مرحباً، أحتاج مساعدة من فريق IBRA Store'
-    : 'Hello, I need help from the IBRA Store team';
+    ? 'مرحباً، أحتاج مساعدة من فريق MS STORE'
+    : 'Hello, I need help from the MS STORE team';
   const href = buildWhatsAppLink({
     number: getAdminWhatsAppNumber(),
     message,

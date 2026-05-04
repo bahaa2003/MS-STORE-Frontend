@@ -4,7 +4,7 @@ import { Radio, ShieldCheck, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../context/LanguageContext';
 import { cn } from '../ui/Button';
-import brandWordmarkImage from '../../assets/ibra.png';
+import BrandMark from '../layout/BrandMark';
 import AuthSocialTubesScene from './AuthSocialTubesScene';
 
 const AuthHeroVisual = ({ mode = 'login' }) => {
@@ -49,7 +49,7 @@ const AuthHeroVisual = ({ mode = 'login' }) => {
         {
           icon: Sparkles,
           label: t('auth.hero.featureGold', {
-            defaultValue: dir === 'rtl' ? 'هوية IBRA' : 'IBRA identity',
+            defaultValue: dir === 'rtl' ? 'هوية MS STORE' : 'MS STORE identity',
           }),
         },
       ];
@@ -70,13 +70,7 @@ const AuthHeroVisual = ({ mode = 'login' }) => {
       <div className="relative z-10 flex h-full flex-col gap-3 p-2.5 sm:gap-4 sm:p-4 lg:min-h-[33rem] lg:justify-between lg:gap-6 lg:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.2)] bg-[rgba(255,250,241,0.84)] px-2.5 py-1.5 text-[var(--color-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.36)] backdrop-blur-xl dark:border-[color:rgb(var(--color-primary-rgb)/0.16)] dark:bg-[rgba(15,17,22,0.72)] dark:text-[#f8f1da] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:gap-2.5 sm:px-3 sm:py-1.5">
-            <img
-              src={brandWordmarkImage}
-              alt="IBRA"
-              loading="eager"
-              decoding="async"
-              className="h-4 w-auto object-contain sm:h-5 lg:h-7"
-            />
+            <BrandMark size="sm" showCaption={false} />
             <span className="rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.2)] bg-[color:rgb(var(--color-primary-rgb)/0.12)] px-1.5 py-0.5 text-[0.5rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-primary)] dark:border-[color:rgb(var(--color-primary-rgb)/0.18)] dark:bg-[color:rgb(var(--color-primary-rgb)/0.08)] dark:text-[#f3de9b] sm:px-2 sm:text-[0.55rem] lg:px-2.5 lg:py-1 lg:text-[0.62rem]">
               Store
             </span>

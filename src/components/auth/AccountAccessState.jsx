@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -7,7 +7,6 @@ import {
   Clock3,
   Home,
   Mail,
-  MessageCircle,
   RefreshCcw,
   ShieldX,
 } from 'lucide-react';
@@ -15,7 +14,6 @@ import Card from '../ui/Card';
 import Button from '../ui/Button';
 import useAuthStore from '../../store/useAuthStore';
 import { useLanguage } from '../../context/LanguageContext';
-import { buildWhatsAppLink, getAdminWhatsAppNumber } from '../../utils/whatsapp';
 import apiClient from '../../services/client';
 import {
   getAccountAccessRoute,
@@ -28,27 +26,22 @@ import {
 import { getDefaultRouteForRole } from '../../utils/authRoles';
 import { useToast } from '../ui/Toast';
 
-const PENDING_MESSAGE = 'مرحبًا، قمت بإنشاء حساب جديد في IBRA Store عبر Google وأحتاج تفعيل الحساب.';
-const REJECTED_MESSAGE = 'مرحبًا، تم رفض تفعيل حسابي في IBRA Store وأحتاج معرفة التفاصيل.';
-
 const ACCOUNT_UI = {
   pending: {
     icon: Clock3,
-    title: 'انتظار تفعيل الحساب',
-    description: 'تم إنشاء حسابك بنجاح، ولكن يحتاج إلى تفعيل من قبل الإدارة. يرجى التواصل مع الأدمن لتفعيل حسابك.',
-    badge: 'بانتظار التفعيل',
+    title: 'تم إنشاء الحساب',
+    description: 'تم استلام بيانات حسابك بنجاح. يمكنك الرجوع لتسجيل الدخول أو تحديث حالة الحساب لاحقًا.',
+    badge: 'تم التسجيل',
     accent:
       'border-[color:rgb(var(--color-warning-rgb)/0.22)] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_55%),rgba(255,255,255,0.82)] text-[var(--color-warning)] dark:bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%),rgba(15,23,42,0.9)]',
-    message: PENDING_MESSAGE,
   },
   rejected: {
     icon: ShieldX,
     title: 'تم رفض الحساب',
-    description: 'عذرًا، لم يتم تفعيل حسابك. يرجى التواصل مع الإدارة للمزيد من التفاصيل.',
+    description: 'عذرًا، هذا الحساب غير متاح حاليًا.',
     badge: 'مرفوض',
     accent:
       'border-[color:rgb(var(--color-error-rgb)/0.22)] bg-[radial-gradient(circle_at_top,rgba(248,113,113,0.16),transparent_55%),rgba(255,255,255,0.82)] text-[var(--color-error)] dark:bg-[radial-gradient(circle_at_top,rgba(248,113,113,0.14),transparent_52%),rgba(15,23,42,0.9)]',
-    message: REJECTED_MESSAGE,
   },
   verification: {
     icon: Mail,
@@ -57,16 +50,14 @@ const ACCOUNT_UI = {
     badge: 'تأكيد البريد مطلوب',
     accent:
       'border-[color:rgb(var(--color-primary-rgb)/0.22)] bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_55%),rgba(255,255,255,0.82)] text-[var(--color-primary)] dark:bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.14),transparent_52%),rgba(15,23,42,0.9)]',
-    message: 'مرحبًا، أحتاج مساعدة بخصوص تأكيد البريد الإلكتروني لحسابي في IBRA Store.',
   },
   approved: {
     icon: CheckCircle2,
     title: 'تم تفعيل الحساب',
-    description: 'تمت الموافقة على حسابك بنجاح. يمكنك الآن الدخول والمتابعة إلى المنصة مباشرة.',
+    description: 'حسابك جاهز. يمكنك الآن الدخول والمتابعة إلى المنصة مباشرة.',
     badge: 'جاهز للدخول',
     accent:
       'border-[color:rgb(var(--color-success-rgb)/0.22)] bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.16),transparent_55%),rgba(255,255,255,0.82)] text-[var(--color-success)] dark:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.14),transparent_52%),rgba(15,23,42,0.9)]',
-    message: 'مرحبًا، تم تفعيل حسابي في IBRA Store وأحتاج مساعدة إضافية.',
   },
 };
 
@@ -91,14 +82,6 @@ const AccountAccessState = ({ variant = 'pending' }) => {
   const Icon = config.icon;
   const activeUser = user || blockedUser || null;
   const showSignInShortcut = displayVariant === 'pending' && !user;
-
-  const whatsappLink = useMemo(
-    () => buildWhatsAppLink({
-      number: getAdminWhatsAppNumber(),
-      message: config.message,
-    }),
-    [config.message]
-  );
 
   const handleResendVerification = async () => {
     const email = String(activeUser?.email || '').trim();
@@ -191,10 +174,10 @@ const AccountAccessState = ({ variant = 'pending' }) => {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-[var(--color-text)]">
-                      {activeUser?.name || 'IBRA Store User'}
+                      {activeUser?.name || 'MS STORE User'}
                     </p>
                     <p className="truncate text-xs text-[var(--color-text-secondary)]">
-                      {activeUser?.email || 'account@ibrastore.app'}
+                      {activeUser?.email || 'account@msstore.app'}
                     </p>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
@@ -232,63 +215,26 @@ const AccountAccessState = ({ variant = 'pending' }) => {
                   دخول
                 </Button>
               ) : showSignInShortcut ? (
-                <>
-                  <a
-                    href={whatsappLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative overflow-hidden rounded-[1.2rem] border border-emerald-500/24 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(5,150,105,0.12))] px-5 py-4 text-start shadow-[0_22px_40px_-30px_rgba(5,150,105,0.55)] transition-all hover:-translate-y-0.5 hover:border-emerald-500/36 hover:shadow-[0_28px_50px_-28px_rgba(5,150,105,0.62)]"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-[0_14px_30px_-18px_rgba(16,185,129,0.95)]">
-                        <MessageCircle className="h-5 w-5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-[var(--color-text)]">
-                          التواصل مع الأدمن عبر واتساب
-                        </span>
-                        <span className="mt-1 block text-xs leading-6 text-[var(--color-text-secondary)]">
-                          افتح المحادثة مباشرة وأرسل طلب تفعيل الحساب للأدمن.
-                        </span>
-                      </span>
-                      <ArrowRight className={`h-5 w-5 shrink-0 text-emerald-700 transition-transform group-hover:translate-x-1 ${dir === 'rtl' ? 'rotate-180 group-hover:-translate-x-1 group-hover:translate-x-0' : ''}`} />
-                    </div>
-                  </a>
-
-                  <Button
-                    type="button"
-                    className="w-full"
-                    onClick={() => {
-                      clearBlockedAccess?.();
-                      navigate('/auth', { replace: true });
-                    }}
-                  >
-                    <ArrowRight className={`h-4 w-4 ${dir === 'rtl' ? '' : 'rotate-180'}`} />
-                    دخول
-                  </Button>
-                </>
-              ) : (
-                <a
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative overflow-hidden rounded-[1.2rem] border border-emerald-500/24 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(5,150,105,0.12))] px-5 py-4 text-start shadow-[0_22px_40px_-30px_rgba(5,150,105,0.55)] transition-all hover:-translate-y-0.5 hover:border-emerald-500/36 hover:shadow-[0_28px_50px_-28px_rgba(5,150,105,0.62)]"
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={() => {
+                    clearBlockedAccess?.();
+                    navigate('/auth', { replace: true });
+                  }}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-[0_14px_30px_-18px_rgba(16,185,129,0.95)]">
-                      <MessageCircle className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-[var(--color-text)]">
-                        التواصل مع الأدمن عبر واتساب
-                      </span>
-                      <span className="mt-1 block text-xs leading-6 text-[var(--color-text-secondary)]">
-                        افتح المحادثة مباشرة وأرسل طلب تفعيل الحساب للأدمن.
-                      </span>
-                    </span>
-                    <ArrowRight className={`h-5 w-5 shrink-0 text-emerald-700 transition-transform group-hover:translate-x-1 ${dir === 'rtl' ? 'rotate-180 group-hover:-translate-x-1 group-hover:translate-x-0' : ''}`} />
-                  </div>
-                </a>
+                  <ArrowRight className={`h-4 w-4 ${dir === 'rtl' ? '' : 'rotate-180'}`} />
+                  دخول
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={() => navigate('/auth', { replace: true })}
+                >
+                  <ArrowRight className={`h-4 w-4 ${dir === 'rtl' ? '' : 'rotate-180'}`} />
+                  دخول
+                </Button>
               )}
 
               {user && !isAccessReady && displayVariant !== 'verification' && (

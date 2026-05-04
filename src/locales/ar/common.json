@@ -47,7 +47,7 @@
     "cardsSection": "قسم بطاقات الدفع",
     "offers": "العروض",
     "featuredServices": "خدمات موثوقة",
-    "heroTitle": "IBRA Store",
+    "heroTitle": "MS STORE",
     "heroDescription": "وجهتك المميزة لشراء رصيد الألعاب، واشتراكات التطبيقات، والمنتجات الرقمية.",
     "heroSubDescription": "توصيل فوري، ومدفوعات آمنة.",
     "getStarted": "ابدأ الآن",
@@ -184,8 +184,8 @@
     "purchaseNow": "اشترِ الآن",
     "productDetails": "تفاصيل المنتج",
     "backToProducts": "عودة للمنتجات",
-    "accountPendingTitle": "الحساب بانتظار الموافقة",
-    "accountPendingDesc": "لا يمكنك تنفيذ طلبات حتى تتم الموافقة على حسابك من الإدارة.",
+    "accountPendingTitle": "الحساب غير متاح حاليًا",
+    "accountPendingDesc": "لا يمكنك تنفيذ طلبات بهذا الحساب حاليًا.",
     "playerIdLabel": "ايدي اللاعب / ايدي المستخدم",
     "playerIdPlaceholder": "أدخل المعرف الخاص بك لهذه اللعبة أو الخدمة",
     "currentBalance": "رصيدك الحالي",
@@ -215,8 +215,8 @@
     "password": "كلمة المرور",
     "confirmPassword": "تأكيد كلمة المرور",
     "welcomeBack": "مرحبًا بعودتك",
-    "signInToAccount": "سجل الدخول إلى حسابك في Ibra Store",
-    "joinToday": "انضم إلى Ibra Store اليوم",
+    "signInToAccount": "سجل الدخول إلى حسابك في MS STORE",
+    "joinToday": "انضم في عالم MS STORE حالا",
     "signIn": "تسجيل الدخول",
     "signUp": "إنشاء حساب",
     "forgotPassword": "نسيت كلمة المرور؟",
@@ -234,7 +234,6 @@
     "activationTitle": "تفعيل الحساب",
     "activationDone": "حسنًا",
     "activationSentTitle": "تم ارسال رابط التفعيل علي الايميل الخاص بك",
-    "activationWhatsAppNote": "تم فتح واتساب الأدمن لإرسال طلب التفعيل.",
     "forgotPasswordDesc": "أدخل بريدك الإلكتروني وسنرسل لك رابط لإعادة تعيين كلمة المرور"
   },
   "sidebar": {
@@ -278,7 +277,7 @@
     "remainingStock": "المخزون المتبقي: {{count}}"
   },
   "legacy": {
-    "brand": "IBRA Store",
+    "brand": "MS STORE",
     "landingHero": "وجهتك المميزة لشراء رصيد الألعاب، واشتراكات التطبيقات، والمنتجات الرقمية.",
     "landingHeroSub": "توصيل فوري، ومدفوعات آمنة.",
     "getStarted": "ابدأ الآن",

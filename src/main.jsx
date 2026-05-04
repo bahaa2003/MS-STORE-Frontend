@@ -78,8 +78,25 @@ function cleanupOldData() {
 
 cleanupOldData();
 
+const hideBootLoader = () => {
+  if (typeof window === 'undefined') return;
+  const bootLoader = document.getElementById('app-boot-loader');
+  if (!bootLoader) return;
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      bootLoader.classList.add('is-hidden');
+      window.setTimeout(() => {
+        bootLoader.remove();
+      }, 260);
+    });
+  });
+};
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
+
+hideBootLoader();

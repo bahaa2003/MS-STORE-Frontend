@@ -48,6 +48,7 @@ const OrderDetailsDrawer = ({
   currencies,
   view = 'admin',
   onUpdateStatus = () => {},
+  canUpdateStatus = true,
   onSync = () => {},
   isActionLoading = false,
   isSyncing = false,
@@ -316,7 +317,7 @@ const OrderDetailsDrawer = ({
                       </Card>
                     ) : null}
 
-                    {view === 'admin' && order.canSync ? (
+                    {view === 'admin' && order.canSync && canUpdateStatus ? (
                       <Card variant="flat" className="p-3.5">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
@@ -333,7 +334,7 @@ const OrderDetailsDrawer = ({
                       </Card>
                     ) : null}
 
-                    {view === 'admin' ? (
+                    {view === 'admin' && canUpdateStatus ? (
                       <>
                         <ManualReviewActions
                           order={order}

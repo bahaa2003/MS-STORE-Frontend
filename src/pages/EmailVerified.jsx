@@ -1,14 +1,10 @@
 import React, { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Home, MessageCircle, ShieldAlert } from 'lucide-react';
+import { Home, ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import AccountAccessState from '../components/auth/AccountAccessState';
-import { useLanguage } from '../context/LanguageContext';
-import { buildWhatsAppLink, getAdminWhatsAppNumber } from '../utils/whatsapp';
-
-const SUPPORT_MESSAGE = 'مرحبًا، أواجه مشكلة في تأكيد البريد الإلكتروني لحسابي في IBRA Store وأحتاج مساعدة من الدعم.';
 
 const includesAny = (value, patterns) => patterns.some((pattern) => value.includes(pattern));
 
@@ -72,7 +68,7 @@ const getVerificationErrorMeta = (rawMessage) => {
       type: 'already_verified',
       label: 'نوع الخطأ: البريد مؤكد مسبقًا',
       title: 'البريد الإلكتروني مؤكد بالفعل',
-      description: 'تم تأكيد هذا البريد سابقًا. يمكنك تسجيل الدخول الآن، ثم انتظار موافقة الإدارة إذا كان الحساب ما زال بانتظار التفعيل.',
+      description: 'تم تأكيد هذا البريد سابقًا. يمكنك تسجيل الدخول الآن.',
       shouldContactSupport: false,
     };
   }
@@ -91,7 +87,7 @@ const getVerificationErrorMeta = (rawMessage) => {
       type: 'account_not_found',
       label: 'نوع الخطأ: الحساب غير موجود',
       title: 'الحساب المرتبط بالرابط غير موجود',
-      description: 'لم يتم العثور على الحساب المرتبط بهذا الرابط. تأكد أنك تستخدم الرابط الصحيح أو تواصل مع الدعم إذا استمرت المشكلة.',
+      description: 'لم يتم العثور على الحساب المرتبط بهذا الرابط. تأكد أنك تستخدم الرابط الصحيح وحاول مرة أخرى.',
       shouldContactSupport: true,
     };
   }
@@ -119,14 +115,13 @@ const getVerificationErrorMeta = (rawMessage) => {
     type: 'unknown',
     label: 'نوع الخطأ: غير معروف',
     title: 'تعذر تحديد نوع المشكلة',
-    description: 'حدث خطأ غير معروف أثناء تأكيد البريد الإلكتروني. إذا استمرت المشكلة، يرجى التواصل مع الدعم.',
+    description: 'حدث خطأ غير معروف أثناء تأكيد البريد الإلكتروني. حاول مرة أخرى لاحقًا.',
     shouldContactSupport: true,
   };
 };
 
 const EmailVerified = () => {
   const location = useLocation();
-  const { dir } = useLanguage();
 
   const { status, message } = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -138,13 +133,6 @@ const EmailVerified = () => {
 
   const isSuccess = status === 'success';
   const errorMeta = useMemo(() => getVerificationErrorMeta(message), [message]);
-  const supportWhatsAppLink = useMemo(
-    () => buildWhatsAppLink({
-      number: getAdminWhatsAppNumber(),
-      message: `${SUPPORT_MESSAGE}${message ? `\nتفاصيل الخطأ: ${message}` : ''}`,
-    }),
-    [message]
-  );
 
   if (isSuccess) {
     return <AccountAccessState variant="pending" />;
@@ -194,36 +182,12 @@ const EmailVerified = () => {
               ) : null}
               {errorMeta.shouldContactSupport ? (
                 <p className="mt-2 text-sm leading-7 text-[var(--color-text-secondary)]">
-                  إذا لم تكن متأكدًا من السبب أو تكرر الخطأ، تواصل مع الدعم.
+                  إذا تكرر الخطأ، عد إلى تسجيل الدخول وحاول مرة أخرى.
                 </p>
               ) : null}
             </div>
 
             <div className="flex flex-col gap-3">
-              {errorMeta.shouldContactSupport ? (
-                <a
-                  href={supportWhatsAppLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative overflow-hidden rounded-[1.2rem] border border-emerald-500/24 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(5,150,105,0.12))] px-5 py-4 text-start shadow-[0_22px_40px_-30px_rgba(5,150,105,0.55)] transition-all hover:-translate-y-0.5 hover:border-emerald-500/36 hover:shadow-[0_28px_50px_-28px_rgba(5,150,105,0.62)]"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-[0_14px_30px_-18px_rgba(16,185,129,0.95)]">
-                      <MessageCircle className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-[var(--color-text)]">
-                        التواصل مع الدعم عبر واتساب
-                      </span>
-                      <span className="mt-1 block text-xs leading-6 text-[var(--color-text-secondary)]">
-                        أرسل رسالة جاهزة فيها تفاصيل مشكلة رابط التحقق.
-                      </span>
-                    </span>
-                    <ArrowRight className={`h-5 w-5 shrink-0 text-emerald-700 transition-transform group-hover:translate-x-1 ${dir === 'rtl' ? 'rotate-180 group-hover:-translate-x-1 group-hover:translate-x-0' : ''}`} />
-                  </div>
-                </a>
-              ) : null}
-
               <Link to="/auth" className="block">
                 <Button variant="secondary" className="w-full">
                   <Home className="h-4 w-4" />

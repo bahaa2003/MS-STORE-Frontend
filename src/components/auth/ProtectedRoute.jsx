@@ -7,8 +7,9 @@ import {
   isApprovedAccountStatus,
   normalizeAccountStatus,
 } from '../../utils/accountStatus';
+import { hasPermission } from '../../utils/permissions';
 
-const ProtectedRoute = ({ children, roles = [] }) => {
+const ProtectedRoute = ({ children, roles = [], permission = null }) => {
   const { user, isAuthenticated, blockedStatus } = useAuthStore();
   const location = useLocation();
   const normalizedStatus = normalizeAccountStatus(user?.status || blockedStatus);
@@ -29,6 +30,10 @@ const ProtectedRoute = ({ children, roles = [] }) => {
   const fallbackPath = getDefaultRouteForRole(user?.role);
 
   if (roles.length > 0 && !hasRequiredRole(user?.role, roles)) {
+    return <Navigate to={fallbackPath} replace />;
+  }
+
+  if (!hasPermission(user, permission)) {
     return <Navigate to={fallbackPath} replace />;
   }
 

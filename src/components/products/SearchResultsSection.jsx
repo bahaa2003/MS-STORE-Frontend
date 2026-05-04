@@ -13,6 +13,7 @@ const SearchResultsSection = ({
   onClear,
   onProductOpen,
   getCategoryLabel,
+  unavailableLabel = 'غير متاح',
 }) => {
   if (!results.length) {
     return (
@@ -39,7 +40,7 @@ const SearchResultsSection = ({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-0">
+      <div className="grid grid-cols-3 gap-3">
         {results.map((product) => (
           <ProductCardSimple
             key={product.id}
@@ -47,6 +48,7 @@ const SearchResultsSection = ({
             categoryLabel={getCategoryLabel(product)}
             onOpen={onProductOpen}
             showCategory
+            unavailableLabel={unavailableLabel}
           />
         ))}
       </div>

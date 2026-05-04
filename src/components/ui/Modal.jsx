@@ -4,13 +4,16 @@ import { X } from 'lucide-react';
 import Button, { cn } from './Button';
 
 const sizeClassNames = {
+  xxs: 'max-w-[20rem]',
+  xs: 'max-w-sm',
   md: 'max-w-lg',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
 };
 
-const Modal = ({ isOpen, onClose, title, children, footer, size = 'md', className: modalClassName }) => {
+const Modal = ({ isOpen, onClose, title, children, footer, size = 'md', className: modalClassName, placement = 'responsive' }) => {
   const backdropZ = modalClassName || 'z-50';
+  const isCentered = placement === 'center';
   return (
     <AnimatePresence>
       {isOpen && (
@@ -22,7 +25,11 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'md', classNam
             onClick={onClose}
             className={cn('fixed inset-0 bg-black/70 backdrop-blur-sm', backdropZ)}
           />
-          <div className={cn('pointer-events-none fixed inset-0 flex items-end justify-center p-3 sm:items-center sm:p-4', backdropZ)}>
+          <div className={cn(
+            'pointer-events-none fixed inset-0 flex justify-center p-3 sm:p-4',
+            isCentered ? 'items-center' : 'items-end sm:items-center',
+            backdropZ
+          )}>
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}

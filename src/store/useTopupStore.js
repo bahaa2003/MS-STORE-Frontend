@@ -200,6 +200,10 @@ const useTopupStore = create(
                 title: 'تم شحن الرصيد تلقائياً',
                 message: `تم إضافة ${finalTopup.financialSnapshot.finalAmountAtExecution} عملة إلى رصيدك`,
                 type: 'success',
+                targetType: 'wallet',
+                targetId: finalTopup?.id,
+                topupId: finalTopup?.id,
+                targetUrl: '/wallet',
               });
             }
           );
@@ -209,6 +213,10 @@ const useTopupStore = create(
           title: topupType === 'game_topup' ? 'طلب شحن لعبة جديد' : 'طلب شحن جديد',
           message: `طلب شحن ${topupType === 'game_topup' ? 'لعبة ' : ''}جديد من ${finalTopup?.userName || userName || 'عميل'}`,
           type: 'info',
+          targetType: 'topup',
+          targetId: finalTopup?.id,
+          topupId: finalTopup?.id,
+          targetUrl: '/admin/payments',
         });
       },
 
@@ -276,12 +284,20 @@ const useTopupStore = create(
               ? `تم قبول طلب ${target?.id || id} بالمبلغ الفعلي ${actualAmount} فقط`
               : `تم قبول طلب الشحن ${target?.id || id}`,
             type: 'success',
+            targetType: 'wallet',
+            targetId: target?.id || id,
+            topupId: target?.id || id,
+            targetUrl: '/wallet',
           });
         } else if (status === 'rejected' || status === 'denied') {
           useNotificationStore.getState().addNotification({
             title: 'رفض طلب شحن',
             message: `تم رفض طلب الشحن ${target?.id || id}`,
             type: 'warning',
+            targetType: 'wallet',
+            targetId: target?.id || id,
+            topupId: target?.id || id,
+            targetUrl: '/wallet',
           });
         }
       },
@@ -298,6 +314,10 @@ const useTopupStore = create(
           title: 'تعديل طلب شحن',
           message: `تم تعديل مبلغ الطلب ${id} إلى ${requestedAmount}`,
           type: 'info',
+          targetType: 'topup',
+          targetId: id,
+          topupId: id,
+          targetUrl: '/admin/payments',
         });
       }
     }),

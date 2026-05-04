@@ -47,7 +47,7 @@
     "cardsSection": "Payment Cards Section",
     "offers": "Offers",
     "featuredServices": "Trusted Services",
-    "heroTitle": "IBRA Store",
+    "heroTitle": "MS STORE",
     "heroDescription": "Your premium destination for game credits, app subscriptions, and digital products.",
     "heroSubDescription": "Instant delivery and secure payments.",
     "getStarted": "Get Started",
@@ -184,8 +184,8 @@
     "purchaseNow": "Buy Now",
     "productDetails": "Product Details",
     "backToProducts": "Back to Products",
-    "accountPendingTitle": "Account Pending Approval",
-    "accountPendingDesc": "You cannot place orders until your account is approved by administration.",
+    "accountPendingTitle": "Account unavailable",
+    "accountPendingDesc": "You cannot place orders with this account right now.",
     "playerIdLabel": "Player ID / User ID",
     "playerIdPlaceholder": "Enter your identifier for this game or service",
     "currentBalance": "Your Current Balance",
@@ -215,8 +215,8 @@
     "password": "Password",
     "confirmPassword": "Confirm Password",
     "welcomeBack": "Welcome Back",
-    "signInToAccount": "Sign in to your account in Ibra Store",
-    "joinToday": "Join Ibra Store today",
+    "signInToAccount": "Sign in to your account in MS STORE",
+    "joinToday": "Join MS STORE today",
     "signIn": "Sign In",
     "signUp": "Create Account",
     "forgotPassword": "Forgot password?",
@@ -234,7 +234,6 @@
     "activationTitle": "Account Activation",
     "activationDone": "OK",
     "activationSentTitle": "Activation link has been sent to your email",
-    "activationWhatsAppNote": "Admin WhatsApp has been opened to send activation request.",
     "forgotPasswordDesc": "Enter your email and we will send a password reset link"
   },
   "sidebar": {
@@ -278,7 +277,7 @@
     "remainingStock": "Remaining stock: {{count}}"
   },
   "legacy": {
-    "brand": "IBRA Store",
+    "brand": "MS STORE",
     "landingHero": "Your premium destination for game credits, app subscriptions, and digital products.",
     "landingHeroSub": "Instant delivery and secure payments.",
     "getStarted": "Get Started",

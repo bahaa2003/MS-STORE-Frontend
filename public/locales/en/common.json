@@ -47,7 +47,7 @@
     "cardsSection": "Payment Cards Section",
     "offers": "Offers",
     "featuredServices": "Trusted Services",
-    "heroTitle": "IBRA Store",
+    "heroTitle": "MS STORE",
     "heroDescription": "Your premium destination for game credits, app subscriptions, and digital products.",
     "heroSubDescription": "Instant delivery and secure payments.",
     "getStarted": "Get Started",
@@ -211,8 +211,8 @@
     "password": "Password",
     "confirmPassword": "Confirm Password",
     "welcomeBack": "Welcome Back",
-    "signInToAccount": "Sign in to your account in Ibra Store",
-    "joinToday": "Join Ibra Store today",
+    "signInToAccount": "Sign in to your account in MS STORE",
+    "joinToday": "Join MS STORE today",
     "signIn": "Sign In",
     "signUp": "Create Account",
     "forgotPassword": "Forgot password?",
@@ -270,7 +270,7 @@
     "remainingStock": "Remaining stock: {{count}}"
   },
   "legacy": {
-    "brand": "IBRA Store",
+    "brand": "MS STORE",
     "landingHero": "Your premium destination for game credits, app subscriptions, and digital products.",
     "landingHeroSub": "Instant delivery and secure payments.",
     "getStarted": "Get Started",

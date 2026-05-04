@@ -18,26 +18,32 @@ const QuickActionsSection = ({ actions, isArabic }) => {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+      <div className="grid gap-2.5">
         {actions.map((action) => (
           <Link
             key={action.to}
             to={action.to}
-            className="group rounded-[calc(var(--radius-xl)-4px)] border border-[color:rgb(var(--color-border-rgb)/0.86)] bg-[color:rgb(var(--color-card-rgb)/0.78)] p-2.5 shadow-[var(--shadow-subtle)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.28)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)] sm:rounded-[var(--radius-xl)] sm:p-4"
+            className="group relative overflow-hidden rounded-[1rem] border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[linear-gradient(180deg,rgb(255_255_255/0.035),rgb(255_255_255/0.015))] px-3 py-3 shadow-[var(--shadow-subtle)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.34)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.06)] sm:px-4 sm:py-3.5"
           >
-            <div className={cn('flex items-start justify-between gap-2.5', isArabic && 'flex-row-reverse')}>
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--radius-md)-2px)] border border-[color:rgb(var(--color-primary-rgb)/0.2)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] text-[var(--color-primary)] sm:h-11 sm:w-11 sm:rounded-[var(--radius-md)]">
-                <action.icon className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="pointer-events-none absolute inset-y-3 w-1 rounded-full bg-[linear-gradient(180deg,var(--color-primary),var(--color-primary-hover))] opacity-0 transition-opacity group-hover:opacity-100 ltr:left-0 rtl:right-0" />
+
+            <div className={cn('flex items-center gap-3', isArabic && 'flex-row-reverse text-right')}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.9rem] border border-[color:rgb(var(--color-primary-rgb)/0.24)] bg-[color:rgb(var(--color-primary-rgb)/0.1)] text-[var(--color-primary)] transition-all group-hover:scale-105 group-hover:bg-[color:rgb(var(--color-primary-rgb)/0.16)]">
+                <action.icon className="h-4.5 w-4.5" />
               </div>
-              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[var(--color-muted)] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[var(--color-primary)] sm:h-4 sm:w-4" />
-            </div>
-            <div className={cn('mt-2.5 sm:mt-3', isArabic ? 'text-right' : 'text-left')}>
-              <p className="text-xs font-semibold leading-5 text-[var(--color-text)] sm:text-sm">
-                {action.label}
-              </p>
-              <p className="mt-1.5 hidden text-xs leading-6 text-[var(--color-text-secondary)] sm:block sm:text-sm">
-                {action.description}
-              </p>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold leading-5 text-[var(--color-text)]">
+                  {action.label}
+                </p>
+                <p className="mt-0.5 hidden truncate text-xs leading-5 text-[var(--color-text-secondary)] sm:block">
+                  {action.description}
+                </p>
+              </div>
+
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[color:rgb(var(--color-surface-rgb)/0.42)] text-[var(--color-muted)] transition-all group-hover:border-[color:rgb(var(--color-primary-rgb)/0.3)] group-hover:text-[var(--color-primary)]">
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </div>
             </div>
           </Link>
         ))}

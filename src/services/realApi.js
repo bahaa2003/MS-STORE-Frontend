@@ -202,6 +202,7 @@ const isPublicAuthRequest = (url = '') => {
     value.includes('/auth/login')
     || value.includes('/auth/register')
     || value.includes('/auth/google')
+    || value.includes('/auth/verify-2fa')
     || value.includes(REFRESH_ENDPOINT)
   );
 };
@@ -465,6 +466,9 @@ const normaliseUser = (u) => {
     rejectedAt: u.rejectedAt || u.deniedAt || null,
     // ensure avatar — resolve relative paths and fallback
     avatar: resolveImageUrl(u.avatar) || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'User')}&background=random`,
+    permissions: Array.isArray(u.permissions) ? u.permissions.map((item) => String(item || '').trim()).filter(Boolean) : [],
+    twoFactorEnabled: Boolean(u.twoFactorEnabled ?? u.isTwoFactorEnabled),
+    isTwoFactorEnabled: Boolean(u.isTwoFactorEnabled ?? u.twoFactorEnabled),
   };
 };
 
@@ -681,6 +685,9 @@ const normaliseProduct = (p) => {
     // Pricing
     basePriceCoins: p.basePrice ?? p.basePriceCoins ?? 0,
     basePrice: p.basePrice ?? 0,
+    originalPriceCoins: p.originalPriceCoins ?? p.originalPrice ?? p.costPrice ?? '',
+    originalPrice: p.originalPrice ?? p.originalPriceCoins ?? p.costPrice ?? '',
+    costPrice: p.costPrice ?? p.originalPriceCoins ?? p.originalPrice ?? '',
     displayPrice: p.displayPrice ?? null,
     markedUpPriceUSD: p.markedUpPriceUSD ?? p.finalPrice ?? null,
     displayCurrency: p.displayCurrency ?? null,
@@ -992,6 +999,99 @@ const providerToBE = (fe) => {
   return body;
 };
 
+const normaliseTargetApp = (app = {}) => {
+  const id = app._id || app.id;
+  const allowedPaymentMethods = Array.isArray(app.allowedPaymentMethods)
+    ? app.allowedPaymentMethods.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+
+  return {
+    ...app,
+    id,
+    _id: undefined,
+    name: String(app.name || '').trim(),
+    unitPrice: Number(app.unitPrice || 0),
+    image: resolveImageUrl(app.image),
+    imagePath: app.image || '',
+    allowedPaymentMethods,
+    paymentMethodIds: allowedPaymentMethods,
+    isActive: app.isActive !== false,
+  };
+};
+
+const normaliseTargetOrder = (order = {}) => {
+  const id = order._id || order.id;
+  const app = typeof order.appId === 'object' && order.appId !== null ? normaliseTargetApp(order.appId) : null;
+  const coinAmount = Number(order.coinAmount ?? order.quantity ?? order.coins ?? 0);
+  const unitPrice = Number(order.unitPriceSnapshot ?? order.unitPrice ?? app?.unitPrice ?? 0);
+  const totalPrice = Number(order.totalPrice ?? (coinAmount * unitPrice));
+  const status = String(order.status || 'PENDING').trim().toUpperCase();
+
+  return {
+    ...order,
+    id,
+    _id: undefined,
+    appId: app?.id || order.appId,
+    app,
+    appNameSnapshot: order.appNameSnapshot || app?.name || order.productName || '',
+    productName: order.appNameSnapshot || app?.name || order.productName || '',
+    coinAmount,
+    quantity: coinAmount,
+    unitPriceSnapshot: unitPrice,
+    unitPrice,
+    totalPrice,
+    paymentMethod: order.paymentMethod || order.paymentMethodName || '',
+    paymentMethodName: order.paymentMethod || order.paymentMethodName || '',
+    transferNumber: order.transferNumber || order.vodafoneCashNumber || order.paymentAccount || '',
+    paymentAccount: order.transferNumber || order.vodafoneCashNumber || order.paymentAccount || '',
+    senderId: order.senderId || order.playerId || order.transferFromId || '',
+    transferFromId: order.senderId || order.playerId || order.transferFromId || '',
+    screenshotProof: resolveImageUrl(order.screenshotProof || order.proofImage || ''),
+    proofImage: resolveImageUrl(order.screenshotProof || order.proofImage || ''),
+    status,
+  };
+};
+
+const appendIfPresent = (formData, key, value) => {
+  if (value === undefined || value === null || value === '') return;
+  formData.append(key, value);
+};
+
+const isFileLike = (value) => (
+  (typeof File !== 'undefined' && value instanceof File)
+  || (typeof Blob !== 'undefined' && value instanceof Blob)
+);
+
+const buildTargetAppFormData = (payload = {}, { partial = false } = {}) => {
+  const formData = new FormData();
+  if (!partial || payload.name !== undefined) appendIfPresent(formData, 'name', String(payload.name || '').trim());
+  if (!partial || payload.unitPrice !== undefined) appendIfPresent(formData, 'unitPrice', String(payload.unitPrice ?? ''));
+  if (!partial || payload.allowedPaymentMethods !== undefined || payload.paymentMethodIds !== undefined) {
+    const methods = payload.allowedPaymentMethods || payload.paymentMethodIds || [];
+    formData.append('allowedPaymentMethods', JSON.stringify(Array.isArray(methods) ? methods : []));
+  }
+  if (payload.isActive !== undefined) formData.append('isActive', String(payload.isActive !== false));
+  const image = payload.imageFile || payload.file || payload.image;
+  if (isFileLike(image)) {
+    formData.append('image', image);
+  } else if (typeof image === 'string' && image && !image.startsWith('data:') && !/^https?:\/\//i.test(image)) {
+    formData.append('image', image);
+  }
+  return formData;
+};
+
+const buildTargetOrderFormData = (payload = {}) => {
+  const formData = new FormData();
+  formData.append('appId', String(payload.appId || payload.productId || ''));
+  formData.append('coinAmount', String(payload.coinAmount ?? payload.quantity ?? ''));
+  formData.append('senderId', String(payload.senderId || payload.transferFromId || payload.playerId || '').trim());
+  formData.append('transferNumber', String(payload.transferNumber || payload.paymentAccount || '').trim());
+  formData.append('paymentMethod', String(payload.paymentMethod || payload.paymentMethodName || '').trim());
+  const file = payload.screenshotProof || payload.proofImage || payload.receipt || null;
+  if (file) formData.append('screenshotProof', file);
+  return formData;
+};
+
 /**
  * Normalise a currency from BE to FE shape.
  *
@@ -1112,6 +1212,9 @@ const productToBE = (fe) => {
   // Send as String to preserve full 50dp precision — no Number() truncation.
   if (fe.basePriceCoins !== undefined) body.basePrice = String(fe.basePriceCoins);
   else if (fe.basePrice !== undefined) body.basePrice = String(fe.basePrice);
+  if (fe.originalPriceCoins !== undefined) body.originalPriceCoins = String(fe.originalPriceCoins || '');
+  if (fe.originalPrice !== undefined) body.originalPrice = String(fe.originalPrice || '');
+  if (fe.costPrice !== undefined) body.costPrice = String(fe.costPrice || '');
 
   // Quantity: FE uses minimumOrderQty / maximumOrderQty, BE uses minQty / maxQty
   if (fe.minimumOrderQty !== undefined) body.minQty = Number(fe.minimumOrderQty);
@@ -1249,12 +1352,57 @@ const realApi = {
     login: async (email, password) => {
       const res = await http.post('/auth/login', { email, password });
       const data = unwrap(res);
+      if (data?.requires2FA || data?.requiresTwoFactor) {
+        const tempToken = data.tempToken || data.twoFactorToken || data.sessionId || data.requestId || null;
+        return {
+          requires2FA: true,
+          tempToken,
+          twoFactorToken: tempToken,
+          user: data.user ? normaliseUser(data.user) : null,
+        };
+      }
       const user = normaliseUser(data.user);
       const token = data.token || data.accessToken || null;
       const refreshToken = data.refreshToken ?? data.refresh_token ?? null;
       // Persist tokens for subsequent requests
       setStoredAuthTokens(token, refreshToken);
       return { user, token };
+    },
+
+    verifyTwoFactor: async ({ tempToken, twoFactorToken, code }) => {
+      const res = await http.post('/auth/verify-2fa', {
+        tempToken: tempToken || twoFactorToken,
+        code,
+      });
+      const data = unwrap(res);
+      const user = normaliseUser(data.user);
+      const token = data.token || data.accessToken || null;
+      const refreshToken = data.refreshToken ?? data.refresh_token ?? null;
+      setStoredAuthTokens(token, refreshToken);
+      return { user, token };
+    },
+
+    generateTwoFactor: async () => {
+      const res = await http.post('/auth/2fa/generate');
+      const data = unwrap(res);
+      return {
+        qrCodeUrl: data?.qrCodeUrl || data?.qrCode || data?.url || '',
+        secret: data?.secret || '',
+      };
+    },
+
+    enableTwoFactor: async ({ token }) => {
+      const res = await http.post('/auth/2fa/enable', { token });
+      return unwrap(res);
+    },
+
+    disableTwoFactor: async ({ token, code, password }) => {
+      const body = {};
+      const twoFactorCode = token || code;
+      if (twoFactorCode) body.code = twoFactorCode;
+      if (password) body.password = password;
+      const res = await http.post('/auth/2fa/disable', body);
+      return unwrap(res);
     },
 
     loginWithGoogle: async () => {
@@ -1311,7 +1459,10 @@ const realApi = {
       });
       const data = unwrap(res);
       const user = normaliseUser(data.user);
-      return { user };
+      const token = data.token || data.accessToken || null;
+      const refreshToken = data.refreshToken ?? data.refresh_token ?? null;
+      if (token) setStoredAuthTokens(token, refreshToken);
+      return { user, token };
     },
 
     getProfile: async (_userId) => {
@@ -1343,6 +1494,87 @@ const realApi = {
       }
 
       return { success: true };
+    },
+  },
+
+  notifications: {
+    unreadCount: async () => {
+      const res = await http.get('/me/notifications/unread-count');
+      const data = unwrap(res);
+      return Number(data?.unreadCount ?? data?.count ?? data?.total ?? data ?? 0) || 0;
+    },
+
+    list: async () => {
+      const endpointPlan = ['/me/notifications', '/notifications'];
+      let lastError = null;
+      for (const endpoint of endpointPlan) {
+        try {
+          const res = await http.get(endpoint);
+          const data = unwrap(res);
+          const items = Array.isArray(data) ? data : (data?.notifications || data?.items || []);
+          return items.map((item) => ({
+            ...item,
+            id: item._id || item.id,
+            read: Boolean(item.read ?? item.isRead),
+          }));
+        } catch (error) {
+          lastError = error;
+          const status = Number(error?.response?.status || error?.status || 0);
+          if (status === 404) {
+            continue;
+          }
+        }
+      }
+
+      if (lastError) {
+        const status = Number(lastError?.response?.status || lastError?.status || 0);
+        if (status === 404) {
+          return [];
+        }
+      }
+
+      return [];
+    },
+
+    markAsRead: async (id) => {
+      const normalizedId = String(id || '').trim();
+      if (!normalizedId) return { success: true };
+      const endpointPlan = [
+        { method: 'patch', url: `/me/notifications/${normalizedId}/read` },
+        { method: 'patch', url: `/notifications/${normalizedId}/read` },
+      ];
+      let lastError = null;
+      for (const request of endpointPlan) {
+        try {
+          await http[request.method](request.url);
+          return { success: true };
+        } catch (error) {
+          lastError = error;
+          const status = Number(error?.response?.status || error?.status || 0);
+          if (status === 404) {
+            return { success: true };
+          }
+        }
+      }
+
+      if (lastError) {
+        const status = Number(lastError?.response?.status || lastError?.status || 0);
+        if (status === 404) {
+          return { success: true };
+        }
+      }
+
+      return { success: true };
+    },
+
+    markAllAsRead: async () => {
+      await http.patch('/me/notifications/read-all');
+      return { success: true };
+    },
+
+    send: async (payload = {}) => {
+      const res = await http.post('/admin/notifications/send', payload);
+      return unwrap(res);
     },
   },
 
@@ -1678,7 +1910,7 @@ const realApi = {
      */
     create: async (payload, _actorContext) => {
       const body = providerToBE(payload);
-      const res = await http.post('/providers', body);
+      const res = await http.post('/admin/providers', body);
       return normaliseProvider(unwrap(res)?.provider || unwrap(res));
     },
 
@@ -1779,7 +2011,16 @@ const realApi = {
      * unwrap() returns the users array directly from paginated envelope.
      * Supports server-side pagination + sorting params.
      */
-    list: async ({ page = 1, limit = 20, sortBy = 'walletBalance', sortOrder = 'desc' } = {}) => {
+    list: async ({
+      page = 1,
+      limit = 20,
+      sortBy = 'walletBalance',
+      sortOrder = 'desc',
+      search = '',
+      role,
+      status,
+      email,
+    } = {}) => {
       const normalizedSortBy = typeof sortBy === 'string' && sortBy.trim() ? sortBy.trim() : 'walletBalance';
       const normalizedSortOrder = String(sortOrder || '').trim().toLowerCase() === 'asc' ? 'asc' : 'desc';
       const query = new URLSearchParams();
@@ -1787,6 +2028,10 @@ const realApi = {
       query.set('limit', String(limit));
       query.set('sortBy', normalizedSortBy);
       query.set('sortOrder', normalizedSortOrder);
+      if (String(search || '').trim()) query.set('search', String(search).trim());
+      if (role) query.set('role', String(role).toUpperCase());
+      if (status) query.set('status', String(status).toUpperCase());
+      if (email) query.set('email', String(email).trim());
       const res = await http.get(`/admin/users?${query}`);
       const body = res.data || {};
       const data = body.data;
@@ -1939,6 +2184,33 @@ const realApi = {
     updateRole: async (userId, role, _actorContext) => {
       const res = await http.patch(`/admin/users/${userId}/role`, { role: (role || '').toUpperCase() });
       return normaliseUser(unwrap(res)?.user || unwrap(res));
+    },
+
+    updatePermissions: async (userId, permissions = [], _actorContext) => {
+      const normalizedUserId = String(userId || '').trim();
+      const payload = {
+        permissions: Array.isArray(permissions)
+          ? permissions.map((item) => String(item || '').trim()).filter(Boolean)
+          : [],
+      };
+
+      const endpointPlan = [
+        { method: 'patch', url: `/admin/users/${normalizedUserId}/permissions`, payload },
+        { method: 'patch', url: `/admin/users/${normalizedUserId}`, payload },
+      ];
+
+      let lastError = null;
+      for (const request of endpointPlan) {
+        try {
+          const res = await http[request.method](request.url, request.payload);
+          const data = unwrap(res);
+          return normaliseUser(data?.user || data);
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error('Unable to update permissions.');
     },
 
     delete: async (userId, _actorContext) => {
@@ -2553,11 +2825,14 @@ const realApi = {
     updateRequest: async (topupId, updates) => {
       try {
         const body = {};
-        if (updates.amountRequested !== undefined || updates.amount !== undefined) {
-          body.amountRequested = updates.amountRequested ?? updates.amount;
-        }
-        if (updates.transferredFromNumber !== undefined || updates.senderNumber !== undefined) {
-          body.transferredFromNumber = updates.transferredFromNumber ?? updates.senderNumber;
+        if (
+          updates.requestedAmount !== undefined
+          || updates.amountRequested !== undefined
+          || updates.amount !== undefined
+        ) {
+          body.requestedAmount = Number(
+            updates.requestedAmount ?? updates.amountRequested ?? updates.amount,
+          );
         }
         const res = await http.patch(`/admin/deposits/${topupId}`, body);
         const data = unwrap(res);
@@ -2566,6 +2841,85 @@ const realApi = {
         devLogger.warnUnlessBenign('[realApi] topups.updateRequest failed:', err);
         return null;
       }
+    },
+  },
+
+  targetApps: {
+    listActive: async () => {
+      const res = await http.get('/me/targets/apps');
+      const data = unwrap(res);
+      const apps = Array.isArray(data) ? data : (data?.apps || data?.items || []);
+      return apps.map(normaliseTargetApp);
+    },
+
+    list: async () => {
+      const res = await http.get('/admin/target-apps');
+      const data = unwrap(res);
+      const apps = Array.isArray(data) ? data : (data?.apps || data?.items || []);
+      return apps.map(normaliseTargetApp);
+    },
+
+    create: async (payload = {}) => {
+      const formData = buildTargetAppFormData(payload);
+      const res = await http.post('/admin/target-apps', formData);
+      const data = unwrap(res);
+      return normaliseTargetApp(data?.app || data);
+    },
+
+    update: async (id, payload = {}) => {
+      const formData = buildTargetAppFormData(payload, { partial: true });
+      const res = await http.patch(`/admin/target-apps/${id}`, formData);
+      const data = unwrap(res);
+      return normaliseTargetApp(data?.app || data);
+    },
+
+    delete: async (id) => {
+      const res = await http.delete(`/admin/target-apps/${id}`);
+      const data = unwrap(res);
+      return normaliseTargetApp(data?.app || data);
+    },
+  },
+
+  targetPurchases: {
+    list: async (params = {}) => {
+      const res = await http.get('/admin/targets', { params });
+      const data = unwrap(res);
+      const items = Array.isArray(data) ? data : (data?.orders || data?.requests || data?.items || []);
+      return items.map(normaliseTargetOrder);
+    },
+
+    listMine: async (params = {}) => {
+      const res = await http.get('/me/targets', { params });
+      const data = unwrap(res);
+      const items = Array.isArray(data) ? data : (data?.orders || data?.requests || data?.items || []);
+      return items.map(normaliseTargetOrder);
+    },
+
+    create: async (payload) => {
+      const formData = payload instanceof FormData ? payload : buildTargetOrderFormData(payload);
+      const res = await http.post('/me/targets', formData);
+      const data = unwrap(res);
+      return normaliseTargetOrder(data?.order || data?.request || data);
+    },
+
+    updateStatus: async (id, status, payload = {}) => {
+      const normalizedStatus = String(status || '').trim().toLowerCase();
+      const endpoint = normalizedStatus === 'approved' || normalizedStatus === 'done'
+        ? `/admin/targets/${id}/approve`
+        : normalizedStatus === 'rejected'
+          ? `/admin/targets/${id}/reject`
+          : null;
+
+      if (!endpoint) {
+        throw new Error(`Unsupported target order status: ${status}`);
+      }
+
+      const body = normalizedStatus === 'rejected'
+        ? { adminNotes: payload.adminNotes ?? payload.rejectionReason ?? payload.reason ?? '' }
+        : {};
+      const res = await http.patch(endpoint, body);
+      const data = unwrap(res);
+      return normaliseTargetOrder(data?.order || data?.request || data);
     },
   },
 

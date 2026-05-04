@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import useSystemStore from '../../store/useSystemStore';
 import {
   Building2,
   ChevronLeft,
@@ -10,16 +9,19 @@ import {
   LayoutDashboard,
   LogOut,
   MessageCircle,
+  MonitorCog,
   Package,
   Settings,
   ShieldCheck,
-  ShoppingCart,
+  ShoppingBag,
   Sparkles,
+  Target,
   User,
   UserCog,
   Users,
   Wallet
 } from 'lucide-react';
+import ConfirmDialog from '../account/ConfirmDialog';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../../store/useAuthStore';
@@ -27,16 +29,21 @@ import { cn } from '../ui/Button';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../ui/LanguageSwitcher';
 import WalletSidebarCard from './WalletSidebarCard';
-import brandIconImage from '../../assets/logo.png';
-import brandWordmarkImage from '../../assets/ibra.png';
-import { buildWhatsAppLink, getAdminWhatsAppNumber } from '../../utils/whatsapp';
-import { hasRequiredRole } from '../../utils/authRoles';
+import BrandMark from './BrandMark';
+import { SUPERVISOR_ROLES, getDefaultRouteForRole, hasRequiredRole } from '../../utils/authRoles';
+import { PERMISSIONS, hasPermission } from '../../utils/permissions';
+
+const ADMIN_NAV_ROLES = ['admin', 'super_admin', ...SUPERVISOR_ROLES];
 
 const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const { dir } = useLanguage();
   const { t } = useTranslation();
+
+  const isExpanded = isOpen || isMobile || isPreviewExpanded;
 
   const closeSidebarOnMobile = () => {
     if (isMobile) {
@@ -50,21 +57,22 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
     navigate('/auth');
   };
 
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = async () => {
+    setShowLogoutConfirm(false);
+    await handleLogout();
+  };
+
   const handleOpenMyAccount = () => {
     closeSidebarOnMobile();
     navigate('/account');
   };
 
   const handleContactClick = () => {
-    const message = dir === 'rtl'
-      ? 'مرحباً، أحتاج مساعدة من فريق IBRA Store'
-      : 'Hello, I need help from the IBRA Store team';
-    const href = buildWhatsAppLink({
-      number: getAdminWhatsAppNumber(),
-      message,
-    });
-
-    window.open(href, '_blank', 'noopener,noreferrer');
+    navigate('/contact-us');
     closeSidebarOnMobile();
   };
 
@@ -79,68 +87,75 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
       icon: Wallet,
       label: t('sidebar.adminWallet', { defaultValue: dir === 'rtl' ? 'محفظة الأدمن' : 'Admin Wallet' }),
       path: '/admin/wallet',
-      roles: ['admin']
+      roles: ADMIN_NAV_ROLES,
+      permission: PERMISSIONS.ADMIN_WALLET,
     },
     {
       icon: LayoutDashboard,
       label: t('sidebar.dashboard', { defaultValue: dir === 'rtl' ? 'لوحة التحكم' : 'Dashboard' }),
-      path: '/manager/dashboard',
-      roles: ['manager']
+      path: '/admin/dashboard',
+      roles: SUPERVISOR_ROLES
     },
     {
       icon: LayoutDashboard,
       label: t('sidebar.adminDashboard', { defaultValue: dir === 'rtl' ? 'لوحة تحكم الأدمن' : 'Admin Dashboard' }),
       path: '/admin/dashboard',
-      roles: ['admin']
+      roles: ['admin', 'super_admin'],
     },
-    { icon: User, label: t('sidebar.myAccount', { defaultValue: 'حسابي' }), path: '/account', roles: ['admin', 'customer', 'manager'] },
-    { icon: ShieldCheck, label: t('sidebar.accountProtection', { defaultValue: 'حماية الحساب' }), path: '/account-security', roles: ['admin', 'customer', 'manager'] },
+    { icon: User, label: t('sidebar.myAccount', { defaultValue: dir === 'rtl' ? 'حسابي' : 'My Account' }), path: '/account', roles: ['admin', 'customer', ...SUPERVISOR_ROLES] },
+    { icon: ShieldCheck, label: t('sidebar.accountProtection', { defaultValue: dir === 'rtl' ? 'حماية الحساب' : 'Account Security' }), path: '/account-security', roles: ['admin', 'customer', ...SUPERVISOR_ROLES] },
     { icon: Wallet, label: t('sidebar.wallet'), path: '/wallet', roles: ['customer'] },
     {
-      icon: ShoppingCart,
+      icon: ShoppingBag,
       label: t('header.orders', { defaultValue: dir === 'rtl' ? 'طلباتي' : 'My Orders' }),
       path: '/orders',
       roles: ['customer']
     },
-    { icon: Users, label: t('sidebar.users'), path: '/admin/users', roles: ['admin'] },
+    { icon: Target, label: 'بيع التارجت', path: '/buy-target', roles: ['customer'] },
+    { icon: Users, label: t('sidebar.users'), path: '/admin/users', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_USERS },
     { icon: UserCog, label: t('sidebar.supervisors'), path: '/admin/supervisors', roles: ['admin'] },
-    { icon: Users, label: t('sidebar.groupsManager'), path: '/admin/groups', roles: ['admin'] },
-    { icon: Package, label: t('sidebar.productsManager'), path: '/admin/products', roles: ['admin'] },
+    { icon: MonitorCog, label: 'مراقبة المشرفين', path: '/admin/supervisor-monitoring', roles: ['admin'] },
+    { icon: Users, label: t('sidebar.groupsManager'), path: '/admin/groups', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_GROUPS },
+    { icon: Package, label: t('sidebar.productsManager'), path: '/admin/products', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_PRODUCTS },
     {
-      icon: ShoppingCart,
+      icon: ShoppingBag,
       label: t('sidebar.ordersManager', { defaultValue: dir === 'rtl' ? 'إدارة الطلبات' : 'Orders Manager' }),
       path: '/admin/orders',
-      roles: ['admin']
+      roles: ADMIN_NAV_ROLES,
+      permission: PERMISSIONS.ADMIN_ORDERS,
     },
-    { icon: Building2, label: t('sidebar.suppliersManager'), path: '/admin/suppliers', roles: ['admin'] },
-    { icon: ShieldCheck, label: t('sidebar.paymentsManager'), path: '/admin/payments', roles: ['admin'] },
-    { icon: CreditCard, label: t('sidebar.paymentMethods'), path: '/admin/payment-methods', roles: ['admin'] },
-    { icon: Coins, label: t('sidebar.currencies'), path: '/admin/currencies', roles: ['admin'] },
+    { icon: Target, label: 'طلبات التارجت', path: '/admin/target-requests', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_TARGET_REQUESTS },
+    { icon: Building2, label: t('sidebar.suppliersManager'), path: '/admin/suppliers', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_SUPPLIERS },
+    { icon: ShieldCheck, label: t('sidebar.paymentsManager'), path: '/admin/payments', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_PAYMENTS },
+    { icon: CreditCard, label: t('sidebar.paymentMethods'), path: '/admin/payment-methods', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_PAYMENT_METHODS },
+    { icon: Coins, label: t('sidebar.currencies'), path: '/admin/currencies', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_CURRENCIES },
     {
       icon: Sparkles,
       label: t('sidebar.createdBy', { defaultValue: 'تم الإنشاء بواسطة' }),
       path: '/created-by',
-      roles: ['customer', 'manager']
+      roles: ['customer', ...SUPERVISOR_ROLES]
     },
-    { icon: Settings, label: t('sidebar.settings'), path: '/settings', roles: ['admin', 'customer', 'manager'] },
     {
       icon: MessageCircle,
       label: t('sidebar.contactUs', { defaultValue: 'اتصل بنا' }),
-      path: '#contact-us',
-      roles: ['customer', 'manager'],
-      isExternal: true,
+      path: '/contact-us',
+      roles: ['customer', ...SUPERVISOR_ROLES],
       onClick: handleContactClick,
-    }
+    },
+    { icon: Settings, label: t('sidebar.settings'), path: '/settings', roles: ['admin', 'customer', ...SUPERVISOR_ROLES] }
   ];
 
-  const filteredNavItems = navItems.filter((item) => hasRequiredRole(user?.role || 'customer', item.roles));
-  const showWalletCard = String(user?.role || '').toLowerCase() === 'customer' && (isOpen || isMobile);
+  const filteredNavItems = navItems.filter((item) => (
+    hasRequiredRole(user?.role || 'customer', item.roles) && hasPermission(user, item.permission)
+  ));
+  const showWalletCard = String(user?.role || '').toLowerCase() === 'customer' && isExpanded;
+  const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
 
   return (
     <>
       {isMobile && isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-black/72 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -148,164 +163,164 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
       <motion.aside
         initial={false}
         animate={{
-          width: isOpen ? 288 : isMobile ? 0 : 88,
-          x: isMobile && !isOpen ? (dir === 'rtl' ? 288 : -288) : 0
+          width: isMobile ? 304 : isExpanded ? 296 : 92,
+          x: isMobile && !isOpen ? (dir === 'rtl' ? 320 : -320) : 0
         }}
-        transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+        onMouseEnter={() => {
+          if (!isMobile && !isOpen) {
+            setIsPreviewExpanded(true);
+          }
+        }}
+        onMouseLeave={() => {
+          if (!isMobile) {
+            setIsPreviewExpanded(false);
+          }
+        }}
         className={cn(
-          'fixed top-0 z-50 flex h-screen flex-col overflow-hidden border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-surface-rgb)/0.96)] shadow-[var(--shadow-medium)]',
-          dir === 'rtl' ? 'right-0 border-l' : 'left-0 border-r',
+          'fixed top-4 z-50 h-[calc(100vh-4rem)] overflow-hidden',
+          dir === 'rtl' ? 'right-4' : 'left-4',
           isMobile && !isOpen && 'hidden'
         )}
       >
-        <div className="border-b border-[color:rgb(var(--color-border-rgb)/0.85)] px-4 py-4">
-          <div className="flex items-center justify-between gap-3">
-            {(isOpen || isMobile) ? (
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="h-11 w-11 overflow-hidden rounded-[var(--radius-md)]">
-                  <img src={brandIconImage} alt="IBRA Store" loading="eager" decoding="async" className="h-full w-full object-cover" />
-                </div>
-                <div className="min-w-0">
-                  <img src={brandWordmarkImage} alt="IBRA" loading="eager" decoding="async" className="h-5 w-auto object-contain sm:h-6" />
-                  <p className="mt-1 truncate text-[11px] uppercase tracking-[0.18em] text-[var(--color-primary)]">
-                    {dir === 'rtl' ? 'هوية فاخرة' : 'Luxury Identity'}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="mx-auto h-11 w-11 overflow-hidden rounded-[var(--radius-md)] border border-[color:rgb(var(--color-border-rgb)/0.85)] bg-[color:rgb(var(--color-card-rgb)/0.84)]">
-                <img src={brandIconImage} alt="IBRA Store" loading="eager" decoding="async" className="h-full w-full object-cover" />
-              </div>
-            )}
-
-            {!isMobile && (
-              <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={cn(
-                  'inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[color:rgb(var(--color-border-rgb)/0.82)] bg-[color:rgb(var(--color-card-rgb)/0.88)] text-[var(--color-text-secondary)] transition-colors hover:border-[color:rgb(var(--color-primary-rgb)/0.28)] hover:text-[var(--color-primary)]',
-                  !isOpen && 'mx-auto'
-                )}
-              >
-                <ChevronLeft className={cn('h-5 w-5 transition-transform', (dir === 'rtl' ? isOpen : !isOpen) && 'rotate-180')} />
-              </button>
-            )}
-          </div>
-
-          {(isOpen || isMobile) && (
-            <div className="mt-4">
-              <LanguageSwitcher variant="sidebar" className="w-full justify-center" />
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide">
-          {showWalletCard && (
-            <WalletSidebarCard
-              className="mb-4"
-              isVisible={showWalletCard}
-              onNavigate={closeSidebarOnMobile}
-            />
-          )}
-
-          <div className="space-y-1">
-            {filteredNavItems.map((item) => (
-              item.isExternal ? (
-                <button
-                  key={item.path}
-                  type="button"
-                  onClick={item.onClick}
-                  className={cn(
-                    'group relative flex w-full items-center gap-3 rounded-[var(--radius-md)] px-3 py-3 text-[var(--color-text-secondary)] transition-all hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)] hover:text-[var(--color-text)]'
-                  )}
-                >
-                  <item.icon className={cn('h-5 w-5 shrink-0', !isOpen && 'mx-auto')} />
-                  {isOpen && <span className="truncate text-sm font-medium">{item.label}</span>}
-                  {!isOpen && (
-                    <div
-                      className={cn(
-                        'pointer-events-none absolute whitespace-nowrap rounded-full border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.96)] px-3 py-1.5 text-xs font-medium text-[var(--color-text)] opacity-0 shadow-[var(--shadow-subtle)] transition-opacity group-hover:opacity-100',
-                        dir === 'rtl' ? 'right-full mr-2' : 'left-full ml-2'
-                      )}
-                    >
-                      {item.label}
-                    </div>
-                  )}
-                </button>
-              ) : (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={closeSidebarOnMobile}
-                  className={({ isActive }) =>
-                    cn(
-                      'group relative flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-3 transition-all',
-                      isActive
-                        ? 'bg-[color:rgb(var(--color-primary-rgb)/0.12)] text-[var(--color-text)] shadow-[var(--shadow-subtle)]'
-                        : 'text-[var(--color-text-secondary)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)] hover:text-[var(--color-text)]'
-                    )
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className={cn('absolute inset-y-2 w-[3px] rounded-full bg-[var(--color-primary)]', dir === 'rtl' ? 'right-0' : 'left-0')} />
-                      )}
-                      <item.icon className={cn('h-5 w-5 shrink-0', !isOpen && 'mx-auto', isActive && 'text-[var(--color-primary)]')} />
-                      {isOpen && <span className="truncate text-sm font-medium">{item.label}</span>}
-                      {!isOpen && (
-                        <div
-                          className={cn(
-                            'pointer-events-none absolute whitespace-nowrap rounded-full border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.96)] px-3 py-1.5 text-xs font-medium text-[var(--color-text)] opacity-0 shadow-[var(--shadow-subtle)] transition-opacity group-hover:opacity-100',
-                            dir === 'rtl' ? 'right-full mr-2' : 'left-full ml-2'
-                          )}
-                        >
-                          {item.label}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </NavLink>
-              )
-            ))}
-          </div>
-        </div>
-
-        <div className="border-t border-[color:rgb(var(--color-border-rgb)/0.85)] bg-[color:rgb(var(--color-card-rgb)/0.64)] p-4">
-          <div className={cn('flex items-center gap-3', !isOpen && 'justify-center')}>
-            <button
-              type="button"
-              onClick={handleOpenMyAccount}
-              className={cn(
-                'group flex min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-lg)] text-right transition-colors hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)]',
-                isOpen ? 'px-1.5 py-1.5' : 'max-w-[3.5rem] justify-center p-1'
-              )}
-              aria-label={t('sidebar.myAccount', { defaultValue: 'حسابي' })}
-            >
-              <img
-                src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.name}`}
-                alt={user?.name}
-                className="h-11 w-11 rounded-full border border-[color:rgb(var(--color-border-rgb)/0.9)] object-cover transition-transform group-hover:scale-[1.03]"
-              />
-              {isOpen && (
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[var(--color-text)]">{user?.name}</p>
-                  <p className="truncate text-xs text-[var(--color-muted)]">{user?.email}</p>
-                </div>
-              )}
-            </button>
-            {isOpen && (
+        <div className={cn(
+          'app-shell-sidebar-panel relative flex h-full flex-col rounded-[32px] border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.76),rgb(var(--color-elevated-rgb)/0.56))] shadow-[var(--shadow-medium)] backdrop-blur-[24px]',
+          isAdmin && 'border-[color:rgb(var(--color-primary-rgb)/0.22)] bg-[linear-gradient(180deg,rgb(255_255_255/0.86),rgb(245_241_231/0.72))] shadow-[0_34px_90px_-58px_rgb(80_64_24/0.36)] dark:bg-[linear-gradient(180deg,rgb(26_26_26/0.84),rgb(10_10_10/0.72))] dark:shadow-[0_34px_90px_-54px_rgb(0_0_0/0.94)]'
+        )}>
+          <div className="border-b border-[color:rgb(var(--color-border-rgb)/0.56)] px-4 pb-4 pt-5">
+            <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={handleLogout}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[color:rgb(var(--color-error-rgb)/0.2)] bg-[color:rgb(var(--color-error-rgb)/0.08)] text-[var(--color-error)] transition-colors hover:bg-[color:rgb(var(--color-error-rgb)/0.14)]"
-                aria-label={t('common.logout')}
+                onClick={() => navigate(getDefaultRouteForRole(user?.role))}
+                className={cn(
+                  'flex items-center rounded-[24px] transition-all hover:-translate-y-0.5',
+                  isExpanded ? 'bg-transparent' : 'mx-auto'
+                )}
               >
-                <LogOut className="h-4 w-4" />
+                <BrandMark compact={!isExpanded} size={isExpanded ? 'sm' : 'md'} showCaption={false} />
               </button>
+
+              {!isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(!isOpen)}
+                  className={cn(
+                    'inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.74)] bg-[color:rgb(var(--color-surface-rgb)/0.46)] text-[var(--color-text-secondary)] transition-all hover:border-[color:rgb(var(--color-primary-rgb)/0.24)] hover:text-[var(--color-primary)]',
+                    !isExpanded && 'mx-auto'
+                  )}
+                  aria-label={dir === 'rtl' ? 'تصغير الشريط الجانبي' : 'Collapse sidebar'}
+                >
+                  <ChevronLeft className={cn('h-4.5 w-4.5 transition-transform', (dir === 'rtl' ? isExpanded : !isExpanded) && 'rotate-180')} />
+                </button>
+              )}
+            </div>
+
+            {isExpanded && (
+              <>
+                <div className="mt-4">
+                  <LanguageSwitcher variant="sidebar" className="w-full justify-center bg-[color:rgb(var(--color-surface-rgb)/0.5)]" />
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <img
+                    src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || 'User')}&background=random`}
+                    alt={user?.name || 'User'}
+                    className="h-10 w-10 rounded-full object-cover"
+                    onClick={handleOpenMyAccount}
+                    style={{ cursor: 'pointer' }}
+                  />
+
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-[var(--color-text)]">{user?.name || user?.email || 'حسابي'}</div>
+                      </div>
+                  <button
+                    type="button"
+                    onClick={handleLogoutClick}
+                    className={cn(
+                      dir === 'rtl' ? 'mr-auto' : 'ml-auto',
+                      'inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:rgb(var(--color-error-rgb)/0.42)] bg-[color:rgb(var(--color-error-rgb)/0.14)] text-[var(--color-error)] shadow-sm transition-all hover:bg-[color:rgb(var(--color-error-rgb)/0.22)] hover:border-[color:rgb(var(--color-error-rgb)/0.58)]'
+                    )}
+                    aria-label={dir === 'rtl' ? 'تسجيل الخروج' : 'Logout'}
+                  >
+                    <LogOut className="h-4.5 w-4.5" />
+                  </button>
+                </div>
+              </>
             )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide">
+            {showWalletCard && (
+              <WalletSidebarCard
+                className="mb-4"
+                isVisible={showWalletCard}
+                onNavigate={closeSidebarOnMobile}
+              />
+            )}
+
+            <div className="space-y-2">
+              {filteredNavItems.map((item) => (
+                item.isExternal ? (
+                  <button
+                    key={item.path}
+                    type="button"
+                    onClick={item.onClick}
+                    className={cn(
+                      'group relative flex w-full items-center gap-3 overflow-hidden rounded-[22px] border border-transparent px-3 py-3 text-[var(--color-text-secondary)] transition-all hover:border-[color:rgb(var(--color-primary-rgb)/0.16)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)] hover:text-[var(--color-text)]',
+                      !isExpanded && 'justify-center'
+                    )}
+                  >
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.08)] text-[var(--color-primary)]">
+                      <item.icon className="h-4.5 w-4.5" />
+                    </span>
+                    {isExpanded && <span className="truncate text-sm font-medium">{item.label}</span>}
+                  </button>
+                ) : (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={closeSidebarOnMobile}
+                    className={({ isActive }) =>
+                      cn(
+                        'group relative flex items-center gap-3 overflow-hidden rounded-[22px] border px-3 py-3 transition-all',
+                        !isExpanded && 'justify-center',
+                        isActive
+                          ? 'border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[linear-gradient(90deg,rgb(var(--color-primary-rgb)/0.14),transparent)] text-[var(--color-text)] shadow-[0_18px_34px_-28px_rgb(var(--color-primary-rgb)/0.24)]'
+                          : 'border-transparent text-[var(--color-text-secondary)] hover:border-[color:rgb(var(--color-primary-rgb)/0.14)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.07)] hover:text-[var(--color-text)]'
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {isActive && (
+                          <span className={cn('absolute inset-y-3 w-[3px] rounded-full bg-[linear-gradient(180deg,var(--color-primary),var(--color-primary-hover))]', dir === 'rtl' ? 'right-0' : 'left-0')} />
+                        )}
+                        <span className={cn(
+                          'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors',
+                          isActive ? 'bg-[color:rgb(var(--color-primary-rgb)/0.14)] text-[var(--color-primary)]' : 'bg-[color:rgb(var(--color-surface-rgb)/0.42)] text-[var(--color-text-secondary)] group-hover:text-[var(--color-primary)]'
+                        )}
+                        >
+                          <item.icon className="h-4.5 w-4.5" />
+                        </span>
+                        {isExpanded && <span className="truncate text-sm font-medium">{item.label}</span>}
+                      </>
+                    )}
+                  </NavLink>
+                )
+              ))}
+            </div>
           </div>
         </div>
       </motion.aside>
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title={dir === 'rtl' ? 'تسجيل الخروج' : 'Logout'}
+        description={dir === 'rtl' ? 'هل متأكد من تسجيل الخروج؟' : 'Are you sure you want to logout?'}
+        confirmLabel={dir === 'rtl' ? 'نعم، تسجيل الخروج' : 'Yes, logout'}
+        cancelLabel={dir === 'rtl' ? 'إلغاء' : 'Cancel'}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </>
   );
 };

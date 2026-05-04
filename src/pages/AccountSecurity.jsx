@@ -36,14 +36,14 @@ const AccountSecurity = () => {
       <motion.header
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.9)] p-5 shadow-[var(--shadow-subtle)] backdrop-blur-md"
+        className="security-glow-card rounded-2xl border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.9)] p-5 shadow-[var(--shadow-subtle)] backdrop-blur-md"
       >
         <h1 className="text-2xl font-bold text-[var(--color-text)]">{text.title}</h1>
         <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{text.subtitle}</p>
       </motion.header>
 
       <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="rounded-2xl border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.9)] p-5">
+        <Card className="security-glow-card rounded-2xl border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.9)] p-5">
           <h2 className="mb-2 flex items-center gap-2 text-base font-semibold text-[var(--color-text)]">
             <ShieldCheck className="h-[18px] w-[18px] text-[var(--color-primary)]" />
             {text.securityOverview}
@@ -53,7 +53,12 @@ const AccountSecurity = () => {
       </motion.section>
 
       <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <TwoFactorCard userId={user?.id} email={String(user?.email || '')} emailChangedPending={false} />
+        <TwoFactorCard
+          userId={user?.id}
+          email={String(user?.email || '')}
+          twoFactorEnabled={Boolean(user?.twoFactorEnabled ?? user?.isTwoFactorEnabled)}
+          emailChangedPending={false}
+        />
       </motion.section>
     </div>
   );

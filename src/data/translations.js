@@ -2,9 +2,9 @@ export const translations = {
   ar: {
     // Auth
     welcomeBack: "مرحبًا بعودتك",
-    signInToAccount: "سجل الدخول إلى حسابك في Ibra Store",
+    signInToAccount: "سجل الدخول إلى حسابك في MS STORE",
     createAccount: "إنشاء حساب",
-    joinToday: "انضم إلى Ibra Store اليوم",
+    joinToday: "انضم في عالم MS STORE حالا",
     signIn: "تسجيل الدخول",
     signUp: "إنشاء حساب",
     forgotPassword: "نسيت كلمة المرور؟",
@@ -118,7 +118,7 @@ export const translations = {
     topupTrend: "اتجاه الشحنات",
 
     // Landing
-    brand: "Ibra Store",
+    brand: "MS STORE",
     landingHero: "وجهتك المميزة لشراء رصيد الألعاب، واشتراكات التطبيقات، والمنتجات الرقمية.",
     landingHeroSub: "توصيل فوري، ومدفوعات آمنة.",
     getStarted: "ابدأ الآن",

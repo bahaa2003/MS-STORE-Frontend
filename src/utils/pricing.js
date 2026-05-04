@@ -9,7 +9,7 @@
  */
 
 import { formatNumber } from './intl';
-import { getMoneyFormatOptions, normalizeMoneyAmount, toRawPriceString } from './money';
+import { formatRawPriceString, getMoneyFormatOptions, normalizeMoneyAmount, toRawPriceString } from './money';
 import useGroupStore from '../store/useGroupStore';
 
 export const GROUP_MARKUPS = {
@@ -153,9 +153,9 @@ export const convertPriceByCurrency = (baseAmount, currencyCode = 'USD', currenc
 export const formatCurrencyAmount = (amount, currencyCode = 'USD', currencies = [], locale = 'ar-EG', formatOptions = {}) => {
   const meta = getCurrencyMeta(currencyCode, currencies);
 
-  // String product prices — always render raw, no truncation
+  // String product prices - display only; no truncation and no API value mutation.
   if (typeof amount === 'string') {
-    const cleanPrice = toRawPriceString(amount);
+    const cleanPrice = formatRawPriceString(amount);
     return `${cleanPrice} ${meta.symbol}`;
   }
 
@@ -165,4 +165,3 @@ export const formatCurrencyAmount = (amount, currencyCode = 'USD', currencies = 
 
   return `${formatted} ${meta.symbol}`;
 };
-

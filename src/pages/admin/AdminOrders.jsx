@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Clock3,
@@ -13,14 +14,12 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Card from '../../components/ui/Card';
-import Modal from '../../components/ui/Modal';
-import Button from '../../components/ui/Button';
-import { textareaClassName } from '../../components/ui/Input';
 import OrdersFiltersBar from '../../components/orders/OrdersFiltersBar';
 import OrdersMobileCards from '../../components/orders/OrdersMobileCards';
 import EmptyOrdersState from '../../components/orders/EmptyOrdersState';
 import { useToast } from '../../components/ui/Toast';
 import useOrderStore from '../../store/useOrderStore';
+import useAuthStore from '../../store/useAuthStore';
 import useAdminStore from '../../store/useAdminStore';
 import useMediaStore from '../../store/useMediaStore';
 import useSystemStore from '../../store/useSystemStore';
@@ -34,6 +33,7 @@ import {
 } from '../../utils/orders';
 import { formatNumber } from '../../utils/intl';
 import { cn } from '../../components/ui/Button';
+import { PERMISSIONS, hasPermission } from '../../utils/permissions';
 
 const OrderDetailsDrawer = lazy(() => import('../../components/orders/OrderDetailsDrawer'));
 
@@ -199,11 +199,13 @@ const AdminOrders = () => {
     updateOrderStatus,
     syncOrderSupplierStatus,
   } = useOrderStore();
+  const { user: actor } = useAuthStore();
   const { users, loadUsers } = useAdminStore();
   const { products, loadProducts } = useMediaStore();
   const { currencies, loadCurrencies } = useSystemStore();
   const { addToast } = useToast();
   const { i18n } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -281,6 +283,7 @@ const AdminOrders = () => {
   const isArabic = String(i18n.resolvedLanguage || i18n.language || 'ar').toLowerCase().startsWith('ar');
   const locale = isArabic ? 'ar-EG' : 'en-US';
   const language = isArabic ? 'ar' : 'en';
+  const canConfirmOrders = hasPermission(actor, PERMISSIONS.CONFIRM_ORDERS);
 
   // ── Re-fetch when page / limit / dates change ────────────────────────
   // (Search changes are handled directly inside the debounce above.)
@@ -332,12 +335,20 @@ const AdminOrders = () => {
     [dateFilter, enrichedOrders, sortOrder, statusFilter, typeFilter, providerFilter]
   );
 
-  const summary = useMemo(() => summarizeOrders(enrichedOrders), [enrichedOrders]);
+  const summary = useMemo(() => summarizeOrders(filteredOrders), [filteredOrders]);
 
   const selectedOrder = useMemo(
     () => enrichedOrders.find((order) => order.id === selectedOrderId) || null,
     [enrichedOrders, selectedOrderId]
   );
+
+  useEffect(() => {
+    const orderIdFromQuery = String(searchParams.get('orderId') || '').trim();
+    if (!orderIdFromQuery) return;
+
+    setSelectedOrderId(orderIdFromQuery);
+    void getOrderById(orderIdFromQuery).catch(() => {});
+  }, [getOrderById, searchParams]);
 
   const formatCount = (value) => formatNumber(value, locale);
 
@@ -364,46 +375,13 @@ const AdminOrders = () => {
     setPage(1);
   }, []);
 
-  // ── Rejection modal state ────────────────────────────────────────────────
-  const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
-  const [rejectionText, setRejectionText] = useState('');
-  const pendingRejectionRef = useRef(null);
-
-  const confirmRejection = useCallback(() => {
-    const reason = rejectionText.trim();
-    if (!reason) {
-      addToast(
-        isArabic ? 'يجب إدخال سبب الرفض لتأكيد العملية.' : 'A rejection reason is required to proceed.',
-        'warning'
-      );
+  const handleUpdateStatus = useCallback(async (order, nextStatus, rejectionReason = '') => {
+    if (!canConfirmOrders) {
+      addToast(isArabic ? 'ليس لديك صلاحية تأكيد الطلبات.' : 'You do not have permission to confirm orders.', 'error');
       return;
     }
-    const { order, nextStatus } = pendingRejectionRef.current || {};
-    if (!order || !nextStatus) return;
 
-    setRejectionModalOpen(false);
-    setRejectionText('');
-    pendingRejectionRef.current = null;
-
-    executeStatusUpdate(order, nextStatus, reason);
-  }, [rejectionText, isArabic, addToast]);
-
-  const cancelRejection = useCallback(() => {
-    setRejectionModalOpen(false);
-    setRejectionText('');
-    pendingRejectionRef.current = null;
-  }, []);
-
-  const handleUpdateStatus = useCallback(async (order, nextStatus) => {
     const nextStatusLabel = getManualOrderStatusLabel(nextStatus, isArabic ? 'ar' : 'en');
-    const normalizedNext = String(nextStatus || '').toLowerCase();
-
-    if (['rejected', 'failed', 'denied', 'cancelled', 'canceled'].includes(normalizedNext)) {
-      pendingRejectionRef.current = { order, nextStatus };
-      setRejectionText('');
-      setRejectionModalOpen(true);
-      return;
-    }
 
     const confirmationMessage = isArabic
       ? `هل تريد تحديث حالة هذا الطلب إلى "${nextStatusLabel}"؟`
@@ -413,8 +391,8 @@ const AdminOrders = () => {
       return;
     }
 
-    executeStatusUpdate(order, nextStatus, null);
-  }, [isArabic]);
+    executeStatusUpdate(order, nextStatus, rejectionReason);
+  }, [addToast, canConfirmOrders, isArabic]);
 
   const executeStatusUpdate = useCallback(async (order, nextStatus, rejectionReason) => {
     const nextStatusLabel = getManualOrderStatusLabel(nextStatus, isArabic ? 'ar' : 'en');
@@ -465,17 +443,23 @@ const AdminOrders = () => {
 
   const handleViewOrder = useCallback(async (order) => {
     setSelectedOrderId(order.id);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('orderId', order.id);
+    setSearchParams(nextParams, { replace: true });
 
     try {
       await getOrderById(order.id);
     } catch (error) {
       addToast(error?.message || (isArabic ? 'تعذر تحميل تفاصيل الطلب' : 'Unable to load order details'), 'error');
     }
-  }, [addToast, getOrderById, isArabic]);
+  }, [addToast, getOrderById, isArabic, searchParams, setSearchParams]);
 
   const handleCloseOrderDetails = useCallback(() => {
     setSelectedOrderId(null);
-  }, []);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('orderId');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   return (
     <div className="min-w-0 space-y-4 pb-4 sm:space-y-5">
@@ -676,7 +660,8 @@ const AdminOrders = () => {
             isArabic={isArabic}
             currencies={currencies}
             view="admin"
-            onUpdateStatus={handleUpdateStatus}
+            onUpdateStatus={canConfirmOrders ? handleUpdateStatus : undefined}
+            canUpdateStatus={canConfirmOrders}
             onSync={handleSync}
             isActionLoading={Boolean(selectedOrder && actionOrderId === selectedOrder.id)}
             isSyncing={Boolean(selectedOrder && syncingOrderId === selectedOrder.id)}
@@ -684,39 +669,6 @@ const AdminOrders = () => {
         </Suspense>
       ) : null}
 
-      {/* ── Rejection Reason Modal ────────────────────────────────────────── */}
-      <Modal
-        isOpen={rejectionModalOpen}
-        onClose={cancelRejection}
-        title={isArabic ? 'سبب رفض الطلب' : 'Order Rejection Reason'}
-        className="z-[90]"
-        footer={(
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button variant="ghost" className="flex-1" onClick={cancelRejection}>
-              {isArabic ? 'إلغاء' : 'Cancel'}
-            </Button>
-            <Button variant="danger" className="flex-1" onClick={confirmRejection}>
-              {isArabic ? 'تأكيد الرفض' : 'Confirm Rejection'}
-            </Button>
-          </div>
-        )}
-      >
-        <div className="space-y-3">
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {isArabic
-              ? 'يرجى كتابة السبب الذي سيظهر للعميل عند رفض الطلب.'
-              : 'Please write the reason that will be shown to the customer when the order is rejected.'}
-          </p>
-          <textarea
-            className={textareaClassName}
-            value={rejectionText}
-            onChange={(e) => setRejectionText(e.target.value)}
-            placeholder={isArabic ? 'اكتب سبب الرفض هنا...' : 'Enter rejection reason here...'}
-            autoFocus
-            rows={4}
-          />
-        </div>
-      </Modal>
     </div>
   );
 };

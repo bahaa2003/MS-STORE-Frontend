@@ -4,13 +4,13 @@ import { useTheme } from '../../context/ThemeContext';
 import { cn } from './Button';
 
 const variantStyles = {
-  default: 'border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)]',
-  glass: 'border-white/50 bg-white/55 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/65',
+  default: 'border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.78),rgb(var(--color-elevated-rgb)/0.58))] backdrop-blur-xl',
+  glass: 'border-[color:rgb(var(--color-border-rgb)/0.6)] bg-[color:rgb(var(--color-card-rgb)/0.62)] backdrop-blur-xl',
 };
 
 const compactVariantStyles = {
-  default: 'border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)] text-[var(--color-text)]',
-  glass: 'border-white/50 bg-white/55 text-slate-700 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/65 dark:text-slate-100',
+  default: 'border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.78),rgb(var(--color-elevated-rgb)/0.58))] text-[var(--color-text)] backdrop-blur-xl',
+  glass: 'border-[color:rgb(var(--color-border-rgb)/0.6)] bg-[color:rgb(var(--color-card-rgb)/0.62)] text-[var(--color-text)] backdrop-blur-xl',
 };
 
 const ThemeToggle = ({ className, compact = false, variant = 'default' }) => {
@@ -22,7 +22,7 @@ const ThemeToggle = ({ className, compact = false, variant = 'default' }) => {
         type="button"
         onClick={toggleTheme}
         className={cn(
-          'inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-[var(--shadow-subtle)] transition-all duration-200 hover:border-[color:rgb(var(--color-primary-rgb)/0.28)] hover:text-[var(--color-primary)] hover:-translate-y-0.5',
+          'inline-flex h-11 w-11 items-center justify-center rounded-full border shadow-[var(--shadow-subtle)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.24)] hover:text-[var(--color-primary)]',
           compactVariantStyles[variant] || compactVariantStyles.default,
           className
         )}
@@ -38,7 +38,7 @@ const ThemeToggle = ({ className, compact = false, variant = 'default' }) => {
       type="button"
       onClick={toggleTheme}
       className={cn(
-        'relative inline-flex h-11 w-[78px] items-center rounded-full border px-1.5 shadow-[var(--shadow-subtle)] transition-all duration-200 hover:border-[color:rgb(var(--color-primary-rgb)/0.28)]',
+        'relative inline-flex h-11 w-[82px] items-center rounded-full border px-1.5 shadow-[var(--shadow-subtle)] transition-all duration-200 hover:border-[color:rgb(var(--color-primary-rgb)/0.24)]',
         variantStyles[variant] || variantStyles.default,
         className
       )}
@@ -46,8 +46,8 @@ const ThemeToggle = ({ className, compact = false, variant = 'default' }) => {
     >
       <span
         className={cn(
-          'absolute left-1.5 inset-y-1.5 w-[34px] rounded-full bg-[var(--color-primary)] shadow-[var(--shadow-gold)] transition-transform duration-300 ease-out',
-          isDark ? 'translate-x-[34px]' : 'translate-x-0'
+          'absolute left-1.5 inset-y-1.5 w-[36px] rounded-full bg-[linear-gradient(135deg,var(--color-primary),var(--color-primary-hover))] shadow-[var(--shadow-gold)] transition-transform duration-300 ease-out',
+          isDark ? 'translate-x-[38px]' : 'translate-x-0'
         )}
       />
       <span className="relative z-10 grid w-full grid-cols-2 items-center">

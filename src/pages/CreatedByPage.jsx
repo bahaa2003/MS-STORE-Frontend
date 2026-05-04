@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowUpLeft,
@@ -6,21 +7,37 @@ import {
   Building2,
   Globe,
   Layers3,
+  Menu,
   MessageCircleMore,
   Palette,
   ShieldCheck,
   Sparkles,
   Store,
   Users2,
-  Zap
+  Zap,
+  LogIn,
+  UserPlus,
+  Home,
+  ChevronLeft,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import useAuthStore from '../store/useAuthStore';
+import useMediaStore from '../store/useMediaStore';
+import useGroupStore from '../store/useGroupStore';
+import Button from '../components/ui/Button';
+import { cn } from '../components/ui/Button';
+import ThemeToggle from '../components/ui/ThemeToggle';
+import LanguageSwitcher from '../components/ui/LanguageSwitcher';
+import BrandMark from '../components/layout/BrandMark';
+import PublicSidebar from '../components/layout/PublicSidebar';
 import digitechLogo from '../assets/digitech-solutions.png';
 import ahmedImage from '../assets/WhatsApp Image 2026-03-26 at 7.18.08 AM.jpeg';
 import kareemImage from '../assets/WhatsApp Image 2026-03-26 at 7.18.08 AM (1).jpeg';
 import bahaaImage from '../assets/WhatsApp Image 2026-03-26 at 7.18.08 AM (2).jpeg';
 
-const WHATSAPP_NUMBER = '01019603238';
+const WHATSAPP_NUMBER = '01096451539';
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER.replace(/^0/, '20')}`;
+const COMPANY_WEBSITE_LINK = 'https://digiteech.me/';
 
 
 const services = [
@@ -52,7 +69,7 @@ const services = [
 
 const projects = [
   {
-    name: 'IBRA Store',
+    name: 'MS STORE',
     category: 'متجر رقمي احترافي',
     summary:
       'نموذج عملي يجسد قدرتنا على تقديم منصة تجمع بين الأداء العالي، الثقة، وسهولة الاستخدام ضمن تجربة متقنة بصريًا ووظيفيًا.',
@@ -161,12 +178,107 @@ const sectionViewport = {
   margin: '0px 0px -8% 0px',
 };
 
+const GoogleMark = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4.5 w-4.5 shrink-0">
+    <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.2-1.9 2.9l3.1 2.4c1.8-1.7 2.9-4.1 2.9-7 0-.7-.1-1.4-.2-2H12z" />
+    <path fill="#34A853" d="M12 22c2.7 0 5-0.9 6.7-2.6l-3.1-2.4c-.9.6-2 1-3.6 1-2.7 0-5-1.8-5.8-4.3l-3.2 2.5C4.7 19.6 8 22 12 22z" />
+    <path fill="#4A90E2" d="M6.2 13.7c-.2-.6-.3-1.1-.3-1.7s.1-1.2.3-1.7L3 7.8C2.4 9 2 10.4 2 12s.4 3 1 4.2l3.2-2.5z" />
+    <path fill="#FBBC05" d="M12 5c1.5 0 2.9.5 4 1.6l3-3C17 1.8 14.7 1 12 1 8 1 4.7 3.4 3 7.8l3.2 2.5C7 6.8 9.3 5 12 5z" />
+  </svg>
+);
+
+const GoldShineButton = ({ children, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="group relative inline-flex h-11 w-full items-center justify-center overflow-hidden rounded-full border border-[#d8b36b]/75 bg-[linear-gradient(180deg,#f6e4a2_0%,#d4af37_48%,#b98a1e_100%)] px-4 text-sm font-extrabold text-white shadow-[0_18px_34px_-20px_rgba(212,175,55,0.95)] transition-all hover:-translate-y-0.5"
+  >
+    <span className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.65),transparent_42%)] opacity-85" />
+    <span className="absolute left-[-45%] top-[-18%] h-[140%] w-[30%] rotate-[16deg] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.22),rgba(255,255,255,0.95),rgba(255,255,255,0.22),transparent)] blur-[1px] mix-blend-screen animate-[gold-shine_2.8s_ease-in-out_infinite]" />
+    <span className="relative z-10 flex items-center gap-2">
+      <LogIn className="h-4 w-4" />
+      {children}
+    </span>
+  </button>
+);
+
 const CreatedByPage = () => {
+  const navigate = useNavigate();
+  const { i18n } = useTranslation();
+  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const isArabic = i18n.resolvedLanguage === 'ar';
+
+  const handleLogin = useCallback(() => {
+    navigate('/auth?mode=login');
+  }, [navigate]);
+
+  const handleCreateAccount = useCallback(() => {
+    navigate('/auth?mode=signup');
+  }, [navigate]);
+
+  const handleGoogleLogin = useCallback(() => {
+    Promise.resolve(loginWithGoogle());
+  }, [loginWithGoogle]);
+
+  const handleHome = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
+  const handleAbout = useCallback(() => {
+    navigate('/about-us');
+  }, [navigate]);
+
+  const handleCreatedBy = useCallback(() => {
+    navigate('/created-by');
+  }, [navigate]);
+
   return (
-    <div
-      dir="rtl"
-      className="relative min-h-screen overflow-hidden bg-transparent text-[var(--color-text)]"
-    >
+    <div className="min-h-screen pb-5 pt-[4.75rem]">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-[color:rgb(var(--color-border-rgb)/0.32)] bg-[color:rgb(var(--color-background-rgb)/0.88)] shadow-[0_18px_44px_-34px_rgb(var(--color-primary-rgb)/0.36)] backdrop-blur-xl">
+        <div className="mx-auto max-w-[var(--shell-max-width)] px-3 py-2.5 sm:px-4 lg:px-6">
+          <div className="flex flex-col items-start gap-2 rounded-[1.5rem] border border-[color:rgb(var(--color-border-rgb)/0.22)] bg-[color:rgb(var(--color-card-rgb)/0.22)] px-3 py-2 shadow-[var(--shadow-subtle)] backdrop-blur-xl sm:px-4 sm:py-2.5">
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsMenuOpen((previous) => !previous)}
+                  className="inline-flex h-9.5 w-9.5 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[color:rgb(var(--color-surface-rgb)/0.55)] text-[var(--color-text)] transition-all hover:-translate-y-0.5 hover:text-[var(--color-primary)]"
+                  aria-label={isArabic ? 'القائمة' : 'Menu'}
+                >
+                  <Menu className="h-4.5 w-4.5" />
+                </button>
+                <BrandMark size="xs" />
+              </div>
+
+              <ThemeToggle variant="glass" compact className="h-8 w-8" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="px-4 pt-3 sm:px-6 lg:px-8 lg:hidden">
+        <div className="mx-auto max-w-[var(--shell-max-width)]">
+          <GoldShineButton onClick={handleLogin}>
+            {isArabic ? 'تسجيل الدخول' : 'Login'}
+          </GoldShineButton>
+        </div>
+      </div>
+
+      <PublicSidebar
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        onHome={handleHome}
+        onAbout={handleAbout}
+        onLogin={handleLogin}
+        onCreateAccount={handleCreateAccount}
+        onGoogleLogin={handleGoogleLogin}
+        onCreatedBy={handleCreatedBy}
+        isBusy={false}
+        isArabic={isArabic}
+      />
+
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
         <motion.section
           variants={heroContainerVariants}
@@ -181,7 +293,7 @@ const CreatedByPage = () => {
               <motion.div variants={heroItemVariants} className="inline-flex">
                 <span className="inline-flex items-center gap-2 rounded-full border border-sky-200/70 bg-white/85 px-4 py-2 text-xs font-semibold tracking-[0.22em] text-sky-700 shadow-[0_10px_30px_-18px_rgba(14,116,244,0.45)] backdrop-blur-xl dark:border-sky-400/20 dark:bg-sky-500/10 dark:text-sky-100">
                   <BadgeCheck className="h-4 w-4" />
-                  Trusted &amp; Built for IBRA Store
+                  Trusted &amp; Built for MS STORE
                 </span>
               </motion.div>
 
@@ -203,12 +315,10 @@ const CreatedByPage = () => {
 
                 <div className="space-y-4">
                   <h1 className="max-w-4xl text-3xl font-black leading-[1.25] text-slate-950 dark:text-white sm:text-4xl lg:text-[3.4rem]">
-                    نصنع واجهات وتجارب رقمية تمنح مشروعك هيبة العلامات الكبرى وتحوّل فكرتك إلى حضور لا يُنسى.
+                    تصميم (منصة باسمك) أو مواقع إلكترونية باسمك، أي موقع يتصمم على مزاجك زي ما تحب.
                   </h1>
-                  <div className="max-w-2xl rounded-[1.6rem] border border-emerald-200/70 bg-[linear-gradient(135deg,rgba(3,161,98,0.10),rgba(255,255,255,0.94),rgba(14,165,233,0.08))] p-4 text-center shadow-[0_22px_55px_-36px_rgba(5,150,105,0.45)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(16,185,129,0.16),rgba(255,255,255,0.04),rgba(14,165,233,0.08))] sm:p-5">
-                    <p className="text-sm font-semibold leading-7 text-emerald-700 dark:text-emerald-200">
-                      ابدأ مشروعك اليوم واجعل فكرتك تنطلق باحترافية
-                    </p>
+                  <div className="max-w-2xl rounded-[1.6rem] border border-cyan-200/70 bg-[linear-gradient(135deg,rgba(14,165,233,0.12),rgba(255,255,255,0.96),rgba(34,197,94,0.08))] p-4 text-center shadow-[0_22px_55px_-36px_rgba(14,165,233,0.38)] backdrop-blur-xl dark:border-cyan-400/20 dark:bg-[linear-gradient(135deg,rgba(14,165,233,0.16),rgba(255,255,255,0.04),rgba(34,197,94,0.10))] sm:p-5">
+                
                     <motion.a
                       href={WHATSAPP_LINK}
                       target="_blank"
@@ -230,6 +340,22 @@ const CreatedByPage = () => {
                         />
                         <MessageCircleMore className="relative h-5 w-5" />
                         <span className="relative">تواصل معنا الآن</span>
+                      </span>
+                    </motion.a>
+
+                    <motion.a
+                      href={COMPANY_WEBSITE_LINK}
+                      target="_blank"
+                      rel="noreferrer"
+                      whileHover={{ y: -4, scale: 1.04 }}
+                      whileTap={{ scale: 0.985 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 16 }}
+                      className="group relative mt-3 inline-flex items-center justify-center"
+                    >
+                      <span className="pointer-events-none absolute left-1/2 top-1/2 h-[132%] w-[120%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(34,197,94,0.26),rgba(14,165,233,0.18),transparent_72%)] blur-2xl opacity-75" />
+                      <span className="relative inline-flex items-center justify-center gap-2.5 rounded-[1.05rem] border border-cyan-200/60 bg-[linear-gradient(135deg,rgba(8,145,178,0.96),rgba(14,165,233,0.96),rgba(34,197,94,0.92))] px-5 py-2.5 text-sm font-extrabold text-white shadow-[0_18px_40px_-18px_rgba(14,165,233,0.75)] backdrop-blur-xl transition-all duration-200 group-hover:border-cyan-300 group-hover:shadow-[0_22px_48px_-18px_rgba(14,165,233,0.92)] sm:px-6 sm:text-base">
+                        <Globe className="relative h-4.5 w-4.5" />
+                        <span className="relative">اضغط هنا لعرض اعمالنا</span>
                       </span>
                     </motion.a>
                   </div>
@@ -402,7 +528,7 @@ const CreatedByPage = () => {
               نفذنا مشاريع ناجحة مثل
             </div>
             <p className="mx-auto mt-4 max-w-3xl text-base leading-8 text-slate-600 dark:text-slate-300/80">
-              IBRA Store مثال واضح على قدرتنا على تنفيذ حلول رقمية قوية تجمع بين الأداء والثقة وسهولة الاستخدام.
+              MS STORE مثال واضح على قدرتنا على تنفيذ حلول رقمية قوية تجمع بين الأداء والثقة وسهولة الاستخدام.
             </p>
           </div>
 

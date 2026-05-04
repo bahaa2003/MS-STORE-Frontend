@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit, Image as ImageIcon, Plus, RefreshCw, Trash2, AlertCircle, Info, Search, Check, Package } from 'lucide-react';
+import { Edit, Image as ImageIcon, Plus, RefreshCw, Trash2, Info, Search, Check, Package } from 'lucide-react';
 import { resolveImageUrl } from '../../utils/imageUrl';
 import { uploadImage } from '../../services/realApi';
 import useMediaStore from '../../store/useMediaStore';
@@ -13,7 +13,7 @@ import Badge from '../../components/ui/Badge';
 import { useToast } from '../../components/ui/Toast';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatNumber } from '../../utils/intl';
-import { validateProductForm, getProductStatus, getAvailableProductStatuses, getScheduleVisibilityModes } from '../../utils/productStatus';
+import { validateProductForm, getProductStatus, getAvailableProductStatuses } from '../../utils/productStatus';
 
 const getProviderProductSearchToken = (product) =>
     `${product?.name || ''} ${getProviderProductPriceValue(product) || ''}`.toLowerCase();
@@ -275,6 +275,7 @@ const AdminProducts = () => {
         enableManualPrice: false,
         manualPriceAdjustment: '',
         syncedProviderBasePrice: '',
+        originalPriceCoins: '',
         basePriceCoins: '',
         minQty: 1,
         maxQty: 999,
@@ -290,9 +291,6 @@ const AdminProducts = () => {
         pauseSales: false,
         pauseReason: '',
         internalNotes: '',
-        // =====================================================
-        // جدولة الظهور - Schedule
-        // =====================================================
         enableSchedule: false,
         scheduledStartAt: '',
         scheduledEndAt: '',
@@ -303,9 +301,6 @@ const AdminProducts = () => {
         minimumOrderQty: 1,
         maximumOrderQty: 999,
         stepQty: 1,
-        // =====================================================
-        // إدارة المخزون - Inventory Management
-        // =====================================================
         trackInventory: false,
         stockQuantity: 999,
         lowStockThreshold: 50,
@@ -497,8 +492,13 @@ const AdminProducts = () => {
                     fallbackMaxQty: prev.maximumOrderQty,
                 })
             ));
-        } catch {
-            addToast('تعذر مزامنة السعر والحدود من المورد', 'error');
+        } catch (error) {
+            addToast(getReadableErrorMessage(
+                error,
+                isEnglish
+                    ? 'Could not sync supplier price. Check the selected supplier product, then retry.'
+                    : 'تعذرت مزامنة سعر المورد: تأكد من المنتج المختار من المزود ثم أعد المحاولة.'
+            ), 'error');
         } finally {
             setIsSyncingPrice(false);
         }
@@ -547,6 +547,38 @@ const AdminProducts = () => {
         })
         .filter((m) => m.internalField && m.externalField);
 
+    const getReadableErrorMessage = (error, fallback) => {
+        const rawMessage = String(error?.response?.data?.message || error?.message || '').trim();
+        const status = error?.response?.status;
+        const normalized = rawMessage.toLowerCase();
+
+        if (status === 401 || normalized.includes('unauthorized') || normalized.includes('token')) {
+            return isEnglish
+                ? 'Your session expired. Sign in again, then retry the action.'
+                : 'انتهت الجلسة: سجّل الدخول مرة أخرى ثم أعد المحاولة.';
+        }
+
+        if (status === 403 || normalized.includes('forbidden') || normalized.includes('permission')) {
+            return isEnglish
+                ? 'You do not have permission to complete this action.'
+                : 'ليست لديك صلاحية لتنفيذ هذا الإجراء. راجع صلاحيات الحساب.';
+        }
+
+        if (status === 404 || normalized.includes('not found')) {
+            return isEnglish
+                ? 'The item was not found. Refresh the page and try again.'
+                : 'العنصر غير موجود أو تم حذفه. حدّث الصفحة ثم حاول مرة أخرى.';
+        }
+
+        if (status >= 500 || normalized.includes('network') || normalized.includes('timeout')) {
+            return isEnglish
+                ? 'Connection or server issue. Check the backend connection and try again.'
+                : 'مشكلة اتصال أو خادم: تأكد من اتصال الباك إند ثم حاول مرة أخرى.';
+        }
+
+        return rawMessage || fallback;
+    };
+
     const handleResetData = () => {
         if (window.confirm('This will restore default products and categories. Continue?')) {
             resetProducts();
@@ -561,14 +593,19 @@ const AdminProducts = () => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 20 * 1024 * 1024) {
-            addToast(isEnglish ? 'Image must be under 20MB' : 'يجب أن يكون حجم الصورة أقل من 20 ميجابايت', 'error');
+            addToast(isEnglish ? 'Image is too large: upload an image under 20MB.' : 'الصورة كبيرة جدًا: ارفع صورة أقل من 20 ميجابايت.', 'error');
             return;
         }
         try {
             const path = await uploadImage(uploadCategory, file);
             setForm((prev) => ({ ...prev, image: path }));
-        } catch {
-            addToast('فشل رفع الصورة', 'error');
+        } catch (error) {
+            addToast(getReadableErrorMessage(
+                error,
+                isEnglish
+                    ? 'Image upload failed. Check the image format and try again.'
+                    : 'تعذر رفع الصورة: تأكد من صيغة الصورة وحاول مرة أخرى.'
+            ), 'error');
         }
     };
 
@@ -602,6 +639,7 @@ const AdminProducts = () => {
                 enableManualPrice: Number(product.manualPriceAdjustment || 0) !== 0,
                 manualPriceAdjustment: normalizePriceInput(product.manualPriceAdjustment ?? ''),
                 syncedProviderBasePrice: normalizePriceInput(product.syncedProviderBasePrice ?? product.basePriceCoins ?? ''),
+                originalPriceCoins: normalizePriceInput(product.originalPriceCoins ?? product.originalPrice ?? product.costPrice ?? ''),
                 basePriceCoins: normalizePriceInput(product.basePriceCoins ?? ''),
                 minQty: product.minQty ?? 1,
                 maxQty: product.maxQty ?? 999,
@@ -614,18 +652,18 @@ const AdminProducts = () => {
                 pauseSales: product.pauseSales || false,
                 pauseReason: product.pauseReason || '',
                 internalNotes: product.internalNotes || '',
-                enableSchedule: product.enableSchedule || false,
-                scheduledStartAt: product.scheduledStartAt || '',
-                scheduledEndAt: product.scheduledEndAt || '',
-                scheduleVisibilityMode: product.scheduleVisibilityMode || 'hide',
+                enableSchedule: false,
+                scheduledStartAt: '',
+                scheduledEndAt: '',
+                scheduleVisibilityMode: 'hide',
                 minimumOrderQty: product.minimumOrderQty ?? 1,
                 maximumOrderQty: product.maximumOrderQty ?? 999,
                 stepQty: product.stepQty ?? 1,
-                trackInventory: product.trackInventory || false,
-                stockQuantity: product.stockQuantity ?? 999,
-                lowStockThreshold: product.lowStockThreshold ?? 50,
-                hideWhenOutOfStock: product.hideWhenOutOfStock || false,
-                showOutOfStockLabel: product.showOutOfStockLabel !== false,
+                trackInventory: false,
+                stockQuantity: 999,
+                lowStockThreshold: 50,
+                hideWhenOutOfStock: false,
+                showOutOfStockLabel: true,
             });
         } else {
             setEditingProduct(null);
@@ -649,6 +687,7 @@ const AdminProducts = () => {
                 enableManualPrice: false,
                 manualPriceAdjustment: '',
                 syncedProviderBasePrice: '',
+                originalPriceCoins: '',
                 basePriceCoins: '',
                 minQty: 1,
                 maxQty: 999,
@@ -703,6 +742,22 @@ const AdminProducts = () => {
         const fallbackCategory = String(productForm.category || categories[0]?.id || '').trim();
         const productImage = String(productForm.image || editingProduct?.image || '').trim();
 
+        if (isAutomaticConnection && !selectedSupplierId) {
+            addToast(isEnglish
+                ? 'Supplier is required: choose the provider that will fulfill this automatic product.'
+                : 'المورد مطلوب: اختر المزود الذي سينفذ هذا المنتج الآلي.',
+            'error');
+            return;
+        }
+
+        if (isAutomaticConnection && !selectedProviderProductId) {
+            addToast(isEnglish
+                ? 'Supplier product is required: choose the matching product from the selected provider.'
+                : 'منتج المورد مطلوب: اختر المنتج المطابق من قائمة المزود المختار.',
+            'error');
+            return;
+        }
+
         let minQty = Number(productForm.minimumOrderQty === '' || productForm.minimumOrderQty == null ? 1 : productForm.minimumOrderQty);
         let maxQty = Number(productForm.maximumOrderQty === '' || productForm.maximumOrderQty == null ? 999 : productForm.maximumOrderQty);
         const stepQty = Number(productForm.stepQty === '' || productForm.stepQty == null ? 1 : productForm.stepQty);
@@ -731,14 +786,22 @@ const AdminProducts = () => {
                 minQty = syncedSnapshot.minimumOrderQty;
                 maxQty = syncedSnapshot.maximumOrderQty;
                 setProductForm((prev) => ({ ...prev, ...syncedSnapshot }));
-            } catch {
-                addToast('فشل مزامنة السعر والحدود من المورد قبل الحفظ', 'error');
+            } catch (error) {
+                addToast(getReadableErrorMessage(
+                    error,
+                    isEnglish
+                        ? 'Could not refresh supplier price before saving. Check the provider product link.'
+                        : 'تعذرت مزامنة السعر قبل الحفظ: تأكد من اختيار المورد والمنتج الصحيحين.'
+                ), 'error');
                 return;
             }
         }
 
         if (Number.isNaN(basePriceCoins) || basePriceCoins <= 0) {
-            addToast('يرجى إدخال سعر يدوي صحيح', 'error');
+            addToast(isEnglish
+                ? 'Final price is required: enter a number greater than zero.'
+                : 'السعر النهائي غير صحيح: أدخل رقمًا أكبر من صفر.',
+            'error');
             return;
         }
 
@@ -770,6 +833,9 @@ const AdminProducts = () => {
             enableManualPrice: productForm.enableManualPrice,
             manualPriceAdjustment,
             syncedProviderBasePrice,
+            originalPriceCoins: isAutomaticConnection ? '' : normalizePriceInput(productForm.originalPriceCoins),
+            originalPrice: isAutomaticConnection ? '' : normalizePriceInput(productForm.originalPriceCoins),
+            costPrice: isAutomaticConnection ? '' : normalizePriceInput(productForm.originalPriceCoins),
             basePriceCoins: basePriceCoinsValue || String(basePriceCoins),
             
             // الكميات والحدود
@@ -788,18 +854,15 @@ const AdminProducts = () => {
             pauseReason: productForm.pauseReason,
             internalNotes: productForm.internalNotes,
             
-            // الجدولة
-            enableSchedule: productForm.enableSchedule,
-            scheduledStartAt: productForm.scheduledStartAt || null,
-            scheduledEndAt: productForm.scheduledEndAt || null,
-            scheduleVisibilityMode: productForm.scheduleVisibilityMode,
-            
-            // المخزون
-            trackInventory: productForm.trackInventory,
-            stockQuantity: productForm.trackInventory ? Number(productForm.stockQuantity || 0) : 999,
-            lowStockThreshold: productForm.trackInventory ? Number(productForm.lowStockThreshold || 0) : 0,
-            hideWhenOutOfStock: productForm.hideWhenOutOfStock,
-            showOutOfStockLabel: productForm.showOutOfStockLabel,
+            enableSchedule: false,
+            scheduledStartAt: null,
+            scheduledEndAt: null,
+            scheduleVisibilityMode: 'hide',
+            trackInventory: false,
+            stockQuantity: 999,
+            lowStockThreshold: 0,
+            hideWhenOutOfStock: false,
+            showOutOfStockLabel: true,
         };
 
         setIsSavingProduct(true);
@@ -821,7 +884,12 @@ const AdminProducts = () => {
 
             void loadProducts({ force: true });
         } catch (error) {
-            addToast(error?.message || 'فشل حفظ المنتج', 'error');
+            addToast(getReadableErrorMessage(
+                error,
+                editingProduct
+                    ? (isEnglish ? 'Could not update the product. Review the fields and try again.' : 'تعذر تحديث المنتج: راجع البيانات المطلوبة ثم حاول مرة أخرى.')
+                    : (isEnglish ? 'Could not add the product. Review the fields and try again.' : 'تعذر إضافة المنتج: راجع البيانات المطلوبة ثم حاول مرة أخرى.')
+            ), 'error');
         } finally {
             setIsSavingProduct(false);
         }
@@ -843,7 +911,12 @@ const AdminProducts = () => {
                 'success'
             );
         } catch (error) {
-            addToast(error?.message || (isEnglish ? `Failed to ${actionLabel} product` : `فشل ${actionLabel} المنتج`), 'error');
+            addToast(getReadableErrorMessage(
+                error,
+                isEnglish
+                    ? `Could not ${actionLabel} product. Refresh the list and try again.`
+                    : `تعذر ${actionLabel} المنتج: حدّث القائمة ثم حاول مرة أخرى.`
+            ), 'error');
         } finally {
             setTogglingProductId((currentId) => (currentId === product.id ? null : currentId));
         }
@@ -873,7 +946,7 @@ const AdminProducts = () => {
         const safeSortOrder = Number.isFinite(sortOrder) ? sortOrder : 0;
 
         if (!name) {
-            addToast(isEnglish ? 'Category name is required' : 'اسم القسم مطلوب', 'error');
+            addToast(isEnglish ? 'Category name is required: write the name shown in the catalog list.' : 'اسم القسم مطلوب: اكتب الاسم الذي سيظهر في قائمة الكتالوجات.', 'error');
             return;
         }
 
@@ -902,7 +975,12 @@ const AdminProducts = () => {
             setIsCategoryModalOpen(false);
             setEditingCategory(null);
         } catch (error) {
-            addToast(error?.message || (isEnglish ? 'Failed to save category' : 'فشل حفظ القسم'), 'error');
+            addToast(getReadableErrorMessage(
+                error,
+                isEnglish
+                    ? 'Could not save category. Check the name/image and try again.'
+                    : 'تعذر حفظ القسم: راجع الاسم أو الصورة ثم حاول مرة أخرى.'
+            ), 'error');
         } finally {
             setIsSavingCategory(false);
         }
@@ -917,7 +995,12 @@ const AdminProducts = () => {
             await deleteCategory(category.id);
             addToast(isEnglish ? 'Category deleted' : 'تم حذف القسم', 'success');
         } catch (error) {
-            addToast(error?.message || (isEnglish ? 'Failed to delete category' : 'فشل حذف القسم'), 'error');
+            addToast(getReadableErrorMessage(
+                error,
+                isEnglish
+                    ? 'Could not delete category. It may contain products or has already been removed.'
+                    : 'تعذر حذف القسم: قد يكون مرتبطًا بمنتجات أو تم حذفه بالفعل.'
+            ), 'error');
         }
     };
 
@@ -1237,6 +1320,7 @@ const AdminProducts = () => {
                                                     autoFulfillmentEnabled: option.value === 'auto',
                                                     syncPriceWithProvider: option.value === 'auto' ? prev.syncPriceWithProvider : false,
                                                     externalPricingMode: option.value === 'auto' ? prev.externalPricingMode : 'use_local_price',
+                                                    originalPriceCoins: option.value === 'manual' ? prev.originalPriceCoins : '',
                                                 }))}
                                                 className={`h-11 rounded-[0.95rem] border px-3 text-sm font-semibold transition-all ${
                                                     isSelected
@@ -1271,6 +1355,7 @@ const AdminProducts = () => {
                                                 providerProductId: '',
                                                 externalProductName: '',
                                                 syncedProviderBasePrice: '',
+                                                originalPriceCoins: '',
                                                 basePriceCoins: '',
                                                 enableManualPrice: false,
                                                 manualPriceAdjustment: '',
@@ -1425,14 +1510,6 @@ const AdminProducts = () => {
                                     autoFulfillmentEnabled
                                 </label>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">ربط حقول المزود (داخلي:خارجي)</label>
-                                    <textarea
-                                        className="w-full rounded-lg border bg-white p-2 dark:border-gray-700 dark:bg-gray-900 min-h-[90px]"
-                                        value={productForm.supplierFieldMappingsText}
-                                        onChange={(e) => setProductForm({ ...productForm, supplierFieldMappingsText: e.target.value })}
-                                    />
-                                </div>
                             </>
                             ) : null}
 
@@ -1577,7 +1654,21 @@ const AdminProducts = () => {
                                     disabled={Boolean(canSyncWithProvider)}
                                     required
                                 />
-                                <div className="w-full">
+                                <div className="w-full space-y-3">
+                                    {productForm.connectionType === 'manual' ? (
+                                        <Input
+                                            label={isEnglish ? 'Original Price' : 'السعر الأصلي'}
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={productForm.originalPriceCoins}
+                                            onChange={(e) => setProductForm({ ...productForm, originalPriceCoins: e.target.value })}
+                                            suffix={(
+                                                <span className="text-xs font-semibold text-[var(--color-muted)]">
+                                                    {isEnglish ? 'USD' : 'دولار'}
+                                                </span>
+                                            )}
+                                        />
+                                    ) : null}
                                     <Input
                                         label={isEnglish ? 'Final Price' : 'السعر النهائي'}
                                         type="text"
@@ -1700,124 +1791,6 @@ const AdminProducts = () => {
                                 value={productForm.internalNotes}
                                 onChange={(e) => setProductForm({ ...productForm, internalNotes: e.target.value })}
                             />
-                        </div>
-                    </div>
-
-                    {/* ========== 4. جدولة الظهور ========== */}
-                    <div>
-                        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">4</span>
-                            جدولة الظهور
-                        </h3>
-                        <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
-                            <label className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-                                <input
-                                    type="checkbox"
-                                    checked={Boolean(productForm.enableSchedule)}
-                                    onChange={(e) => setProductForm({ ...productForm, enableSchedule: e.target.checked })}
-                                />
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">تفعيل جدولة ظهور المنتج</span>
-                            </label>
-
-                            {productForm.enableSchedule && (
-                                <>
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <Input
-                                            label="وقت البداية"
-                                            type="datetime-local"
-                                            value={productForm.scheduledStartAt}
-                                            onChange={(e) => setProductForm({ ...productForm, scheduledStartAt: e.target.value })}
-                                            required
-                                        />
-                                        <Input
-                                            label="وقت النهاية"
-                                            type="datetime-local"
-                                            value={productForm.scheduledEndAt}
-                                            onChange={(e) => setProductForm({ ...productForm, scheduledEndAt: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">طريقة التعامل خارج فترة الجدولة</label>
-                                        <select
-                                            className={`${selectClassName} h-11 dark:[color-scheme:dark]`}
-                                            value={productForm.scheduleVisibilityMode}
-                                            onChange={(e) => setProductForm({ ...productForm, scheduleVisibilityMode: e.target.value })}
-                                        >
-                                            {getScheduleVisibilityModes().map((mode) => (
-                                                <option key={mode.value} value={mode.value} className="bg-white text-gray-900 dark:bg-gray-950 dark:text-white">{mode.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ========== 5. إدارة المخزون ========== */}
-                    <div>
-                        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">5</span>
-                            إدارة المخزون
-                        </h3>
-                        <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
-                            <label className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-                                <input
-                                    type="checkbox"
-                                    checked={Boolean(productForm.trackInventory)}
-                                    onChange={(e) => setProductForm({ ...productForm, trackInventory: e.target.checked })}
-                                />
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">تفعيل تتبع المخزون</span>
-                            </label>
-
-                            {productForm.trackInventory && (
-                                <>
-                                    {Number(productForm.stockQuantity || 0) <= Number(productForm.lowStockThreshold || 50) && (
-                                        <div className="flex gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-900 dark:bg-yellow-900/20">
-                                            <AlertCircle className="h-5 w-5 flex-shrink-0 text-yellow-600 dark:text-yellow-500" />
-                                            <span className="text-sm text-yellow-600 dark:text-yellow-500">تحذير: المخزون منخفض!</span>
-                                        </div>
-                                    )}
-
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <Input
-                                            label="كمية المخزون"
-                                            type="number"
-                                            value={productForm.stockQuantity}
-                                            onChange={(e) => setProductForm({ ...productForm, stockQuantity: e.target.value })}
-                                            required
-                                        />
-                                        <Input
-                                            label="حد المخزون المنخفض"
-                                            type="number"
-                                            value={productForm.lowStockThreshold}
-                                            onChange={(e) => setProductForm({ ...productForm, lowStockThreshold: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-
-                                    <label className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-                                        <input
-                                            type="checkbox"
-                                            checked={Boolean(productForm.hideWhenOutOfStock)}
-                                            onChange={(e) => setProductForm({ ...productForm, hideWhenOutOfStock: e.target.checked })}
-                                        />
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">إخفاء المنتج عند نفاد المخزون</span>
-                                    </label>
-
-                                    {!productForm.hideWhenOutOfStock && (
-                                        <label className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={Boolean(productForm.showOutOfStockLabel)}
-                                                onChange={(e) => setProductForm({ ...productForm, showOutOfStockLabel: e.target.checked })}
-                                            />
-                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">إظهار المنتج كنفد مخزون</span>
-                                        </label>
-                                    )}
-                                </>
-                            )}
                         </div>
                     </div>
 

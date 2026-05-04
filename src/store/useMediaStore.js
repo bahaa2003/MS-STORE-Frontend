@@ -78,6 +78,10 @@ const mergeSavedProductSnapshot = (baseProduct = {}, apiProduct = {}) => ({
     : Boolean(baseProduct.enableManualPrice),
   manualPriceAdjustment: pickDefinedProductValue(apiProduct.manualPriceAdjustment, baseProduct.manualPriceAdjustment ?? ''),
   syncedProviderBasePrice: apiProduct.syncedProviderBasePrice ?? baseProduct.syncedProviderBasePrice ?? null,
+  originalPriceCoins: pickDefinedProductValue(
+    apiProduct.originalPriceCoins ?? apiProduct.originalPrice ?? apiProduct.costPrice,
+    baseProduct.originalPriceCoins ?? baseProduct.originalPrice ?? baseProduct.costPrice ?? ''
+  ),
 });
 
 const splitProductStatusUpdate = (currentProduct = {}, updates = {}) => {
@@ -176,6 +180,7 @@ const normalizeProductRecord = (product = {}, categories = mockCategories) => {
       : Number(manualPriceAdjustment || 0) !== 0,
     manualPriceAdjustment,
     syncedProviderBasePrice: product.syncedProviderBasePrice ?? null,
+    originalPriceCoins: product.originalPriceCoins ?? product.originalPrice ?? product.costPrice ?? '',
     searchIndex: product.searchIndex || buildProductSearchIndex(product),
   };
 

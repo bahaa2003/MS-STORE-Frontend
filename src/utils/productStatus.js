@@ -211,41 +211,41 @@ export function validateProductForm(inputProductForm, options = {}) {
     stepQty: rawStepQty === '' || rawStepQty == null ? 1 : rawStepQty,
   };
 
-  if (requireImage && !rawImage) errors.push('Product image is required');
+  if (requireImage && !rawImage) errors.push('صورة المنتج مطلوبة: ارفع صورة واضحة للمنتج قبل الحفظ.');
 
-  if (!productForm.name || !productForm.name.trim()) errors.push('اسم المنتج مطلوب');
-  if (!productForm.category || !productForm.category.trim()) errors.push('التصنيف مطلوب');
+  if (!productForm.name || !productForm.name.trim()) errors.push('اسم المنتج مطلوب: اكتب اسمًا يظهر للعميل في المتجر.');
+  if (!productForm.category || !productForm.category.trim()) errors.push('التصنيف مطلوب: اختر القسم الذي سيظهر داخله المنتج.');
 
-  if (requireImage && !productForm.image) errors.push('ØµÙˆØ±Ø© Ø§Ù„Ù…Ù†ØªØ¬ Ù…Ø·Ù„ÙˆØ¨Ø©');
+  if (requireImage && !productForm.image) errors.push('صورة المنتج مطلوبة: لم يتم العثور على رابط الصورة بعد الرفع.');
 
   const minQty = Number(productForm.minimumOrderQty || 1);
   const maxQty = Number(productForm.maximumOrderQty || 999);
   const stepQty = Number(productForm.stepQty || 1);
 
-  if (minQty < 1) errors.push('الحد الأدنى للطلب يجب أن يكون 1 على الأقل');
-  if (maxQty < 1) errors.push('الحد الأقصى للطلب يجب أن يكون 1 على الأقل');
-  if (maxQty < minQty) errors.push('الحد الأقصى لا يمكن أن يكون أقل من الحد الأدنى');
-  if (stepQty < 1) errors.push('خطوة الزيادة يجب أن تكون 1 على الأقل');
+  if (minQty < 1) errors.push('الحد الأدنى للطلب غير صحيح: أدخل رقمًا يبدأ من 1 أو أكثر.');
+  if (maxQty < 1) errors.push('الحد الأقصى للطلب غير صحيح: أدخل رقمًا يبدأ من 1 أو أكثر.');
+  if (maxQty < minQty) errors.push('حدود الطلب غير منطقية: الحد الأقصى يجب أن يكون أكبر من أو يساوي الحد الأدنى.');
+  if (stepQty < 1) errors.push('خطوة الزيادة غير صحيحة: يجب أن تكون 1 أو أكثر.');
 
   if (productForm.trackInventory) {
     const stock = Number(productForm.stockQuantity || 0);
     const threshold = Number(productForm.lowStockThreshold || 0);
 
-    if (stock < 0) errors.push('كمية المخزون لا يمكن أن تكون سالبة');
-    if (threshold < 0) errors.push('حد التنبيه لا يمكن أن يكون سالبًا');
-    if (threshold > stock) errors.push('حد التنبيه يجب أن يكون أقل من كمية المخزون');
+    if (stock < 0) errors.push('كمية المخزون غير صحيحة: لا يمكن إدخال رقم سالب.');
+    if (threshold < 0) errors.push('حد تنبيه المخزون غير صحيح: لا يمكن أن يكون رقمًا سالبًا.');
+    if (threshold > stock) errors.push('حد تنبيه المخزون أعلى من الكمية: اجعله أقل من أو يساوي كمية المخزون.');
   }
 
   if (productForm.enableSchedule) {
-    if (!productForm.scheduledStartAt) errors.push('تاريخ البداية مطلوب عند تفعيل الجدولة');
-    if (!productForm.scheduledEndAt) errors.push('تاريخ النهاية مطلوب عند تفعيل الجدولة');
+    if (!productForm.scheduledStartAt) errors.push('تاريخ بداية الجدولة مطلوب: اختر وقت بداية ظهور المنتج.');
+    if (!productForm.scheduledEndAt) errors.push('تاريخ نهاية الجدولة مطلوب: اختر وقت انتهاء ظهور المنتج.');
 
     if (
       productForm.scheduledStartAt &&
       productForm.scheduledEndAt &&
       new Date(productForm.scheduledStartAt) >= new Date(productForm.scheduledEndAt)
     ) {
-      errors.push('تاريخ البداية يجب أن يكون قبل تاريخ النهاية');
+      errors.push('نطاق الجدولة غير صحيح: تاريخ البداية يجب أن يكون قبل تاريخ النهاية.');
     }
   }
 

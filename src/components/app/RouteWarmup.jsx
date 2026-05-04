@@ -8,7 +8,6 @@ const loadProducts = () => import('../../pages/Products');
 const loadOrders = () => import('../../pages/Orders');
 const loadWallet = () => import('../../pages/Wallet');
 const loadSettings = () => import('../../pages/Settings');
-const loadManagerDashboard = () => import('../../pages/ManagerDashboard');
 const loadAdminDashboard = () => import('../../pages/AdminDashboard');
 const loadAdminOrders = () => import('../../pages/admin/AdminOrders');
 const loadAdminProducts = () => import('../../pages/admin/AdminProducts');
@@ -16,7 +15,7 @@ const loadAdminProducts = () => import('../../pages/admin/AdminProducts');
 const warmupByRole = {
   guest: [loadAuth, loadLayout],
   customer: [loadLayout, loadDashboard, loadProducts, loadOrders, loadWallet],
-  manager: [loadLayout, loadManagerDashboard, loadSettings],
+  manager: [loadLayout, loadAdminDashboard, loadAdminOrders, loadSettings],
   admin: [
     loadLayout,
     loadDashboard,
@@ -65,13 +64,14 @@ const RouteWarmup = () => {
   useEffect(() => {
     if (!canWarmRoutes()) return undefined;
 
-    const normalizedRole = ['customer', 'manager', 'admin'].includes(role)
+    const normalizedRole = ['customer', 'manager', 'moderator', 'supervisor', 'admin'].includes(role)
       ? role
       : role === 'super_admin'
         ? 'admin'
         : 'guest';
+    const warmupRole = ['manager', 'moderator', 'supervisor'].includes(normalizedRole) ? 'manager' : normalizedRole;
     const handle = scheduleIdle(() => {
-      preloadLoaders(warmupByRole[normalizedRole]);
+      preloadLoaders(warmupByRole[warmupRole]);
     });
 
     return () => clearIdle(handle);

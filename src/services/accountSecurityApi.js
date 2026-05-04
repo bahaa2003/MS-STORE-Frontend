@@ -84,7 +84,8 @@ const accountSecurityApi = {
     return {
       requestId,
       expiresIn,
-      maskedEmail: maskEmail(email)
+      maskedEmail: maskEmail(email),
+      qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`otpauth://totp/MS STORE:${email}?secret=MSSTORE${userId}&issuer=MS STORE`)}`
     };
   },
 

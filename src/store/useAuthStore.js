@@ -78,6 +78,25 @@ const useAuthStore = create(
         });
         try {
           const response = await apiClient.auth.login(email, password);
+          if (response?.requires2FA) {
+            set({
+              user: null,
+              token: null,
+              isAuthenticated: false,
+              isLoading: false,
+              blockedStatus: null,
+              blockedUser: null,
+              profileLastLoadedAt: 0,
+            });
+            return {
+              ok: true,
+              requires2FA: true,
+              tempToken: response.tempToken || response.twoFactorToken,
+              twoFactorToken: response.tempToken || response.twoFactorToken,
+              user: response.user || null,
+              canAccessApp: false,
+            };
+          }
           const outcome = buildAuthOutcome(response.user);
 
           set({
@@ -119,6 +138,32 @@ const useAuthStore = create(
             blockedUser: null,
             profileLastLoadedAt: 0,
           });
+          return { ok: false, error: formattedError };
+        }
+      },
+
+      verifyTwoFactor: async ({ tempToken, twoFactorToken, code }) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await apiClient.auth.verifyTwoFactor({
+            tempToken: tempToken || twoFactorToken,
+            twoFactorToken: tempToken || twoFactorToken,
+            code,
+          });
+          const outcome = buildAuthOutcome(response.user);
+          set({
+            user: response.user,
+            token: response.token || null,
+            isAuthenticated: true,
+            isLoading: false,
+            blockedStatus: outcome.canAccessApp ? null : outcome.status,
+            blockedUser: outcome.canAccessApp ? null : response.user,
+            profileLastLoadedAt: Date.now(),
+          });
+          return outcome;
+        } catch (err) {
+          const formattedError = formatAuthErrorMessage(err, { action: 'login' });
+          set({ error: formattedError, isLoading: false, isAuthenticated: false });
           return { ok: false, error: formattedError };
         }
       },
@@ -209,7 +254,25 @@ const useAuthStore = create(
         });
         try {
           const response = await apiClient.auth.register(userData);
+          if (response?.token && response?.user) {
+            const outcome = buildAuthOutcome(response.user);
+
+            set({
+              user: response.user,
+              token: response.token,
+              isAuthenticated: true,
+              isLoading: false,
+              blockedStatus: outcome.canAccessApp ? null : outcome.status,
+              blockedUser: outcome.canAccessApp ? null : response.user,
+              profileLastLoadedAt: Date.now(),
+            });
+
+            await useAdminStore.getState().loadUsers({ force: true });
+            return outcome;
+          }
+
           const status = normalizeAccountStatus(response?.user?.status);
+          const effectiveStatus = status === 'pending' ? 'approved' : status;
           const requiresEmailVerification = response?.user?.verified === false
             && String(response?.user?.signupMethod || userData?.signupMethod || 'email').toLowerCase() !== 'google';
 
@@ -220,11 +283,13 @@ const useAuthStore = create(
             token: null,
             isAuthenticated: false,
             isLoading: false,
-            blockedStatus: requiresEmailVerification ? 'verification_required' : status,
-            blockedUser: response?.user || {
-              email: userData?.email,
-              name: userData?.name || userData?.username,
-            },
+            blockedStatus: requiresEmailVerification ? 'verification_required' : null,
+            blockedUser: requiresEmailVerification
+              ? (response?.user || {
+                  email: userData?.email,
+                  name: userData?.name || userData?.username,
+                })
+              : null,
           });
 
           if (requiresEmailVerification) {
@@ -236,9 +301,9 @@ const useAuthStore = create(
 
           return {
             ok: true,
-            status,
+            status: effectiveStatus,
             user: response?.user || null,
-            redirectTo: getAccountAccessRoute(status),
+            redirectTo: getAccountAccessRoute(effectiveStatus) || getDefaultRouteForRole(response?.user?.role),
             canAccessApp: false,
           };
         } catch (err) {

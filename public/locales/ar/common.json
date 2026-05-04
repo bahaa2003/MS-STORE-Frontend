@@ -47,7 +47,7 @@
     "cardsSection": "قسم بطاقات الدفع",
     "offers": "العروض",
     "featuredServices": "خدمات موثوقة",
-    "heroTitle": "IBRA Store",
+    "heroTitle": "MS STORE",
     "heroDescription": "وجهتك المميزة لشراء رصيد الألعاب، واشتراكات التطبيقات، والمنتجات الرقمية.",
     "heroSubDescription": "توصيل فوري، ومدفوعات آمنة.",
     "getStarted": "ابدأ الآن",
@@ -211,8 +211,8 @@
     "password": "كلمة المرور",
     "confirmPassword": "تأكيد كلمة المرور",
     "welcomeBack": "مرحبًا بعودتك",
-    "signInToAccount": "سجل الدخول إلى حسابك في Ibra Store",
-    "joinToday": "انضم إلى Ibra Store اليوم",
+    "signInToAccount": "سجل الدخول إلى حسابك في MS STORE",
+    "joinToday": "انضم إلى MS STORE اليوم",
     "signIn": "تسجيل الدخول",
     "signUp": "إنشاء حساب",
     "forgotPassword": "نسيت كلمة المرور؟",
@@ -270,7 +270,7 @@
     "remainingStock": "المخزون المتبقي: {{count}}"
   },
   "legacy": {
-    "brand": "IBRA Store",
+    "brand": "MS STORE",
     "landingHero": "وجهتك المميزة لشراء رصيد الألعاب، واشتراكات التطبيقات، والمنتجات الرقمية.",
     "landingHeroSub": "توصيل فوري، ومدفوعات آمنة.",
     "getStarted": "ابدأ الآن",

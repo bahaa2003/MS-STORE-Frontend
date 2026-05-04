@@ -1,9 +1,11 @@
-import { isAdminRole } from './authRoles';
+import { isAdminRole, isSupervisorRole } from './authRoles';
 
 const ADMIN_SIDEBAR_PATHS = new Set([
+  '/admin/dashboard',
   '/admin/wallet',
   '/admin/users',
   '/admin/supervisors',
+  '/admin/supervisor-monitoring',
   '/admin/groups',
   '/admin/products',
   '/admin/orders',
@@ -11,6 +13,7 @@ const ADMIN_SIDEBAR_PATHS = new Set([
   '/admin/payment-methods',
   '/admin/currencies',
   '/admin/suppliers',
+  '/admin/target-requests',
   '/account',
   '/account-security',
   '/settings',
@@ -26,7 +29,15 @@ const CUSTOMER_SIDEBAR_PATHS = new Set([
 ]);
 
 const MANAGER_SIDEBAR_PATHS = new Set([
-  '/manager/dashboard',
+  '/admin/dashboard',
+  '/admin/users',
+  '/admin/orders',
+  '/admin/groups',
+  '/admin/products',
+  '/admin/payments',
+  '/admin/payment-methods',
+  '/admin/suppliers',
+  '/admin/target-requests',
   '/account',
   '/account-security',
   '/created-by',
@@ -37,7 +48,7 @@ const pathnameHistory = [];
 
 export const getDashboardPathForRole = (role) => {
   if (isAdminRole(role)) return '/admin/dashboard';
-  if (String(role || '').trim().toLowerCase() === 'manager') return '/manager/dashboard';
+  if (isSupervisorRole(role)) return '/admin/dashboard';
   return '/dashboard';
 };
 
@@ -49,7 +60,7 @@ export const isSidebarRootPath = (pathname, role) => {
     return ADMIN_SIDEBAR_PATHS.has(path);
   }
 
-  if (String(role || '').trim().toLowerCase() === 'manager') {
+  if (isSupervisorRole(role)) {
     return MANAGER_SIDEBAR_PATHS.has(path);
   }
 

@@ -58,8 +58,8 @@ const getCopy = (language = 'ar') => {
       processing: 'Processing...',
       insufficientTitle: 'Insufficient balance',
       insufficientMessage: (amount) => `You need ${amount} more to complete this order.`,
-      pendingTitle: 'Account pending approval',
-      pendingMessage: 'Your account must be approved before placing orders.',
+      pendingTitle: 'Account unavailable',
+      pendingMessage: 'Purchasing is not available for this account right now.',
       unavailableTitle: 'Product unavailable',
       unavailableMessage: 'This product is currently unavailable for purchase.',
       preparingTitle: 'Preparing sheet',
@@ -97,8 +97,8 @@ const getCopy = (language = 'ar') => {
     processing: 'جارٍ تنفيذ الطلب...',
     insufficientTitle: 'الرصيد غير كافٍ',
     insufficientMessage: (amount) => `تحتاج إلى ${amount} إضافية لإتمام الطلب.`,
-    pendingTitle: 'الحساب بانتظار التفعيل',
-    pendingMessage: 'لا يمكنك تنفيذ الطلبات قبل تفعيل الحساب من الإدارة.',
+    pendingTitle: 'الحساب غير متاح حاليًا',
+    pendingMessage: 'لا يمكنك تنفيذ الطلبات بهذا الحساب حاليًا.',
     unavailableTitle: 'المنتج غير متاح',
     unavailableMessage: 'هذا المنتج غير متاح للشراء حاليًا.',
     preparingTitle: 'جارٍ تجهيز النافذة',
@@ -566,23 +566,23 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 22, scale: 0.99 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="relative flex max-h-[min(92vh,48rem)] w-full max-w-xl flex-col overflow-hidden rounded-[1.6rem] border border-white/15 bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.14),transparent_56%),linear-gradient(180deg,#0c1222_0%,#070c18_56%,#05080f_100%)] text-white shadow-[0_28px_85px_-35px_rgba(0,0,0,0.9)] sm:rounded-[2rem]"
+              className="relative flex max-h-[min(92vh,48rem)] w-full max-w-xl flex-col overflow-hidden rounded-[1.6rem] border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.94),rgb(var(--color-surface-rgb)/0.56))] text-[var(--color-text)] shadow-[var(--shadow-medium)] sm:rounded-[2rem]"
             >
               <button
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className="absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/8 text-white/85 transition hover:bg-white/14 disabled:cursor-not-allowed disabled:opacity-50 sm:right-4 sm:top-4 sm:h-10 sm:w-10"
+                className="absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.64)] bg-[color:rgb(var(--color-surface-rgb)/0.52)] text-[var(--color-text-secondary)] transition hover:bg-[color:rgb(var(--color-surface-rgb)/0.72)] disabled:cursor-not-allowed disabled:opacity-50 sm:right-4 sm:top-4 sm:h-10 sm:w-10"
                 aria-label={copy.closeLabel}
               >
                 <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </button>
 
-              <header className="space-y-1.5 border-b border-white/10 px-2.5 pb-2 pt-2 sm:space-y-3 sm:px-4 sm:pb-3 sm:pt-3">
+              <header className="space-y-1.5 border-b border-[color:rgb(var(--color-border-rgb)/0.52)] px-2.5 pb-2 pt-2 sm:space-y-3 sm:px-4 sm:pb-3 sm:pt-3">
                 <div className="flex flex-wrap items-start justify-start gap-1.5 [direction:ltr] sm:gap-2">
-                  <div className="rounded-lg border border-[#d4af37]/35 bg-[#d4af37]/12 px-2 py-1 shadow-[0_10px_24px_-18px_rgba(212,175,55,0.8)] sm:rounded-2xl sm:px-3 sm:py-2">
-                    <p className="text-[10px] font-semibold text-white/75 sm:text-[11px]">{copy.unitPrice}</p>
-                    <p className="mt-0.5 text-[13px] font-bold tracking-tight text-[#f7d98a] sm:mt-1 sm:text-base">{formattedUnitPrice}</p>
+                  <div className="rounded-lg border border-[color:rgb(var(--color-primary-rgb)/0.32)] bg-[color:rgb(var(--color-primary-rgb)/0.12)] px-2 py-1 shadow-[0_10px_24px_-18px_rgb(var(--color-primary-rgb)/0.24)] sm:rounded-2xl sm:px-3 sm:py-2">
+                    <p className="text-[10px] font-semibold text-[color:rgb(var(--color-primary-rgb)/0.68)] sm:text-[11px]">{copy.unitPrice}</p>
+                    <p className="mt-0.5 text-[13px] font-bold tracking-tight text-[color:rgb(var(--color-primary-rgb)/0.92)] sm:mt-1 sm:text-base">{formattedUnitPrice}</p>
                   </div>
                   <Badge variant={availabilityVariant} className="px-1.5 py-0.5 text-[9px] sm:px-2.5 sm:py-1 sm:text-[11px]">{availabilityLabel}</Badge>
                   <Badge variant="premium" className="gap-1 px-1.5 py-0.5 text-[9px] sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[11px]">
@@ -593,7 +593,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
 
                 <div className={cn('flex items-center gap-2 sm:gap-3', isRTL ? 'flex-row-reverse text-right' : 'text-left')}>
                   {product?.image ? (
-                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-white/6 sm:h-16 sm:w-16 sm:rounded-2xl">
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-[color:rgb(var(--color-border-rgb)/0.56)] bg-[color:rgb(var(--color-surface-rgb)/0.42)] sm:h-16 sm:w-16 sm:rounded-2xl">
                       <img
                         src={product.image}
                         alt={productTitle}
@@ -603,22 +603,22 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                       />
                     </div>
                   ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/6 sm:h-16 sm:w-16 sm:rounded-2xl">
-                      <Package2 className="h-4 w-4 text-[#f7d98a] sm:h-6 sm:w-6" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[color:rgb(var(--color-border-rgb)/0.56)] bg-[color:rgb(var(--color-surface-rgb)/0.42)] sm:h-16 sm:w-16 sm:rounded-2xl">
+                      <Package2 className="h-4 w-4 text-[color:rgb(var(--color-primary-rgb)/0.84)] sm:h-6 sm:w-6" />
                     </div>
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <h2 className="line-clamp-2 text-base font-bold leading-5 tracking-[-0.02em] text-white sm:text-2xl sm:leading-8">
+                    <h2 className="line-clamp-2 text-base font-bold leading-5 tracking-[-0.02em] text-[var(--color-text)] sm:text-2xl sm:leading-8">
                       {productTitle}
                     </h2>
                     {productSubtitle ? (
-                      <p className="mt-0.5 truncate text-[11px] text-white/65 sm:mt-1 sm:text-sm">
+                      <p className="mt-0.5 truncate text-[11px] text-[color:rgb(var(--color-text-rgb)/0.65)] sm:mt-1 sm:text-sm">
                         {productSubtitle}
                       </p>
                     ) : null}
                     {productDescription ? (
-                      <p className="mt-2 line-clamp-3 max-w-[30rem] text-[11px] leading-5 text-white/78 sm:text-sm">
+                      <p className="mt-2 line-clamp-3 max-w-[30rem] text-[11px] leading-5 text-[color:rgb(var(--color-text-rgb)/0.78)] sm:text-sm">
                         {productDescription}
                       </p>
                     ) : null}
@@ -627,10 +627,10 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
               </header>
 
               <div className="flex-1 space-y-2 overflow-y-auto px-2.5 py-2.5 sm:space-y-3 sm:px-4 sm:py-3">
-                <section className="rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 p-2.5 sm:rounded-2xl sm:p-3">
-                  <p className="text-[11px] font-semibold text-[#f7d98a]">{copy.total}</p>
-                  <p className="mt-1 text-lg font-bold text-white sm:mt-1.5 sm:text-xl">{formattedTotalPrice}</p>
-                  <p className="mt-0.5 hidden text-[11px] text-white/70 sm:block">{copy.totalHint}</p>
+                <section className="rounded-xl border border-[color:rgb(var(--color-primary-rgb)/0.28)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] p-2.5 sm:rounded-2xl sm:p-3">
+                  <p className="text-[11px] font-semibold text-[color:rgb(var(--color-primary-rgb)/0.84)]">{copy.total}</p>
+                  <p className="mt-1 text-lg font-bold text-[var(--color-text)] sm:mt-1.5 sm:text-xl">{formattedTotalPrice}</p>
+                  <p className="mt-0.5 hidden text-[11px] text-[color:rgb(var(--color-text-rgb)/0.70)] sm:block">{copy.totalHint}</p>
                 </section>
 
                 {!canAfford && isApproved && productState.isPurchasable ? (
@@ -654,11 +654,11 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                   </div>
                 ) : null}
 
-                <section className="space-y-1.5 rounded-xl border border-white/12 bg-white/6 p-2.5 sm:space-y-2 sm:rounded-2xl sm:p-3">
+                <section className="space-y-1.5 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.48)] bg-[color:rgb(var(--color-surface-rgb)/0.32)] p-2.5 sm:space-y-2 sm:rounded-2xl sm:p-3">
                   <div className={cn('flex items-center justify-between gap-3', isRTL ? 'flex-row-reverse' : 'flex-row')}>
                     <div>
-                      <h3 className="text-[11px] font-semibold text-white sm:text-xs">{copy.orderFields}</h3>
-                      <p className="mt-0.5 hidden text-[11px] text-white/65 sm:block">{copy.orderFieldsHint}</p>
+                      <h3 className="text-[11px] font-semibold text-[var(--color-text)] sm:text-xs">{copy.orderFields}</h3>
+                      <p className="mt-0.5 hidden text-[11px] text-[color:rgb(var(--color-text-rgb)/0.65)] sm:block">{copy.orderFieldsHint}</p>
                     </div>
                   </div>
 
@@ -683,10 +683,10 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                   </div>
                 </section>
 
-                <section className="space-y-1.5 rounded-xl border border-white/12 bg-white/6 p-2.5 sm:space-y-2 sm:rounded-2xl sm:p-3">
+                <section className="space-y-1.5 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.48)] bg-[color:rgb(var(--color-surface-rgb)/0.32)] p-2.5 sm:space-y-2 sm:rounded-2xl sm:p-3">
                   <div className={cn('flex items-center justify-between gap-3', isRTL ? 'flex-row-reverse' : 'flex-row')}>
-                    <p className="text-[11px] font-semibold text-white sm:text-xs">{copy.quantityTitle}</p>
-                    <div className={cn('flex items-center gap-1 text-[9px] text-white/65 sm:gap-1 sm:text-[10px]', isRTL ? 'flex-row-reverse' : 'flex-row')}>
+                    <p className="text-[11px] font-semibold text-[var(--color-text)] sm:text-xs">{copy.quantityTitle}</p>
+                    <div className={cn('flex items-center gap-1 text-[9px] text-[color:rgb(var(--color-text-rgb)/0.65)] sm:gap-1 sm:text-[10px]', isRTL ? 'flex-row-reverse' : 'flex-row')}>
                       <span>{copy.min} {quantityMeta.minQty}</span>
                       <span>•</span>
                       <span>{copy.max} {quantityMeta.maxQty}</span>
@@ -716,7 +716,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                 </section>
               </div>
 
-              <footer className="border-t border-white/12 bg-[#070d19]/94 px-2.5 py-2.5 sm:px-4 sm:py-3">
+              <footer className="border-t border-[color:rgb(var(--color-border-rgb)/0.52)] bg-[color:rgb(var(--color-surface-rgb)/0.88)] px-2.5 py-2.5 sm:px-4 sm:py-3">
                 {statusCard.message && !successfulOrderId ? (
                   <div className={`mb-2 flex items-start gap-2 rounded-lg border px-2.5 py-2 text-[11px] sm:mb-2.5 sm:gap-2.5 sm:rounded-xl sm:py-2 sm:text-xs ${statusToneStyles[statusCard.tone] || statusToneStyles.info}`}>
                     <StatusIcon className={cn('mt-0.5 h-4 w-4 shrink-0', statusCard.tone === 'info' && isSubmitting && 'animate-spin')} />
@@ -733,7 +733,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                     variant="outline"
                     onClick={handleClose}
                     disabled={isSubmitting}
-                    className="h-9 rounded-md border-white/20 bg-transparent text-white hover:bg-white/10 sm:h-10 sm:rounded-lg"
+                    className="h-9 rounded-md border-[color:rgb(var(--color-border-rgb)/0.7)] bg-[color:rgb(var(--color-card-rgb)/0.72)] text-[var(--color-text)] hover:border-[color:rgb(var(--color-primary-rgb)/0.42)] hover:bg-[color:rgb(var(--color-surface-rgb)/0.94)] sm:h-10 sm:rounded-lg"
                   >
                     {copy.cancel}
                   </Button>
@@ -741,7 +741,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                     type="button"
                     onClick={handleSubmit}
                     disabled={!canSubmit}
-                    className="h-9 rounded-md sm:h-10 sm:rounded-lg"
+                    className="h-9 rounded-md border-[color:rgb(var(--color-primary-rgb)/0.62)] bg-[linear-gradient(135deg,rgb(var(--color-primary-rgb)/0.9),rgb(var(--color-primary-rgb)/0.72))] text-[var(--color-button-text)] shadow-[0_20px_46px_-26px_rgb(var(--color-primary-rgb)/0.6)] hover:brightness-[1.04] sm:h-10 sm:rounded-lg"
                   >
                     {isSubmitting ? copy.processing : copy.buy}
                   </Button>

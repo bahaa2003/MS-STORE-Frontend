@@ -9,6 +9,7 @@ import {
   Package,
   ShieldCheck,
   ShoppingCart,
+  Target,
   TrendingUp,
   UserCog,
   Users,
@@ -21,14 +22,16 @@ import useAuthStore from '../store/useAuthStore';
 import useAdminStore from '../store/useAdminStore';
 import useOrderStore from '../store/useOrderStore';
 import useTopupStore from '../store/useTopupStore';
+import useTargetStore from '../store/useTargetStore';
 import useMediaStore from '../store/useMediaStore';
 import useSystemStore from '../store/useSystemStore';
 import apiClient from '../services/client';
 import DashboardHeader from '../components/admin-dashboard/DashboardHeader';
 import StatsGrid from '../components/admin-dashboard/StatsGrid';
-import PendingApprovalsSection from '../components/admin-dashboard/PendingApprovalsSection';
 import RecentOrdersSection from '../components/admin-dashboard/RecentOrdersSection';
 import ManualTopupsSection from '../components/admin-dashboard/ManualTopupsSection';
+import TargetRequestsReviewSection from '../components/admin-dashboard/TargetRequestsReviewSection';
+import RejectionReasonModal from '../components/target/RejectionReasonModal';
 import QuickActionsSection from '../components/admin-dashboard/QuickActionsSection';
 import ActivityFeedSection from '../components/admin-dashboard/ActivityFeedSection';
 import SupplierBalancesSection from '../components/admin-dashboard/SupplierBalancesSection';
@@ -39,6 +42,7 @@ import { useToast } from '../components/ui/Toast';
 import { formatDateTime, formatNumber, getNumericLocale } from '../utils/intl';
 import { enrichOrders } from '../utils/orders';
 import { getUserRegistrationDate, isApprovedAccountStatus, isPendingAccountStatus } from '../utils/accountStatus';
+import { PERMISSIONS, hasPermission } from '../utils/permissions';
 
 const PENDING_STATUSES = ['pending', 'requested', 'under_review', 'processing'];
 const COMPLETED_STATUSES = ['completed', 'approved', 'success'];
@@ -125,6 +129,12 @@ const getTopupDashboardDate = (topup) => (
   || null
 );
 
+const getTargetRequestDashboardDate = (request) => (
+  request?.createdAt
+  || request?.updatedAt
+  || null
+);
+
 const formatRelativeProductName = (product, isArabic) => (
   product?.nameAr || product?.name || (isArabic ? 'منتج غير معروف' : 'Unknown product')
 );
@@ -181,6 +191,7 @@ const AdminDashboard = () => {
     syncOrderSupplierStatus,
   } = useOrderStore();
   const { topups, loadTopups, updateTopupStatus } = useTopupStore();
+  const { requests: targetRequests, updateRequestStatus } = useTargetStore();
   const { products, categories, loadProducts } = useMediaStore();
   const { currencies, loadCurrencies } = useSystemStore();
   const { i18n } = useTranslation();
@@ -196,6 +207,8 @@ const AdminDashboard = () => {
   const [loadingOrderActionId, setLoadingOrderActionId] = useState('');
   const [syncingOrderId, setSyncingOrderId] = useState('');
   const [approvingTopupId, setApprovingTopupId] = useState('');
+  const [approvingTargetRequestId, setApprovingTargetRequestId] = useState('');
+  const [rejectingTargetRequest, setRejectingTargetRequest] = useState(null);
   const [approvingUserId, setApprovingUserId] = useState('');
   const [rejectingUserId, setRejectingUserId] = useState('');
   const [supplierBalances, setSupplierBalances] = useState([]);
@@ -204,6 +217,15 @@ const AdminDashboard = () => {
   const isArabic = String(i18n.resolvedLanguage || i18n.language || 'ar').toLowerCase().startsWith('ar');
   const locale = getNumericLocale(isArabic ? 'ar-EG' : 'en-US');
   const todayInputValue = useMemo(() => toDateInputValue(new Date()), []);
+  const canViewUsers = hasPermission(user, PERMISSIONS.ADMIN_USERS);
+  const canConfirmAccounts = hasPermission(user, PERMISSIONS.CONFIRM_ACCOUNTS);
+  const canViewOrders = hasPermission(user, PERMISSIONS.ADMIN_ORDERS);
+  const canConfirmOrders = hasPermission(user, PERMISSIONS.CONFIRM_ORDERS);
+  const canViewPayments = hasPermission(user, PERMISSIONS.ADMIN_PAYMENTS);
+  const canViewProducts = hasPermission(user, PERMISSIONS.ADMIN_PRODUCTS);
+  const canViewSuppliers = hasPermission(user, PERMISSIONS.ADMIN_SUPPLIERS);
+  const canViewTargets = hasPermission(user, PERMISSIONS.ADMIN_TARGET_REQUESTS);
+  const canConfirmTargets = hasPermission(user, PERMISSIONS.CONFIRM_TARGET_REQUESTS);
 
   useEffect(() => {
     let isMounted = true;
@@ -211,13 +233,14 @@ const AdminDashboard = () => {
     const loadDashboardData = async () => {
       setIsLoading(true);
 
-      await Promise.allSettled([
-        Promise.resolve(loadUsers()),
-        Promise.resolve(loadOrders()),
-        Promise.resolve(loadTopups()),
-        Promise.resolve(loadProducts()),
-        Promise.resolve(loadCurrencies?.()),
-      ]);
+      const tasks = [];
+      if (canViewUsers || canConfirmAccounts) tasks.push(Promise.resolve(loadUsers()));
+      if (canViewOrders || canConfirmOrders) tasks.push(Promise.resolve(loadOrders()));
+      if (canViewPayments) tasks.push(Promise.resolve(loadTopups()));
+      if (canViewProducts) tasks.push(Promise.resolve(loadProducts()));
+      tasks.push(Promise.resolve(loadCurrencies?.()));
+
+      await Promise.allSettled(tasks);
 
       if (isMounted) {
         setIsLoading(false);
@@ -229,7 +252,19 @@ const AdminDashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [loadCurrencies, loadOrders, loadProducts, loadTopups, loadUsers]);
+  }, [
+    canConfirmAccounts,
+    canConfirmOrders,
+    canViewOrders,
+    canViewPayments,
+    canViewProducts,
+    canViewUsers,
+    loadCurrencies,
+    loadOrders,
+    loadProducts,
+    loadTopups,
+    loadUsers,
+  ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -313,12 +348,17 @@ const AdminDashboard = () => {
       }
     };
 
-    void loadSupplierBalances();
+    if (canViewSuppliers) {
+      void loadSupplierBalances();
+    } else {
+      setSupplierBalances([]);
+      setIsLoadingSupplierBalances(false);
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [locale]);
+  }, [canViewSuppliers, locale]);
 
   const applyDateRangeSelection = (nextStartDate, nextEndDate = nextStartDate) => {
     const normalizedStartDate = nextStartDate || '';
@@ -427,6 +467,21 @@ const AdminDashboard = () => {
   const recentManualTopups = useMemo(
     () => [...filteredManualTopups].sort(byNewestDate).slice(0, 6),
     [filteredManualTopups]
+  );
+
+  const filteredTargetRequests = useMemo(
+    () => (targetRequests || []).filter((entry) => isDateWithinRange(getTargetRequestDashboardDate(entry), dateRange)),
+    [dateRange, targetRequests]
+  );
+
+  const pendingTargetRequests = useMemo(
+    () => (targetRequests || []).filter((entry) => String(entry?.status || '').trim().toLowerCase() === 'pending'),
+    [targetRequests]
+  );
+
+  const recentTargetRequests = useMemo(
+    () => [...filteredTargetRequests].sort(byNewestDate).slice(0, 6),
+    [filteredTargetRequests]
   );
 
   const formatCount = (value) => formatNumber(asNumber(value), locale);
@@ -580,6 +635,14 @@ const AdminDashboard = () => {
         icon: ShoppingCart,
       },
       {
+        label: isArabic ? 'طلبات التارجت' : 'Target Requests',
+        description: isArabic
+          ? 'مراجعة طلبات التارجت وتأكيد التحويلات بسرعة.'
+          : 'Review target requests and confirm transfers quickly.',
+        to: '/admin/target-requests',
+        icon: Target,
+      },
+      {
         label: isArabic ? 'إدارة المستخدمين' : 'Manage Users',
         description: isArabic
           ? 'مراجعة الحسابات والحالات والصلاحيات من مكان واحد.'
@@ -603,14 +666,26 @@ const AdminDashboard = () => {
         to: '/admin/payments',
         icon: ArrowLeftRight,
       },
-    ],
-    [isArabic]
+    ].filter((action) => hasPermission(user, ({
+      '/admin/products': PERMISSIONS.ADMIN_PRODUCTS,
+      '/admin/payment-methods': PERMISSIONS.ADMIN_PAYMENT_METHODS,
+      '/admin/orders': PERMISSIONS.ADMIN_ORDERS,
+      '/admin/target-requests': PERMISSIONS.ADMIN_TARGET_REQUESTS,
+      '/admin/users': PERMISSIONS.ADMIN_USERS,
+      '/admin/suppliers': PERMISSIONS.ADMIN_SUPPLIERS,
+      '/admin/payments': PERMISSIONS.ADMIN_PAYMENTS,
+    })[action.to])),
+    [isArabic, user]
   );
 
   const statsOrders = dashboardStats?.orders || {};
   const statsFinancials = dashboardStats?.financials || {};
   const statsUsers = dashboardStats?.users || {};
   const statsProducts = dashboardStats?.products || {};
+  const monthlyTargetUsd = 100;
+  const monthlyTargetProfitUsd = asNumber(statsFinancials.totalProfitUsd ?? statsFinancials.netProfit);
+  const monthlyTargetProgress = Math.min(100, Math.round((monthlyTargetProfitUsd / monthlyTargetUsd) * 100));
+  const monthlyTargetRemaining = Math.max(0, monthlyTargetUsd - monthlyTargetProfitUsd);
 
   const stats = useMemo(
     () => [
@@ -674,11 +749,26 @@ const AdminDashboard = () => {
         note: walletMetricNote,
         icon: Wallet,
       },
+      {
+        title: isArabic ? 'تارجت الشهر' : 'Monthly Target',
+        value: `${formatMoney(monthlyTargetProfitUsd, 'USD')} / ${formatMoney(monthlyTargetUsd, 'USD')}`,
+        note: monthlyTargetRemaining > 0
+          ? (isArabic
+            ? `متبقي ${formatMoney(monthlyTargetRemaining, 'USD')} للوصول لهدف ربح الشهر`
+            : `${formatMoney(monthlyTargetRemaining, 'USD')} remaining to reach this month's profit target`)
+          : (isArabic ? 'تم تحقيق هدف ربح الشهر' : 'This month’s profit target is complete'),
+        icon: Target,
+        progress: monthlyTargetProgress,
+        wide: true,
+      },
     ],
     [
       formatCount,
       formatMoney,
       isArabic,
+      monthlyTargetProfitUsd,
+      monthlyTargetProgress,
+      monthlyTargetRemaining,
       pendingApprovalUsers.length,
       pendingManualTopups.length,
       productMetricNote,
@@ -806,13 +896,14 @@ const AdminDashboard = () => {
     setSelectedOrderId('');
   };
 
-  const handleDashboardOrderStatusUpdate = async (order, status) => {
+  const handleDashboardOrderStatusUpdate = async (order, status, rejectionReason = '') => {
     const orderId = String(order?.id || '').trim();
     if (!orderId) return;
+    if (!canConfirmOrders) return;
 
     try {
       setLoadingOrderActionId(orderId);
-      await updateOrderStatus(orderId, status, order);
+      await updateOrderStatus(orderId, status, { ...order, rejectionReason });
     } finally {
       setLoadingOrderActionId('');
     }
@@ -821,6 +912,7 @@ const AdminDashboard = () => {
   const handleDashboardOrderSync = async (order) => {
     const orderId = String(order?.id || '').trim();
     if (!orderId) return;
+    if (!canConfirmOrders) return;
 
     try {
       setSyncingOrderId(orderId);
@@ -833,6 +925,7 @@ const AdminDashboard = () => {
   const handleDashboardTopupApprove = async (topup) => {
     const topupId = String(topup?.id || '').trim();
     if (!topupId) return;
+    if (!canViewPayments) return;
 
     try {
       setApprovingTopupId(topupId);
@@ -853,9 +946,51 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDashboardTargetApprove = async (request) => {
+    const requestId = String(request?.id || '').trim();
+    if (!requestId) return;
+    if (!canConfirmTargets) return;
+
+    try {
+      setApprovingTargetRequestId(requestId);
+      await updateRequestStatus(requestId, 'Done', { rejectionReason: '' });
+      addToast(isArabic ? 'تم تأكيد طلب التارجت.' : 'Target request approved.', 'success');
+    } catch (error) {
+      addToast(error?.message || (isArabic ? 'تعذر تأكيد طلب التارجت.' : 'Failed to approve target request.'), 'error');
+    } finally {
+      setApprovingTargetRequestId('');
+    }
+  };
+
+  const handleDashboardTargetReject = async (request) => {
+    const requestId = String(request?.id || '').trim();
+    if (!requestId) return;
+    if (!canConfirmTargets) return;
+
+    setRejectingTargetRequest(request);
+  };
+
+  const handleConfirmDashboardTargetReject = async (reason = '') => {
+    const requestId = String(rejectingTargetRequest?.id || '').trim();
+    if (!requestId) return;
+    if (!canConfirmTargets) return;
+
+    try {
+      setApprovingTargetRequestId(requestId);
+      await updateRequestStatus(requestId, 'Rejected', { rejectionReason: reason.trim() });
+      addToast(isArabic ? 'تم رفض طلب التارجت.' : 'Target request rejected.', 'success');
+      setRejectingTargetRequest(null);
+    } catch (error) {
+      addToast(error?.message || (isArabic ? 'تعذر رفض طلب التارجت.' : 'Failed to reject target request.'), 'error');
+    } finally {
+      setApprovingTargetRequestId('');
+    }
+  };
+
   const handleDashboardUserApprove = async (entry) => {
     const targetId = String(entry?.id || '').trim();
     if (!targetId) return;
+    if (!canConfirmAccounts) return;
 
     try {
       setApprovingUserId(targetId);
@@ -876,6 +1011,7 @@ const AdminDashboard = () => {
   const handleDashboardUserReject = async (entry) => {
     const targetId = String(entry?.id || '').trim();
     if (!targetId) return;
+    if (!canConfirmAccounts) return;
 
     try {
       setRejectingUserId(targetId);
@@ -894,14 +1030,14 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-w-0 space-y-4 pb-3 md:space-y-8 md:pb-4">
+    <div className="admin-dashboard-shell min-w-0 space-y-4 pb-3 md:space-y-8 md:pb-4">
       <DashboardHeader
         isArabic={isArabic}
         userName={user?.name}
         currentDateLabel={currentDateLabel}
       />
 
-      <Card variant="premium" className="overflow-visible p-4 sm:p-6">
+      <Card variant="premium" className="admin-dashboard-filter-card overflow-visible p-4 sm:p-6">
         <DashboardDateRangeFilter
           isArabic={isArabic}
           formatRangeDate={formatRangeDate}
@@ -916,38 +1052,47 @@ const AdminDashboard = () => {
 
       <div className="grid place-items-center gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)] xl:place-items-stretch xl:gap-6">
         <div className="w-full space-y-4 md:space-y-6">
-          <PendingApprovalsSection
-            users={pendingApprovalUsers}
-            isArabic={isArabic}
-            formatDate={formatDate}
-            onApproveUser={handleDashboardUserApprove}
-            onRejectUser={handleDashboardUserReject}
-            approvingUserId={approvingUserId}
-            rejectingUserId={rejectingUserId}
-          />
-          <RecentOrdersSection
-            orders={recentOrders}
-            isArabic={isArabic}
-            onViewOrder={handleViewOrderFromDashboard}
-          />
-          <ManualTopupsSection
-            topups={recentManualTopups}
-            pendingCount={pendingManualTopups.length}
-            isArabic={isArabic}
-            formatDate={formatDate}
-            formatMoney={formatMoney}
-            onApproveTopup={handleDashboardTopupApprove}
-            approvingTopupId={approvingTopupId}
-          />
+          {canViewOrders ? (
+            <RecentOrdersSection
+              orders={recentOrders}
+              isArabic={isArabic}
+              onViewOrder={handleViewOrderFromDashboard}
+            />
+          ) : null}
+          {canViewPayments ? (
+            <ManualTopupsSection
+              topups={recentManualTopups}
+              pendingCount={pendingManualTopups.length}
+              isArabic={isArabic}
+              formatDate={formatDate}
+              formatMoney={formatMoney}
+              onApproveTopup={handleDashboardTopupApprove}
+              approvingTopupId={approvingTopupId}
+            />
+          ) : null}
+          {canViewTargets ? (
+            <TargetRequestsReviewSection
+              requests={recentTargetRequests}
+              pendingCount={pendingTargetRequests.length}
+              isArabic={isArabic}
+              formatDate={formatDate}
+              formatMoney={formatMoney}
+              onApproveRequest={canConfirmTargets ? handleDashboardTargetApprove : undefined}
+              onRejectRequest={canConfirmTargets ? handleDashboardTargetReject : undefined}
+              approvingRequestId={approvingTargetRequestId}
+            />
+          ) : null}
         </div>
 
         <div className="w-full space-y-4 md:space-y-6">
           <QuickActionsSection actions={quickActions} isArabic={isArabic} />
-          <SupplierBalancesSection
-            items={supplierBalanceItems}
-            isArabic={isArabic}
-            isLoading={isLoadingSupplierBalances}
-          />
+          {canViewSuppliers ? (
+            <SupplierBalancesSection
+              items={supplierBalanceItems}
+              isArabic={isArabic}
+              isLoading={isLoadingSupplierBalances}
+            />
+          ) : null}
           <ActivityFeedSection items={activityItems} isArabic={isArabic} formatDate={formatDate} />
         </div>
       </div>
@@ -959,11 +1104,23 @@ const AdminDashboard = () => {
         isArabic={isArabic}
         currencies={currencies}
         view="admin"
-        onUpdateStatus={handleDashboardOrderStatusUpdate}
-        onSync={handleDashboardOrderSync}
+        onUpdateStatus={canConfirmOrders ? handleDashboardOrderStatusUpdate : undefined}
+        canUpdateStatus={canConfirmOrders}
+        onSync={canConfirmOrders ? handleDashboardOrderSync : undefined}
         isActionLoading={loadingOrderActionId === selectedOrderId}
         isSyncing={syncingOrderId === selectedOrderId}
       />
+
+      <RejectionReasonModal
+        isOpen={Boolean(rejectingTargetRequest)}
+        onClose={() => setRejectingTargetRequest(null)}
+        onConfirm={handleConfirmDashboardTargetReject}
+        title={isArabic ? 'رفض طلب التارجت' : 'Reject Target Request'}
+        description={isArabic ? 'سبب الرفض اختياري وسيظهر داخل تفاصيل الطلب عند كتابته.' : 'The rejection reason is optional and will appear in the request details when provided.'}
+        confirmLabel={isArabic ? 'تأكيد الرفض' : 'Confirm rejection'}
+        cancelLabel={isArabic ? 'إلغاء' : 'Cancel'}
+      />
+
     </div>
   );
 };

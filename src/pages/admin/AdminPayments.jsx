@@ -1,6 +1,7 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Check, CheckCircle2, Clock3, Eye, Pencil, Search, Wallet, X } from 'lucide-react';
 import useTopupStore from '../../store/useTopupStore';
+import useAuthStore from '../../store/useAuthStore';
 import useAdminStore from '../../store/useAdminStore';
 import useSystemStore from '../../store/useSystemStore';
 import Card from '../../components/ui/Card';
@@ -11,6 +12,7 @@ import Modal from '../../components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import { useToast } from '../../components/ui/Toast';
 import { formatDateTime, formatNumber } from '../../utils/intl';
+import { PERMISSIONS, hasPermission } from '../../utils/permissions';
 
 const statusVariant = (status) => {
   if (status === 'approved' || status === 'completed') return 'success';
@@ -38,9 +40,11 @@ const SummaryCard = ({ icon: Icon, label, value }) => (
 
 const AdminPayments = () => {
   const { topups, topupsPagination, topupsSummary, loadTopups, loadTopupsFiltered, getTopupById, updateTopupStatus, updateTopupRequest } = useTopupStore();
+  const { user: actor } = useAuthStore();
   const { users, loadUsers } = useAdminStore();
   const { currencies, loadCurrencies } = useSystemStore();
   const { addToast } = useToast();
+  const canConfirmPayments = hasPermission(actor, PERMISSIONS.ADMIN_PAYMENTS);
 
   // ── Filter state ────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,6 +137,10 @@ const AdminPayments = () => {
   };
 
   const handleApprove = async () => {
+    if (!canConfirmPayments) {
+      addToast('ليس لديك صلاحية اعتماد طلبات الشحن.', 'error');
+      return;
+    }
     if (!selectedRequest) return;
     const actual = Number(reviewForm.actualPaidAmount || 0);
     if (actual <= 0) {
@@ -162,6 +170,10 @@ const AdminPayments = () => {
   };
 
   const handleReject = async (request) => {
+    if (!canConfirmPayments) {
+      addToast('ليس لديك صلاحية رفض طلبات الشحن.', 'error');
+      return;
+    }
     const note = window.prompt('سبب الرفض (اختياري):', 'طلب غير مطابق');
     if (note === null) return;
 
@@ -324,7 +336,7 @@ const AdminPayments = () => {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {isPendingLike(request.status) ? (
+                {isPendingLike(request.status) && canConfirmPayments ? (
                   <>
                     <Button size="sm" variant="outline" onClick={() => openEditModal(request)}>
                       <Pencil className="w-4 h-4" />
@@ -393,7 +405,7 @@ const AdminPayments = () => {
                     <Badge variant={statusVariant(request.status)}>{request.status}</Badge>
                   </TableCell>
                   <TableCell className="text-end">
-                    {isPendingLike(request.status) ? (
+                    {isPendingLike(request.status) && canConfirmPayments ? (
                       <div className="flex justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => openEditModal(request)}>
                           <Pencil className="w-4 h-4" />

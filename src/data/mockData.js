@@ -6,7 +6,7 @@ export const mockUsers = [
   {
     id: 'u1',
     name: 'Ibrahim',
-    email: 'admin@ibrastore.com',
+    email: 'admin@msstore.com',
     password: 'Password123',
     role: 'admin',
     status: 'approved',
@@ -56,7 +56,7 @@ export const mockUsers = [
   {
     id: 'u4',
     name: 'Operations Manager',
-    email: 'manager@ibrastore.com',
+    email: 'manager@msstore.com',
     password: 'password123',
     role: 'manager',
     status: 'approved',
@@ -114,7 +114,7 @@ export const mockSuppliers = [
     bearerToken: '',
     username: '',
     password: '',
-    customHeaders: [{ key: 'X-Client', value: 'ibra-store' }],
+    customHeaders: [{ key: 'X-Client', value: 'ms-store' }],
     timeoutMs: 8000,
     webhookUrl: '',
     webhookSecret: '',

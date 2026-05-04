@@ -22,10 +22,10 @@ const ProductPurchaseSheet = lazy(() => import('../components/products/ProductPu
 const getProductsPageCopy = (language = 'ar') => (
   language === 'ar'
     ? {
-        pageKicker: 'تجربة تسوق أخف وأوضح',
+        pageKicker: 'Premium Storefront',
         catalogsTitle: 'الكاتلوجات',
-        catalogsDescription: 'ابدأ من القسم المناسب أو ابحث مباشرة عن المنتج، ثم أكمل الشراء داخل نفس التجربة.',
-        categoryDescription: 'منتجات هذا الكاتلوج تظهر بشكل شبكي نظيف مع صورة واسم فقط لسرعة التصفح.',
+        catalogsDescription: 'ابدأ من القسم المناسب أو ابحث مباشرة عن المنتج، ثم أكمل الشراء ضمن واجهة أفخم وأكثر وضوحًا.',
+        categoryDescription: 'منتجات هذا الكاتلوج تظهر في كروت حديثة مع صورة وسعر وزر شراء مباشر.',
         searchPlaceholder: 'ابحث عن منتج وسيظهر مباشرة أسفل البحث...',
         noResults: 'لا يوجد منتج مطابق',
         backToCatalogs: 'العودة إلى الكاتلوجات',
@@ -41,12 +41,13 @@ const getProductsPageCopy = (language = 'ar') => (
         products: 'المنتجات',
         home: 'الرئيسية',
         backToCategories: 'الرجوع للأقسام',
+        buyNow: 'شراء الآن',
       }
     : {
-        pageKicker: 'Lighter and clearer storefront',
+        pageKicker: 'Premium Storefront',
         catalogsTitle: 'Catalogs',
-        catalogsDescription: 'Start from the right collection or search directly for a product, then continue purchasing in the same flow.',
-        categoryDescription: 'Products in this catalog use a clean visual grid with image and name only for faster browsing.',
+        catalogsDescription: 'Start from the right collection or search directly for a product, then continue purchasing inside a more premium flow.',
+        categoryDescription: 'Products in this catalog use modern cards with image, pricing, and a direct purchase action.',
         searchPlaceholder: 'Search for a product and get direct matches...',
         noResults: 'No matching product found',
         backToCatalogs: 'Back to catalogs',
@@ -62,6 +63,7 @@ const getProductsPageCopy = (language = 'ar') => (
         products: 'Products',
         home: 'Home',
         backToCategories: 'Back to categories',
+        buyNow: 'Buy now',
       }
 );
 
@@ -394,7 +396,7 @@ const Products = () => {
             placeholder={copy.searchPlaceholder}
             noResultsLabel={copy.noResults}
             className="mx-auto w-full"
-            inputClassName="h-11 rounded-[1.35rem] border-[color:rgb(var(--color-border-rgb)/0.18)] bg-[color:rgb(var(--color-surface-rgb)/0.92)] text-sm shadow-[0_16px_40px_-32px_rgba(15,23,42,0.55)] focus:border-[#efc86f] focus:bg-[color:rgb(var(--color-surface-rgb)/0.98)] focus:ring-0 focus:shadow-[0_0_0_1px_rgba(239,200,111,0.68),0_0_16px_rgba(239,200,111,0.18),0_20px_40px_-34px_rgba(15,23,42,0.58)] sm:h-12 sm:rounded-[1.55rem]"
+            inputClassName="h-12 rounded-full border-[color:rgb(var(--color-border-rgb)/0.68)] bg-[color:rgb(var(--color-surface-rgb)/0.56)] text-sm shadow-[var(--shadow-subtle)] focus:border-[#efc86f] focus:bg-[color:rgb(var(--color-surface-rgb)/0.72)] focus:ring-0 focus:shadow-[0_0_0_1px_rgba(239,200,111,0.42),0_0_16px_rgba(239,200,111,0.14)] sm:rounded-full"
           />
         </div>
       </section>
@@ -431,7 +433,7 @@ const Products = () => {
         <>
           {/* Root categories — wide banners (currentParentId is null) */}
           {currentCategories.length > 0 && currentParentId === null && !activeCategoryParam && (
-            <section className="grid grid-cols-2 gap-2 p-4 sm:gap-2.5 md:grid-cols-3 xl:grid-cols-4">
+            <section className="grid grid-cols-2 gap-3 p-1 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
               {currentCategories.map((catalog, index) => (
                 <CategoryCard
                   key={catalog.id}
@@ -446,7 +448,7 @@ const Products = () => {
 
           {/* Sub-categories — tight square cards (drilled into a parent) */}
           {currentCategories.length > 0 && currentParentId !== null && !activeSubcategoryId && (
-            <section className="grid grid-cols-3 gap-2 p-4 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
+            <section className="grid grid-cols-2 gap-3 p-1 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
               {currentCategories.map((catalog, index) => (
                 <CategoryCard
                   key={catalog.id}
@@ -467,12 +469,12 @@ const Products = () => {
                 <button
                   type="button"
                   onClick={clearActiveSubcategory}
-                  className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[color:rgb(var(--color-border-rgb)/0.6)] bg-[color:rgb(var(--color-surface-rgb)/0.88)] px-3 py-1.5 text-xs font-semibold text-[var(--color-primary)] shadow-sm transition-colors hover:bg-[color:rgb(var(--color-surface-rgb)/1)]"
+                  className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[color:rgb(var(--color-border-rgb)/0.6)] bg-[color:rgb(var(--color-surface-rgb)/0.6)] px-3 py-2 text-xs font-semibold text-[var(--color-primary)] shadow-sm backdrop-blur-xl transition-colors hover:bg-[color:rgb(var(--color-surface-rgb)/0.78)]"
                 >
                   {isRTL ? <ArrowRight className="h-3.5 w-3.5" /> : <ArrowLeft className="h-3.5 w-3.5" />}
                   {copy.backToCategories}
                 </button>
-                <div className="flex items-center gap-3 rounded-[1rem] border border-[color:rgb(var(--color-border-rgb)/0.4)] bg-[color:rgb(var(--color-card-rgb)/0.7)] px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-3 rounded-[1.4rem] border border-[color:rgb(var(--color-border-rgb)/0.5)] bg-[color:rgb(var(--color-card-rgb)/0.64)] px-4 py-3 shadow-sm backdrop-blur-xl">
                   {activeSub.image && (
                     <img
                       src={activeSub.image}
@@ -488,9 +490,15 @@ const Products = () => {
 
           {/* Products — from leaf category or parent drill-down */}
           {displayProducts.length > 0 && (
-            <section className="grid grid-cols-3 gap-2 p-4 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
+            <section className="grid grid-cols-3 gap-3 p-1 sm:gap-4">
               {displayProducts.map((product) => (
-                <ProductCardSimple key={product.id} product={product} onOpen={openProduct} />
+                <ProductCardSimple
+                  key={product.id}
+                  product={product}
+                  onOpen={openProduct}
+                  buyLabel={copy.buyNow}
+                  unavailableLabel={language === 'ar' ? 'غير متاح' : 'Unavailable'}
+                />
               ))}
             </section>
           )}

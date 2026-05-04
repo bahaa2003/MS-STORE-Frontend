@@ -8,7 +8,6 @@ import { useLanguage } from '../context/LanguageContext';
 import useSystemStore from '../store/useSystemStore';
 import useTopupStore from '../store/useTopupStore';
 import useAuthStore from '../store/useAuthStore';
-import apiClient from '../services/client';
 import { useToast } from '../components/ui/Toast';
 import { inputBaseClassName, textareaClassName } from '../components/ui/Input';
 import { findPaymentMethodById } from '../utils/paymentSettings';
@@ -47,27 +46,10 @@ const PaymentDetails = () => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
-  const [hasPendingDeposit, setHasPendingDeposit] = useState(false);
 
   useEffect(() => {
     loadPaymentSettings();
   }, [loadPaymentSettings]);
-
-  // ── Proactive check for existing PENDING deposit ────────────────────
-  useEffect(() => {
-    const checkPending = async () => {
-      try {
-        const result = await apiClient.topups.list({ status: 'PENDING', limit: 1 });
-        const items = result?.items || [];
-        if (items.length > 0) {
-          setHasPendingDeposit(true);
-        }
-      } catch (_error) {
-        // Ignore — non-critical check
-      }
-    };
-    checkPending();
-  }, []);
 
   const selectedMethodEntry = useMemo(
     () => findPaymentMethodById(paymentSettings, methodId),
@@ -179,16 +161,8 @@ const PaymentDetails = () => {
       setSubmitStatus('success');
       setTimeout(() => navigate('/wallet'), 3000);
     } catch (error) {
-      // Check for duplicate pending deposit error
-      const errorCode = error?.response?.data?.code || error?.code || '';
-      const errorMessage = error?.response?.data?.message || error?.message || '';
-      if (errorCode === 'DUPLICATE_PENDING_DEPOSIT' || errorMessage.includes('pending deposit')) {
-        setHasPendingDeposit(true);
-        setSubmitStatus(null);
-      } else {
-        devLogger.warnUnlessBenign('Topup submission failed:', error);
-        setSubmitStatus('error');
-      }
+      devLogger.warnUnlessBenign('Topup submission failed:', error);
+      setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
     }
@@ -423,19 +397,10 @@ const PaymentDetails = () => {
             </div>
           </div>
 
-          {hasPendingDeposit && (
-            <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-50/80 p-4 text-center dark:border-amber-500/30 dark:bg-amber-500/10">
-              <AlertCircle className="mx-auto mb-2 h-8 w-8 text-amber-500" />
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                {dir === 'rtl' ? 'لديك طلب شحن معلق بالفعل. يرجى الانتظار حتى تتم معالجته.' : 'You already have a pending top-up request. Please wait for it to be processed.'}
-              </p>
-            </div>
-          )}
-
           <button
             type="submit"
-            disabled={isSubmitting || hasPendingDeposit}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-400 to-pink-500 px-6 py-4 font-semibold text-white transition-all hover:shadow-lg hover:shadow-orange-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-busy={isSubmitting}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-400 to-pink-500 px-6 py-4 font-semibold text-white transition-all hover:shadow-lg hover:shadow-orange-500/25"
           >
             {isSubmitting ? (
               <>

@@ -1,22 +1,24 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ArrowLeft, Target } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
 import useMediaStore from '../store/useMediaStore';
 import useGroupStore from '../store/useGroupStore';
 import HeroSlider from '../components/home/HeroSlider';
-import AnnouncementTicker from '../components/home/AnnouncementTicker';
 import CategoryCard from '../components/home/CategoryCard';
 import ProductSearchBar from '../components/products/ProductSearchBar';
 import StoreFooter from '../components/home/StoreFooter';
-import buyCardsImage from '../assets/slide1.png';
-import chatAppsImage from '../assets/slide2.jpeg';
-import gamesChargingImage from '../assets/slide3.jpeg';
+import slideOneHeroImage from '../assets/سلايد 1.jpg';
+import slideTwoHeroImage from '../assets/سلايد 2.jpg';
+import slideThreeHeroImage from '../assets/سلايد 3.jpg';
 import {
   createStorefrontCategories,
   createStorefrontProducts,
   getStorefrontLanguage,
 } from '../utils/storefront';
+
+const WHATSAPP_COMMUNITY_LINK = 'https://chat.whatsapp.com/HMAlI6AfDndJ8VSMiqeHOs';
 
 const Dashboard = () => {
   const { user, refreshProfile } = useAuthStore();
@@ -27,9 +29,7 @@ const Dashboard = () => {
   const language = getStorefrontLanguage(i18n);
 
   useEffect(() => {
-    if (refreshProfile) {
-      refreshProfile();
-    }
+    if (refreshProfile) refreshProfile();
   }, [refreshProfile]);
 
   useEffect(() => {
@@ -37,22 +37,10 @@ const Dashboard = () => {
   }, [loadProducts]);
 
   const heroSlides = useMemo(() => ([
-    {
-      id: 'hero-games',
-      image: gamesChargingImage,
-      alt: language === 'ar' ? 'صورة شحن ألعاب' : 'Game topup banner',
-    },
-    {
-      id: 'hero-apps',
-      image: chatAppsImage,
-      alt: language === 'ar' ? 'صورة اشتراكات رقمية' : 'Digital subscriptions banner',
-    },
-    {
-      id: 'hero-cards',
-      image: buyCardsImage,
-      alt: language === 'ar' ? 'صورة بطاقات رقمية' : 'Digital cards banner',
-    },
-  ]), [language]);
+    { id: 'landing-slide-1', image: slideOneHeroImage, title: '' },
+    { id: 'landing-slide-2', image: slideTwoHeroImage, title: '', href: WHATSAPP_COMMUNITY_LINK },
+    { id: 'landing-slide-3', image: slideThreeHeroImage, title: '' },
+  ]), []);
 
   const storefrontProducts = useMemo(
     () => createStorefrontProducts(products, {
@@ -71,7 +59,6 @@ const Dashboard = () => {
   const visibleHomepageCategories = useMemo(
     () => storefrontCategories.filter((category) => {
       if (category.id === 'all') return false;
-      // Strict root-only: parentCategory must be null/undefined/empty
       const p = category.parentCategory;
       if (!p) return true;
       if (typeof p === 'string' && !p.trim()) return true;
@@ -80,102 +67,83 @@ const Dashboard = () => {
     [storefrontCategories]
   );
 
-  const tickerItems = useMemo(
-    () => [
-      {
-        id: 'ticker-basmala',
-        text: 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
-      },
-      {
-        id: 'ticker-verse',
-        text: 'رِجَالٌ لَّا تُلْهِيهِمْ تِجَارَةٌ وَلَا بَيْعٌ عَن ذِكْرِ اللَّهِ',
-      },
-      {
-        id: 'ticker-closing',
-        text: 'صَدَقَ اللَّهُ العَظِيمُ',
-      }
-    ],
-    []
-  );
-
   const handleCategorySelect = useCallback((categoryId) => {
     navigate(categoryId === 'all' ? '/products' : `/products?category=${encodeURIComponent(categoryId)}`);
   }, [navigate]);
 
   const handleProductSelect = useCallback((product) => {
     const next = new URLSearchParams();
-    if (product?.category) {
-      next.set('category', product.category);
-    }
+    if (product?.category) next.set('category', product.category);
     next.set('request', product.id);
     navigate(`/products?${next.toString()}`);
   }, [navigate]);
 
   return (
-    <div className="space-y-4 pb-5 sm:space-y-5">
-      <HeroSlider slides={heroSlides} />
-
-      <section className="py-1">
-        <AnnouncementTicker
-          items={tickerItems}
-          durationMs={5600}
-          direction="ltr"
-          ariaLabel={language === 'ar' ? 'بطاقة قرآنية متحركة' : 'Animated verse card'}
-        />
+    <div className="space-y-5 pb-5 sm:space-y-6">
+      <section className="mx-auto w-full max-w-2xl rounded-2xl border border-[color:rgb(var(--color-warning-rgb)/0.35)] bg-[color:rgb(var(--color-warning-rgb)/0.12)] px-2.5 py-2 text-center text-[10px] text-[var(--color-text)] sm:px-3 sm:py-2.5 sm:text-[11px]">
+        {language === 'ar' ? (
+          <p className="leading-5 sm:leading-[1.35rem]">
+            <span aria-hidden="true" className="me-1 text-[color:rgb(var(--color-warning-rgb)/0.95)]">⚠</span>
+            حرصا على أمان حسابك يجب تفعيل{' '}
+            <Link to="/account-security" className="font-semibold text-[color:rgb(var(--color-warning-rgb)/0.95)] underline underline-offset-2 hover:text-[color:rgb(var(--color-warning-rgb)/0.78)]">
+              المصادقة الثنائية
+            </Link>
+            .
+          </p>
+        ) : (
+          <p className="leading-5 sm:leading-[1.35rem]">
+            <span aria-hidden="true" className="me-1 text-[color:rgb(var(--color-warning-rgb)/0.95)]">⚠</span>
+            For your account safety, you should enable{' '}
+            <Link to="/account-security" className="font-semibold text-[color:rgb(var(--color-warning-rgb)/0.95)] underline underline-offset-2 hover:text-[color:rgb(var(--color-warning-rgb)/0.78)]">
+              two-factor authentication
+            </Link>
+            .
+          </p>
+        )}
       </section>
+
+      <HeroSlider slides={heroSlides} />
 
       <section id="categories" className="scroll-mt-28 space-y-3 sm:space-y-3.5">
         <div className="relative z-10 mx-auto flex w-full max-w-5xl justify-center px-0.5 sm:px-2">
-          <ProductSearchBar
-            products={storefrontProducts}
-            language={language}
-            onSelectProduct={handleProductSelect}
-            forceIconRight
-            placeholder={language === 'ar' ? 'ابحث عن منتج وسيظهر مباشرة أسفل البحث...' : 'Search for a product and get direct matches...'}
-            noResultsLabel={language === 'ar' ? 'لا يوجد منتج مطابق' : 'No matching product found'}
-            className="mx-auto w-full"
-            inputClassName="h-11 rounded-[1.25rem] border-[color:rgb(var(--color-border-rgb)/0.16)] bg-[color:rgb(var(--color-surface-rgb)/0.88)] px-4 text-sm shadow-[0_14px_34px_-30px_rgba(15,23,42,0.5)] backdrop-blur-sm focus:border-[#efc86f] focus:bg-[color:rgb(var(--color-surface-rgb)/0.96)] focus:ring-0 focus:shadow-[0_0_0_1px_rgba(239,200,111,0.58),0_0_14px_rgba(239,200,111,0.16),0_18px_38px_-30px_rgba(15,23,42,0.52)] sm:h-12 sm:rounded-[1.45rem] sm:text-[15px]"
-          />
+          <ProductSearchBar products={storefrontProducts} language={language} onSelectProduct={handleProductSelect} forceIconRight placeholder={language === 'ar' ? 'ابحث عن منتج...' : 'Search for a product...'} noResultsLabel={language === 'ar' ? 'لا يوجد منتج مطابق' : 'No matching product found'} className="mx-auto w-full" inputClassName="h-12 rounded-full" />
         </div>
 
         <div className="relative z-0 grid grid-cols-2 gap-2 sm:gap-2.5 md:grid-cols-3 xl:grid-cols-4">
           {visibleHomepageCategories.map((category, index) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              active={false}
-              index={index}
-              onSelect={handleCategorySelect}
-            />
+            <CategoryCard key={category.id} category={category} active={false} index={index} onSelect={handleCategorySelect} />
           ))}
+        </div>
+
+        <div className="flex justify-center pt-2">
+          <Link
+            to="/buy-target"
+            className="group inline-flex min-h-12 w-full max-w-md items-center justify-center gap-2 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.36)] bg-[linear-gradient(135deg,var(--color-primary),var(--color-primary-hover))] px-5 py-3 text-sm font-black text-[var(--color-button-text)] shadow-[0_20px_46px_-28px_rgb(var(--color-primary-rgb)/0.72)] transition-all hover:-translate-y-0.5 hover:brightness-105 sm:w-auto sm:min-w-[18rem]"
+          >
+            <Target className="h-4.5 w-4.5" />
+            <span>{language === 'ar' ? 'اضغط هنا لبيع تارجت' : 'Sell Target Here'}</span>
+            <ArrowLeft className="h-4.5 w-4.5 transition-transform group-hover:-translate-x-1" />
+          </Link>
         </div>
       </section>
 
-      <StoreFooter
-        title="IBRA Store"
-        description={language === 'ar'
-          ? 'هذا هو الاختيار المناسب لك'
-          : 'A calmer and cleaner mobile-first browsing experience.'}
-        chips={[]}
-        copyright={language === 'ar' ? (
-          <>
-            <span className="font-semibold tracking-[0.08em] text-[var(--color-text)]">IBRA Store</span>
-            <span className="inline-flex h-1 w-1 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.55)]" />
-            <span>© 2026</span>
-            <span className="inline-flex h-1 w-1 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.55)]" />
-            <span>جميع الحقوق محفوظة</span>
-          </>
-        ) : (
-          <>
-            <span className="font-semibold tracking-[0.08em] text-[var(--color-text)]">IBRA Store</span>
-            <span className="inline-flex h-1 w-1 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.55)]" />
-            <span>© 2026</span>
-            <span className="inline-flex h-1 w-1 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.55)]" />
-            <span>All rights reserved</span>
-          </>
-        )}
-        metaLine=""
-      />
+      <StoreFooter title="MS STORE" description={language === 'ar' ? 'تجربة شحن راقية للألعاب والخدمات الصوتية.' : 'A refined recharge storefront.'} chips={[]} copyright={language === 'ar' ? (
+        <>
+          <span className="font-semibold tracking-[0.08em] text-[var(--color-text)]">MS STORE</span>
+          <span className="inline-flex h-1 w-1 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.55)]" />
+          <span>© 2026</span>
+          <span className="inline-flex h-1 w-1 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.55)]" />
+          <span>جميع الحقوق محفوظة</span>
+        </>
+      ) : (
+        <>
+          <span className="font-semibold tracking-[0.08em] text-[var(--color-text)]">MS STORE</span>
+          <span className="inline-flex h-1 w-1 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.55)]" />
+          <span>© 2026</span>
+          <span className="inline-flex h-1 w-1 rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.55)]" />
+          <span>All rights reserved</span>
+        </>
+      )} metaLine="" />
     </div>
   );
 };

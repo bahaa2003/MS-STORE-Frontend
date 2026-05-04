@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../ui/Button';
 import FloatingSocialIcons from './FloatingSocialIcons';
 import SoftCloudLayer from './SoftCloudLayer';
-import brandIconImage from '../../assets/logo.png';
+import brandIconImage from '../../assets/ms-removebg-preview.png';
 
 const SceneTube = ({
   className,

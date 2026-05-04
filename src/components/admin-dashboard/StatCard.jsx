@@ -1,27 +1,53 @@
 import React from 'react';
 import Card from '../ui/Card';
+import { cn } from '../ui/Button';
+import './AdminNeonGlow.css';
 
-const StatCard = ({ title, value, note, icon: Icon }) => {
+const StatCard = ({ title, value, note, icon: Icon, progress = 40, wide = false }) => {
+  const progressValue = Math.max(0, Math.min(100, Number(progress) || 0));
+
   return (
-    <Card variant="elevated" className="relative w-full p-3 sm:p-6">
-      <div className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(var(--color-primary-rgb),0.45),transparent)]" />
-      <div className="flex items-start justify-between gap-2.5 text-start sm:gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)] sm:text-[11px] sm:tracking-[0.16em]">
-            {title}
-          </p>
-          <p className="mt-2 truncate text-lg font-black leading-none tracking-[-0.03em] text-[var(--color-text)] sm:mt-4 sm:text-[2rem]">
+    <Card
+      variant="elevated"
+      className={cn(
+        'admin-stat-card relative w-full p-0 transition-all duration-300',
+        wide && 'col-span-2'
+      )}
+    >
+      <span className="admin-stat-card-shimmer" aria-hidden="true" />
+      <div className="relative flex min-h-[8.25rem] flex-col justify-between overflow-hidden rounded-[inherit] p-3.5 text-start sm:min-h-[9.25rem] sm:p-4">
+        <div className="pointer-events-none absolute -end-4 -top-4 flex h-20 w-20 items-center justify-center rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.1)] bg-[color:rgb(var(--color-primary-rgb)/0.045)] text-[var(--color-primary)] opacity-40 sm:h-24 sm:w-24">
+          <Icon className="h-8 w-8 sm:h-9 sm:w-9" />
+        </div>
+
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="max-w-[9.5rem] text-[10px] font-bold uppercase leading-4 tracking-[0.12em] text-[var(--color-muted)] sm:max-w-[11rem] sm:text-[11px]">
+              {title}
+            </p>
+          </div>
+
+          <div className="admin-icon-glow flex h-7 w-7 shrink-0 items-center justify-center rounded-[0.65rem] border border-[color:rgb(var(--color-primary-rgb)/0.2)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] text-[var(--color-primary)] sm:h-8 sm:w-8">
+            <Icon className="relative z-10 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          </div>
+        </div>
+
+        <div className="relative mt-4">
+          <p className="truncate text-[1.65rem] font-black leading-none text-[var(--color-text)] sm:text-[2.15rem]">
             {value}
           </p>
           {note && (
-            <p className="mt-2 hidden text-xs leading-6 text-[var(--color-text-secondary)] sm:mt-3 sm:block sm:text-sm">
+            <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-[var(--color-text-secondary)] sm:text-xs">
               {note}
             </p>
           )}
         </div>
 
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[calc(var(--radius-md)-2px)] border border-[color:rgb(var(--color-primary-rgb)/0.24)] bg-[color:rgb(var(--color-primary-rgb)/0.1)] text-[var(--color-primary)] shadow-[var(--shadow-subtle)] sm:h-12 sm:w-12 sm:rounded-[var(--radius-md)]">
-          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+        <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-[color:rgb(var(--color-border-rgb)/0.42)]">
+          <div
+            className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary),var(--color-primary-hover))] transition-all duration-500"
+            style={{ width: `${progressValue}%` }}
+          />
         </div>
       </div>
     </Card>

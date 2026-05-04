@@ -4,6 +4,7 @@ import { Bell, Coins, CreditCard, Globe, KeyRound, LayoutDashboard, LogOut, Pale
 import { useNavigate } from 'react-router-dom';
 import SettingsSection from '../components/settings/SettingsSection';
 import SettingsItem from '../components/settings/SettingsItem';
+import ConfirmDialog from '../components/account/ConfirmDialog';
 import Button, { cn } from '../components/ui/Button';
 import Switch from '../components/ui/Switch';
 import { useLanguage } from '../context/LanguageContext';
@@ -26,6 +27,7 @@ const Settings = () => {
     balance: true,
     offers: false
   });
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     try {
@@ -88,6 +90,10 @@ const Settings = () => {
             logoutAccount: 'Log out',
             logoutAccountDescription: 'Securely sign out from this account and return to the login screen',
             logoutAccountAction: 'Sign out now',
+            logoutConfirmTitle: 'Logout',
+            logoutConfirmDescription: 'Do you want to logout?',
+            confirm: 'Confirm',
+            cancel: 'Cancel',
             open: 'Open',
             active: 'Active',
             simulatedActionDone: 'Placeholder action executed. Connect backend endpoint later.',
@@ -133,6 +139,10 @@ const Settings = () => {
             logoutAccount: 'تسجيل الخروج',
             logoutAccountDescription: 'الخروج الآمن من هذا الحساب والرجوع إلى صفحة تسجيل الدخول',
             logoutAccountAction: 'تسجيل الخروج الآن',
+            logoutConfirmTitle: 'تسجيل الخروج',
+            logoutConfirmDescription: 'هل تريد تسجيل الخروج؟',
+            confirm: 'موافق',
+            cancel: 'إلغاء',
             open: 'فتح',
             active: 'مفعل',
             simulatedActionDone: 'تم تنفيذ إجراء تجريبي. اربطه لاحقًا بواجهة الخلفية.',
@@ -147,6 +157,7 @@ const Settings = () => {
   };
 
   const handleLogout = () => {
+    setShowLogoutConfirm(false);
     logout();
     navigate('/auth');
   };
@@ -308,7 +319,7 @@ const Settings = () => {
       <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setShowLogoutConfirm(true)}
           className="group relative w-full overflow-hidden rounded-2xl border border-rose-300/55 bg-gradient-to-br from-rose-500/14 via-[color:rgb(var(--color-card-rgb)/0.94)] to-orange-400/10 px-4 py-4 text-right shadow-[var(--shadow-subtle)] transition-all hover:-translate-y-0.5 hover:border-rose-400/70 hover:shadow-[var(--shadow-lg)]"
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.18),transparent_42%)] opacity-80" />
@@ -328,6 +339,16 @@ const Settings = () => {
           </div>
         </button>
       </motion.section>
+
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title={text.logoutConfirmTitle}
+        description={text.logoutConfirmDescription}
+        confirmLabel={text.confirm}
+        cancelLabel={text.cancel}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 };

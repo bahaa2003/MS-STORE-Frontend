@@ -58,7 +58,7 @@ export const mockPaymentMethods = [
     icon: '📱',
     currency: 'EGP',
     accountNumber: '01012345678',
-    accountName: 'IBRA Store',
+    accountName: 'MS STORE',
     bankName: '',
     instructions: 'أرسل المبلغ المطلوب إلى الرقم أعلاه مع كتابة "شحن محفظة" في رسالة التحويل',
     status: 'active'
@@ -70,7 +70,7 @@ export const mockPaymentMethods = [
     icon: '📱',
     currency: 'EGP',
     accountNumber: '01112345678',
-    accountName: 'IBRA Store',
+    accountName: 'MS STORE',
     bankName: '',
     instructions: 'أرسل المبلغ المطلوب إلى الرقم أعلاه مع كتابة "شحن محفظة" في رسالة التحويل',
     status: 'active'
@@ -82,7 +82,7 @@ export const mockPaymentMethods = [
     icon: '📱',
     currency: 'EGP',
     accountNumber: '01212345678',
-    accountName: 'IBRA Store',
+    accountName: 'MS STORE',
     bankName: '',
     instructions: 'أرسل المبلغ المطلوب إلى الرقم أعلاه مع كتابة "شحن محفظة" في رسالة التحويل',
     status: 'active'
@@ -94,7 +94,7 @@ export const mockPaymentMethods = [
     icon: '🏦',
     currency: 'EGP',
     accountNumber: '123456789012345',
-    accountName: 'IBRA Store Ltd',
+    accountName: 'MS STORE Ltd',
     bankName: 'البنك الأهلي المصري',
     instructions: 'قم بالتحويل البنكي إلى الحساب أعلاه مع كتابة "شحن محفظة" في سبب التحويل',
     status: 'active'
@@ -106,7 +106,7 @@ export const mockPaymentMethods = [
     icon: '💰',
     currency: 'EGP',
     accountNumber: 'WU123456789',
-    accountName: 'IBRA Store',
+    accountName: 'MS STORE',
     bankName: '',
     instructions: 'قم بإرسال المبلغ عبر ويسترن يونيون إلى الاسم أعلاه',
     status: 'active'

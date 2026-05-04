@@ -131,7 +131,18 @@ const sanitizeUser = (user) => {
   return {
     ...safeUser,
     creditLimit: normalizeCreditLimitValue(safeUser.creditLimit),
+    permissions: Array.isArray(safeUser.permissions) ? safeUser.permissions : [],
   };
+};
+
+const isMockTwoFactorEnabled = (userId) => {
+  try {
+    const raw = localStorage.getItem('ibra-account-security-v1');
+    const parsed = raw ? JSON.parse(raw) : {};
+    return Boolean(parsed?.[userId]?.twoFactorEnabled);
+  } catch {
+    return false;
+  }
 };
 
 const secureUsersInDb = async (db) => {
@@ -582,13 +593,13 @@ const mockApi = {
 
       const normalizedEmail = String(email || '').trim().toLowerCase();
       const candidateHash = await hashPassword(password);
+      const emailUser = users.find((u) => String(u.email || '').toLowerCase() === normalizedEmail);
       let user = users.find(
         (u) => String(u.email || '').toLowerCase() === normalizedEmail && u.passwordHash === candidateHash
       );
 
       // Self-heal old corrupted hashes created before migration fix.
       if (!user) {
-        const emailUser = users.find((u) => String(u.email || '').toLowerCase() === normalizedEmail);
         const seedPassword = getSeedPasswordForUser(emailUser);
         if (emailUser && seedPassword && password === seedPassword) {
           emailUser.passwordHash = candidateHash;
@@ -597,6 +608,7 @@ const mockApi = {
         }
       }
       
+      if (!emailUser) throw new Error('User not found');
       if (!user) throw new Error('Invalid email or password');
 
       if (user.signupMethod !== 'google' && user.verified === false) {
@@ -608,8 +620,58 @@ const mockApi = {
         user.status = 'pending';
         saveDB('admin-storage', db);
       }
+
+      if (isMockTwoFactorEnabled(user.id)) {
+        const tempToken = `mock-2fa-${user.id}-${Date.now()}`;
+        return {
+          requires2FA: true,
+          tempToken,
+          twoFactorToken: tempToken,
+          user: sanitizeUser(user),
+        };
+      }
       
       return { user: sanitizeUser(user), token: 'mock-jwt-token-12345' };
+    },
+
+    verifyTwoFactor: async ({ tempToken, twoFactorToken, code }) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const normalizedToken = String(tempToken || twoFactorToken || '');
+      const userId = normalizedToken.split('-').slice(2, -1).join('-');
+      if (!normalizedToken.startsWith('mock-2fa-') || !userId) {
+        throw new Error('Invalid 2FA session');
+      }
+      if (String(code || '').replace(/\D/g, '') !== '123456') {
+        throw new Error('Invalid verification code');
+      }
+      const db = getDB('admin-storage', { state: { users: mockUsers } });
+      const user = (db.state.users || mockUsers).find((entry) => String(entry.id) === String(userId));
+      if (!user) throw new Error('User not found');
+      return { user: sanitizeUser(user), token: 'mock-jwt-token-2fa' };
+    },
+
+    generateTwoFactor: async () => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      return {
+        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('otpauth://totp/MS STORE:mock?secret=MSSTOREMOCK&issuer=MS STORE')}`,
+        secret: 'MSSTOREMOCK',
+      };
+    },
+
+    enableTwoFactor: async ({ token }) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      if (String(token || '').replace(/\D/g, '') !== '123456') {
+        throw new Error('Invalid 2FA code');
+      }
+      return { twoFactorEnabled: true };
+    },
+
+    disableTwoFactor: async ({ password, token, code }) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      if (!String(password || token || code || '').trim()) {
+        throw new Error('Password or 2FA code is required');
+      }
+      return { twoFactorEnabled: false };
     },
 
     loginWithGoogle: async () => {
@@ -619,7 +681,7 @@ const mockApi = {
       const migrated = await secureUsersInDb(db);
       if (migrated) saveDB('admin-storage', db);
 
-      const googleEmail = 'google.user@ibrastore.app';
+      const googleEmail = 'google.user@msstore.app';
       let user = users.find((item) => String(item.email || '').toLowerCase() === googleEmail);
 
       if (!user) {
@@ -684,8 +746,8 @@ const mockApi = {
         coins: 0,
         creditLimit: 0,
         group: resolveGroupName(userData.group),
-        status: 'pending', // Default per requirements
-        verified: false,
+        status: 'approved',
+        verified: true,
         joinDate: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         signupMethod: normalizeSignupMethod(userData.signupMethod || 'email'),
@@ -699,7 +761,7 @@ const mockApi = {
       db.state.users = [...users, newUser];
       saveDB('admin-storage', db);
       
-      return { user: sanitizeUser(newUser) };
+      return { user: sanitizeUser(newUser), token: 'mock-jwt-token-register' };
     },
     
     getProfile: async (userId) => {
@@ -724,6 +786,56 @@ const mockApi = {
       await new Promise(resolve => setTimeout(resolve, 50));
       return { token: 'mock-jwt-token-12345' };
     }
+  },
+
+  notifications: {
+    unreadCount: async () => {
+      await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 200)));
+      const db = getDB('notifications-storage', { state: { notifications: [] } });
+      return (db?.state?.notifications || []).filter((item) => !Boolean(item.read ?? item.isRead)).length;
+    },
+
+    list: async () => {
+      await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 300)));
+      const db = getDB('notifications-storage', { state: { notifications: [] } });
+      return db?.state?.notifications || [];
+    },
+
+    markAsRead: async (id) => {
+      await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 250)));
+      const db = getDB('notifications-storage', { state: { notifications: [] } });
+      db.state.notifications = (db.state.notifications || []).map((item) => (
+        String(item.id) === String(id) ? { ...item, read: true, isRead: true } : item
+      ));
+      saveDB('notifications-storage', db);
+      return { success: true };
+    },
+
+    markAllAsRead: async () => {
+      await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 250)));
+      const db = getDB('notifications-storage', { state: { notifications: [] } });
+      db.state.notifications = (db.state.notifications || []).map((item) => ({ ...item, read: true, isRead: true }));
+      saveDB('notifications-storage', db);
+      return { success: true };
+    },
+
+    send: async (payload = {}) => {
+      await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 300)));
+      const db = getDB('notifications-storage', { state: { notifications: [] } });
+      const notification = {
+        id: `notif-${Date.now()}`,
+        title: payload.title || 'Notification',
+        message: payload.message || '',
+        type: String(payload.type || 'info').toLowerCase(),
+        read: false,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        targetUrl: payload.targetUrl || payload.url || '',
+      };
+      db.state.notifications = [notification, ...(db.state.notifications || [])];
+      saveDB('notifications-storage', db);
+      return notification;
+    },
   },
 
   // --- Products ---
@@ -1361,13 +1473,26 @@ const mockApi = {
   
   // --- Admin User Management ---
   users: {
-      list: async () => {
+      list: async ({ search = '', role, status, email } = {}) => {
           await new Promise(resolve => setTimeout(resolve, DELAY));
           const data = getDB('admin-storage', { state: { users: mockUsers } });
         const migrated = await secureUsersInDb(data);
         if (migrated) saveDB('admin-storage', data);
+        const term = String(search || '').trim().toLowerCase();
+        const normalizedRole = String(role || '').trim().toLowerCase();
+        const normalizedStatus = status ? normalizeAccountStatus(status) : '';
+        const normalizedEmail = String(email || '').trim().toLowerCase();
         return (data.state.users || mockUsers)
           .filter((entry) => !entry?.deletedAt && entry?.isDeleted !== true)
+          .filter((entry) => {
+            if (normalizedRole && String(entry?.role || '').trim().toLowerCase() !== normalizedRole) return false;
+            if (normalizedStatus && normalizeAccountStatus(entry?.status) !== normalizedStatus) return false;
+            if (normalizedEmail && !String(entry?.email || '').toLowerCase().includes(normalizedEmail)) return false;
+            if (!term) return true;
+            return String(entry?.name || '').toLowerCase().includes(term)
+              || String(entry?.email || '').toLowerCase().includes(term)
+              || String(entry?.username || '').toLowerCase().includes(term);
+          })
           .map(sanitizeUser);
       },
 
@@ -1522,7 +1647,27 @@ const mockApi = {
           throw new Error('Cannot demote an admin in mock security mode');
           }
 
-          user.role = role;
+          user.role = String(role || '').toLowerCase();
+          saveDB('admin-storage', db);
+          return sanitizeUser(user);
+        },
+
+        updatePermissions: async (userId, permissions = [], actorContext) => {
+          await new Promise(resolve => setTimeout(resolve, DELAY));
+          const db = getDB('admin-storage', { state: { users: mockUsers } });
+          const migrated = await secureUsersInDb(db);
+          if (migrated) saveDB('admin-storage', db);
+          const actor = resolveActor(actorContext);
+          const user = db.state.users.find(u => u.id === userId);
+          if (!user) return null;
+
+          if (!actor || actor.role !== 'admin') {
+            throw new Error('Only admin can change permissions');
+          }
+
+          user.permissions = Array.isArray(permissions)
+            ? [...new Set(permissions.map((item) => String(item || '').trim()).filter(Boolean))]
+            : [];
           saveDB('admin-storage', db);
           return sanitizeUser(user);
         },
@@ -1930,6 +2075,134 @@ const mockApi = {
         saveDB('topup-storage', db);
         return topup;
     }
+  },
+
+  targetApps: {
+    listActive: async () => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-apps-storage', { state: { apps: [] } });
+      const apps = db.state.apps?.length ? db.state.apps : [
+        { id: 'pubg-target', name: 'PUBG Mobile', unitPrice: 1.35, image: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?auto=format&fit=crop&w=600&q=80', allowedPaymentMethods: ['Vodafone Cash', 'InstaPay', 'Binance'], isActive: true },
+        { id: 'free-fire-target', name: 'Free Fire', unitPrice: 1.1, image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=600&q=80', allowedPaymentMethods: ['Vodafone Cash', 'InstaPay'], isActive: true },
+        { id: 'tiktok-target', name: 'TikTok Coins', unitPrice: 0.92, image: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?auto=format&fit=crop&w=600&q=80', allowedPaymentMethods: ['InstaPay', 'Binance'], isActive: true },
+      ];
+      return apps.filter((app) => app.isActive !== false);
+    },
+
+    list: async () => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-apps-storage', { state: { apps: [] } });
+      if (!db.state.apps?.length) {
+        db.state.apps = await mockApi.targetApps.listActive();
+        saveDB('target-apps-storage', db);
+      }
+      return db.state.apps || [];
+    },
+
+    create: async (payload = {}) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-apps-storage', { state: { apps: [] } });
+      if (!db.state.apps?.length) db.state.apps = await mockApi.targetApps.listActive();
+      const app = {
+        id: `target-app-${Date.now()}`,
+        name: payload.name || 'Target App',
+        unitPrice: Number(payload.unitPrice || 0),
+        image: payload.imagePreview || (typeof payload.image === 'string' ? payload.image : payload.image?.preview || ''),
+        allowedPaymentMethods: payload.allowedPaymentMethods || payload.paymentMethodIds || [],
+        isActive: payload.isActive !== false,
+        createdAt: new Date().toISOString(),
+      };
+      db.state.apps = [app, ...(db.state.apps || [])];
+      saveDB('target-apps-storage', db);
+      return app;
+    },
+
+    update: async (id, payload = {}) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-apps-storage', { state: { apps: [] } });
+      if (!db.state.apps?.length) db.state.apps = await mockApi.targetApps.listActive();
+      const index = db.state.apps.findIndex((app) => String(app.id) === String(id));
+      if (index === -1) throw new Error('Target app not found');
+      db.state.apps[index] = {
+        ...db.state.apps[index],
+        ...payload,
+        image: payload.imagePreview || (typeof payload.image === 'string' ? payload.image : payload.image?.preview || db.state.apps[index].image),
+        allowedPaymentMethods: payload.allowedPaymentMethods || payload.paymentMethodIds || db.state.apps[index].allowedPaymentMethods,
+        updatedAt: new Date().toISOString(),
+      };
+      saveDB('target-apps-storage', db);
+      return db.state.apps[index];
+    },
+
+    delete: async (id) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-apps-storage', { state: { apps: [] } });
+      if (!db.state.apps?.length) db.state.apps = await mockApi.targetApps.listActive();
+      const index = db.state.apps.findIndex((app) => String(app.id) === String(id));
+      if (index === -1) throw new Error('Target app not found');
+      db.state.apps[index] = { ...db.state.apps[index], isActive: false, updatedAt: new Date().toISOString() };
+      saveDB('target-apps-storage', db);
+      return db.state.apps[index];
+    },
+  },
+
+  targetPurchases: {
+    list: async () => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-purchases-storage', { state: { requests: [] } });
+      return db.state.requests || [];
+    },
+
+    create: async (payload) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-purchases-storage', { state: { requests: [] } });
+      const readValue = (key) => (
+        payload instanceof FormData ? payload.get(key) : payload?.[key]
+      );
+      const screenshot = readValue('screenshotProof') || readValue('screenshot') || readValue('proofImage') || null;
+      const appId = readValue('appId') || readValue('productId');
+      const apps = await mockApi.targetApps.list();
+      const app = apps.find((item) => String(item.id) === String(appId)) || {};
+      const coinAmount = Number(readValue('coinAmount') || readValue('coins') || readValue('quantity') || 0);
+      const unitPrice = Number(app.unitPrice || readValue('unitPrice') || 0);
+      const request = {
+        id: `target-${Date.now()}`,
+        userId: readValue('userId'),
+        userName: readValue('userName'),
+        appId,
+        appNameSnapshot: app.name || readValue('productName') || '',
+        coinAmount,
+        quantity: coinAmount,
+        unitPriceSnapshot: unitPrice,
+        unitPrice,
+        totalPrice: coinAmount * unitPrice,
+        senderId: readValue('senderId') || readValue('playerId'),
+        transferNumber: readValue('transferNumber') || readValue('vodafoneCashNumber'),
+        paymentMethod: readValue('paymentMethod') || readValue('paymentMethodName'),
+        screenshotName: screenshot?.name || '',
+        proofImage: screenshot?.preview || '',
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+      };
+      db.state.requests = [request, ...(db.state.requests || [])];
+      saveDB('target-purchases-storage', db);
+      return request;
+    },
+
+    updateStatus: async (id, status) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-purchases-storage', { state: { requests: [] } });
+      const index = (db.state.requests || []).findIndex((entry) => String(entry.id) === String(id));
+      if (index === -1) throw new Error('Target request not found');
+      const next = {
+        ...db.state.requests[index],
+        status,
+        reviewedAt: new Date().toISOString(),
+      };
+      db.state.requests[index] = next;
+      saveDB('target-purchases-storage', db);
+      return next;
+    },
   },
 
   // --- System ---

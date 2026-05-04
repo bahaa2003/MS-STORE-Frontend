@@ -27,7 +27,7 @@ export const ToastProvider = ({ children }) => {
       {children}
       <div 
         className={cn(
-          "fixed bottom-4 z-50 flex flex-col gap-2 pointer-events-none",
+          "fixed bottom-4 z-50 flex flex-col gap-2.5 pointer-events-none",
           dir === 'rtl' ? "left-4 items-start" : "right-4 items-end"
         )}
       >
@@ -39,15 +39,15 @@ export const ToastProvider = ({ children }) => {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: dir === 'rtl' ? '-130%' : '100%', scale: 0.9 }}
               className={cn(
-                'pointer-events-auto flex min-w-[300px] items-center gap-3 rounded-[var(--radius-md)] border px-4 py-3 shadow-[var(--shadow-medium)] backdrop-blur-md',
+                'pointer-events-auto flex min-w-[300px] items-center gap-3 rounded-[1.35rem] border px-4 py-3.5 shadow-[var(--shadow-medium)] backdrop-blur-xl',
                 toast.type === 'success' &&
-                  'border-[color:rgb(var(--color-success-rgb)/0.25)] bg-[color:rgb(var(--color-success-rgb)/0.12)] text-[var(--color-success)]',
+                  'border-[color:rgb(var(--color-success-rgb)/0.2)] bg-[color:rgb(var(--color-success-rgb)/0.12)] text-[var(--color-success)]',
                 toast.type === 'error' &&
-                  'border-[color:rgb(var(--color-error-rgb)/0.25)] bg-[color:rgb(var(--color-error-rgb)/0.12)] text-[var(--color-error)]',
+                  'border-[color:rgb(var(--color-error-rgb)/0.2)] bg-[color:rgb(var(--color-error-rgb)/0.12)] text-[var(--color-error)]',
                 toast.type === 'warning' &&
-                  'border-[color:rgb(var(--color-warning-rgb)/0.25)] bg-[color:rgb(var(--color-warning-rgb)/0.12)] text-[var(--color-warning)]',
+                  'border-[color:rgb(var(--color-warning-rgb)/0.2)] bg-[color:rgb(var(--color-warning-rgb)/0.12)] text-[var(--color-warning)]',
                 toast.type === 'info' &&
-                  'border-[color:rgb(var(--color-primary-rgb)/0.22)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] text-[var(--color-primary)]'
+                  'border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[linear-gradient(180deg,rgb(var(--color-primary-rgb)/0.12),rgb(var(--color-primary-rgb)/0.08))] text-[var(--color-primary)]'
               )}
             >
               {toast.type === 'success' && <Check className="w-5 h-5 shrink-0" />}

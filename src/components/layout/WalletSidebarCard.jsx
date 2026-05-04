@@ -64,12 +64,6 @@ const WalletSidebarCard = ({ className, isVisible = true, onNavigate }) => {
   );
   const isNegativeBalance = walletValue < 0;
 
-  const statusMessage = hasRefreshError
-    ? 'تعذر تحديث الرصيد الآن'
-    : isRefreshing
-      ? 'جارٍ تحديث الرصيد'
-      : 'الرصيد المتاح حاليًا للشراء';
-
   const handleNavigate = (path) => {
     navigate(path);
     if (typeof onNavigate === 'function') {
@@ -81,47 +75,41 @@ const WalletSidebarCard = ({ className, isVisible = true, onNavigate }) => {
     <section
       dir={dir === 'rtl' ? 'rtl' : 'ltr'}
       className={cn(
-        'sidebar-wallet-shimmer relative isolate overflow-hidden rounded-[20px] border border-[#d3b171]/50 bg-[linear-gradient(145deg,rgba(93,72,33,0.16),rgba(246,215,148,0.14)_38%,rgba(255,251,236,0.9)_100%)] p-3 shadow-[0_14px_28px_-24px_rgba(125,92,33,0.66)]',
+        'sidebar-wallet-shimmer relative isolate overflow-hidden rounded-[17px] border border-[#d3b171]/50 bg-[linear-gradient(145deg,rgba(93,72,33,0.16),rgba(246,215,148,0.14)_38%,rgba(255,251,236,0.9)_100%)] p-2.5 shadow-[0_12px_24px_-22px_rgba(125,92,33,0.66)]',
         'before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top_right,rgba(255,243,200,0.56),transparent_45%)] before:opacity-80',
         className
       )}
     >
-      <div className="relative z-10 space-y-2.5">
+      <div className="relative z-10 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold tracking-[0.12em] text-[#8d6a2d]">
+            <p className="text-[9px] font-bold tracking-[0.1em] text-[#8d6a2d]">
               رصيد المحفظة
             </p>
-            <div className="mt-1.5 min-h-[2rem]">
+            <div className="mt-1 min-h-[1.65rem]">
               {(!user && isRefreshing) ? (
-                <div className="space-y-1.5">
-                  <div className="h-3 w-20 animate-pulse rounded-full bg-[#d8c091]/45" />
-                  <div className="h-5 w-28 animate-pulse rounded-full bg-[#cba665]/35" />
+                <div className="space-y-1">
+                  <div className="h-2.5 w-18 animate-pulse rounded-full bg-[#d8c091]/45" />
+                  <div className="h-4 w-24 animate-pulse rounded-full bg-[#cba665]/35" />
                 </div>
               ) : (
-                <p className={`truncate text-[1.14rem] font-black tracking-[-0.02em] sm:text-[1.24rem] ${isNegativeBalance ? 'text-[#b42323]' : 'text-[#6f4f18]'}`}>
+                <p className={`truncate text-[0.98rem] font-black tracking-[-0.01em] sm:text-[1.08rem] ${isNegativeBalance ? 'text-[#b42323]' : 'text-[#6f4f18]'}`}>
                   {walletDisplayValue}
                 </p>
               )}
             </div>
           </div>
 
-          <span className="inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-[14px] border border-[#d8b36b]/55 bg-[linear-gradient(180deg,rgba(255,246,218,0.95),rgba(242,214,150,0.6))] text-[#8c631f] shadow-[inset_0_1px_0_rgba(255,255,255,0.48)]">
-            <Wallet className="h-4.5 w-4.5" />
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] border border-[#d8b36b]/55 bg-[linear-gradient(180deg,rgba(255,246,218,0.95),rgba(242,214,150,0.6))] text-[#8c631f] shadow-[inset_0_1px_0_rgba(255,255,255,0.48)]">
+            <Wallet className="h-4 w-4" />
           </span>
-        </div>
-
-        <div className="flex min-h-[1.1rem] items-center gap-1 text-[10px] font-medium text-[#8f6e36]">
-          {hasRefreshError ? <AlertCircle className="h-3 w-3 shrink-0" /> : null}
-          {isRefreshing ? <LoaderCircle className="h-3 w-3 shrink-0 animate-spin" /> : null}
-          <span className="truncate">{statusMessage}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => handleNavigate('/wallet')}
-            className="inline-flex h-8.5 items-center justify-center gap-1 rounded-[14px] border border-[#d8bd8b]/70 bg-white/66 px-2.5 text-[11px] font-semibold text-[#7b5a1f] transition-all hover:-translate-y-0.5 hover:border-[#caa159] hover:bg-white/82"
+            className="inline-flex h-8 items-center justify-center gap-1 rounded-[12px] border border-[#d8bd8b]/70 bg-white/66 px-2 text-[10px] font-semibold text-[#7b5a1f] transition-all hover:-translate-y-0.5 hover:border-[#caa159] hover:bg-white/82"
           >
             <ReceiptText className="h-3 w-3" />
             <span>تفاصيل</span>
@@ -130,7 +118,7 @@ const WalletSidebarCard = ({ className, isVisible = true, onNavigate }) => {
           <button
             type="button"
             onClick={() => handleNavigate('/wallet/add-balance')}
-            className="inline-flex h-8.5 items-center justify-center gap-1 rounded-[14px] border border-[#b88b36]/80 bg-[linear-gradient(180deg,#dcb76f,#bf8f35)] px-2.5 text-[11px] font-bold text-white shadow-[0_10px_18px_-14px_rgba(111,78,20,0.95)] transition-all hover:-translate-y-0.5 hover:brightness-[1.03]"
+            className="inline-flex h-8 items-center justify-center gap-1 rounded-[12px] border border-[#b88b36]/80 bg-[linear-gradient(180deg,#dcb76f,#bf8f35)] px-2 text-[10px] font-bold text-white shadow-[0_9px_16px_-14px_rgba(111,78,20,0.95)] transition-all hover:-translate-y-0.5 hover:brightness-[1.03]"
           >
             <ArrowUpLeft className="h-3 w-3" />
             <span>اشحن الآن</span>
