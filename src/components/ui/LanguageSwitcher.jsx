@@ -16,7 +16,6 @@ const LanguageSwitcher = ({ variant = 'topbar', className, showIcon = false }) =
   const handleToggleLanguage = () => {
     const next = isArabic ? 'en' : 'ar';
     i18n.changeLanguage(next);
-    localStorage.setItem('language', next);
   };
 
   return (

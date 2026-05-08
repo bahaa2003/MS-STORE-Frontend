@@ -37,7 +37,6 @@ const http = axios.create({
 // ─── Token helpers ───────────────────────────────────────────────────────────
 
 const AUTH_STORAGE_KEY = 'auth-storage';
-const PAYMENT_SETTINGS_CACHE_KEY = 'payment-settings-cache';
 const SESSION_LOGOUT_REASON_KEY = 'auth:logout-reason';
 const SESSION_EXPIRED_REASON = 'expired';
 const LOGIN_REDIRECT_PATH = '/login';
@@ -45,15 +44,9 @@ const REFRESH_ENDPOINT = '/auth/refresh';
 
 const AUTH_FORCE_LOGOUT_EVENT = 'auth:force-logout';
 
+// Session-backed auth root so the signed-in state survives refreshes without localStorage.
+let __authPersistRoot = {};
 
-const STORED_KEYS_TO_CLEAR_ON_LOGOUT = [
-  'admin-ui-storage',
-  'group-storage',
-  'products-storage',
-  'orders-storage',
-  'topups-storage',
-  'notifications-storage',
-];
 
 const safeParseJson = (raw, fallback = null) => {
   try {
@@ -63,17 +56,48 @@ const safeParseJson = (raw, fallback = null) => {
   }
 };
 
-const getAuthPersistedRoot = () => safeParseJson(localStorage.getItem(AUTH_STORAGE_KEY), {});
+const getAuthPersistedRoot = () => {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          __authPersistRoot = parsed;
+        }
+      }
+    } catch {
+      // Fall back to the in-memory copy below.
+    }
+  }
+
+  return __authPersistRoot || {};
+};
 const getStoredAuthState = () => getAuthPersistedRoot()?.state || {};
 const getStoredRole = () => String(getStoredAuthState()?.user?.role || '').trim().toUpperCase();
 
-const readCachedPaymentSettings = () => safeParseJson(localStorage.getItem(PAYMENT_SETTINGS_CACHE_KEY), null);
-const writeCachedPaymentSettings = (settings) => {
-  try {
-    localStorage.setItem(PAYMENT_SETTINGS_CACHE_KEY, JSON.stringify(settings));
-  } catch {
-    // Ignore storage failures and continue with live data only.
+const prepareFreshPaymentSettingsRequest = () => {
+  // No-op: payment settings are always fetched from the API.
+};
+
+const normalizeSettingArray = (value) => {
+  if (Array.isArray(value)) return value;
+
+  if (typeof value === 'string') {
+    const parsed = safeParseJson(value, null);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.value)) return parsed.value;
+    if (Array.isArray(parsed?.items)) return parsed.items;
+    if (Array.isArray(parsed?.paymentGroups)) return parsed.paymentGroups;
+    if (Array.isArray(parsed?.countryAccounts)) return parsed.countryAccounts;
   }
+
+  if (Array.isArray(value?.value)) return value.value;
+  if (Array.isArray(value?.items)) return value.items;
+  if (Array.isArray(value?.paymentGroups)) return value.paymentGroups;
+  if (Array.isArray(value?.countryAccounts)) return value.countryAccounts;
+
+  return [];
 };
 
 const normalizePaymentSettingsResponse = (settings) => {
@@ -88,12 +112,12 @@ const normalizePaymentSettingsResponse = (settings) => {
   });
 
   return {
-    countryAccounts: Array.isArray(source?.countryAccounts)
-      ? source.countryAccounts.map((item) => normalizeAccount(item)).filter((item) => item.countryCode)
-      : [],
+    countryAccounts: normalizeSettingArray(source?.countryAccounts)
+      .map((item) => normalizeAccount(item))
+      .filter((item) => item.countryCode),
     instructions: String(source?.instructions || '').trim(),
     whatsappNumber: String(source?.whatsappNumber || '').trim(),
-    paymentGroups: normalizePaymentGroups(source?.paymentGroups, { fallbackToDefault: false }),
+    paymentGroups: normalizePaymentGroups(normalizeSettingArray(source?.paymentGroups), { fallbackToDefault: false }),
   };
 };
 
@@ -125,36 +149,28 @@ const serializePaymentGroupsForApi = (groups) => normalizePaymentGroups(groups, 
 const writeAuthState = (nextState) => {
   const root = getAuthPersistedRoot() || {};
   root.state = { ...(root.state || {}), ...(nextState || {}) };
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(root));
+  __authPersistRoot = root;
+
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(root));
+    } catch {
+      // Best effort.
+    }
+  }
 };
 
 const getStoredToken = () => String(getStoredAuthState()?.token || '').trim() || null;
 const getStoredRefreshToken = () => {
-  const state = getStoredAuthState();
-  return (
-    state?.refreshToken
-    || localStorage.getItem('refresh-token')
-    || localStorage.getItem('refreshToken')
-    || null
-  );
+  return getStoredAuthState()?.refreshToken || null;
 };
 
 const setStoredAuthTokens = (token, refreshToken) => {
   writeAuthState({
     token: token || null,
     isAuthenticated: Boolean(token),
-    ...(refreshToken !== undefined ? { refreshToken: refreshToken || null } : {}),
+    refreshToken: refreshToken || null,
   });
-
-  if (refreshToken !== undefined) {
-    if (refreshToken) {
-      localStorage.setItem('refresh-token', refreshToken);
-      localStorage.setItem('refreshToken', refreshToken);
-    } else {
-      localStorage.removeItem('refresh-token');
-      localStorage.removeItem('refreshToken');
-    }
-  }
 };
 
 const clearStoredSession = () => {
@@ -168,9 +184,13 @@ const clearStoredSession = () => {
     profileLastLoadedAt: 0,
   });
 
-  localStorage.removeItem('refresh-token');
-  localStorage.removeItem('refreshToken');
-  STORED_KEYS_TO_CLEAR_ON_LOGOUT.forEach((key) => localStorage.removeItem(key));
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+  }
 };
 
 const setSessionLogoutReason = (reason = SESSION_EXPIRED_REASON) => {
@@ -788,6 +808,11 @@ const normaliseOrder = (o) => {
       || o.customerInput?.values
       || o.orderFields
       || {},
+    customInputs: o.customInputs
+      || o.customerInput?.values
+      || o.orderFieldsValues
+      || o.orderFields
+      || {},
     orderFields: o.orderFields
       || o.orderFieldsValues
       || o.customerInput?.values
@@ -1019,6 +1044,46 @@ const normaliseTargetApp = (app = {}) => {
   };
 };
 
+const normaliseTargetOrderUser = (order = {}) => {
+  const userRecord = (() => {
+    if (order.user && typeof order.user === 'object') return order.user;
+    if (order.userId && typeof order.userId === 'object') return order.userId;
+    if (order.customer && typeof order.customer === 'object') return order.customer;
+    if (order.customerId && typeof order.customerId === 'object') return order.customerId;
+    if (order.createdBy && typeof order.createdBy === 'object') return order.createdBy;
+    return {};
+  })();
+
+  const userId = String(
+    userRecord._id
+    || userRecord.id
+    || order.userId
+    || order.customerId
+    || order.createdBy
+    || order.user
+    || ''
+  ).trim();
+
+  const userName = String(
+    order.userName
+    || order.customerName
+    || userRecord.name
+    || userRecord.fullName
+    || userRecord.username
+    || ''
+  ).trim();
+
+  const userEmail = String(
+    order.userEmail
+    || order.customerEmail
+    || order.email
+    || userRecord.email
+    || ''
+  ).trim();
+
+  return { userId, userName, userEmail };
+};
+
 const normaliseTargetOrder = (order = {}) => {
   const id = order._id || order.id;
   const app = typeof order.appId === 'object' && order.appId !== null ? normaliseTargetApp(order.appId) : null;
@@ -1026,6 +1091,7 @@ const normaliseTargetOrder = (order = {}) => {
   const unitPrice = Number(order.unitPriceSnapshot ?? order.unitPrice ?? app?.unitPrice ?? 0);
   const totalPrice = Number(order.totalPrice ?? (coinAmount * unitPrice));
   const status = String(order.status || 'PENDING').trim().toUpperCase();
+  const orderUser = normaliseTargetOrderUser(order);
 
   return {
     ...order,
@@ -1049,6 +1115,7 @@ const normaliseTargetOrder = (order = {}) => {
     screenshotProof: resolveImageUrl(order.screenshotProof || order.proofImage || ''),
     proofImage: resolveImageUrl(order.screenshotProof || order.proofImage || ''),
     status,
+    ...orderUser,
   };
 };
 
@@ -1087,6 +1154,9 @@ const buildTargetOrderFormData = (payload = {}) => {
   formData.append('senderId', String(payload.senderId || payload.transferFromId || payload.playerId || '').trim());
   formData.append('transferNumber', String(payload.transferNumber || payload.paymentAccount || '').trim());
   formData.append('paymentMethod', String(payload.paymentMethod || payload.paymentMethodName || '').trim());
+  appendIfPresent(formData, 'paymentMethodId', String(payload.paymentMethodId || '').trim());
+  appendIfPresent(formData, 'userName', String(payload.userName || '').trim());
+  appendIfPresent(formData, 'userEmail', String(payload.userEmail || '').trim());
   const file = payload.screenshotProof || payload.proofImage || payload.receipt || null;
   if (file) formData.append('screenshotProof', file);
   return formData;
@@ -1192,6 +1262,22 @@ const productToBE = (fe) => {
   if (fe.category !== undefined) body.categoryId = fe.category;
   if (fe.displayOrder !== undefined) body.displayOrder = fe.displayOrder;
   if (fe.orderFields !== undefined) body.orderFields = fe.orderFields;
+  if (fe.dynamicFields !== undefined) {
+    body.dynamicFields = (Array.isArray(fe.dynamicFields) ? fe.dynamicFields : [])
+      .map((field, index) => {
+        const rawName = String(field?.name || field?.key || `field_${index + 1}`).trim();
+        const sanitizedName = rawName.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const label = String(field?.label || rawName).trim();
+        const type = String(field?.type || 'text').trim().toLowerCase();
+        return {
+          name: sanitizedName,
+          label,
+          type: ['text', 'number', 'email', 'select'].includes(type) ? type : 'text',
+          required: field?.required !== false,
+        };
+      })
+      .filter((field) => field.name && field.label);
+  }
   if (fe.productStatus !== undefined) body.productStatus = fe.productStatus;
   if (fe.isVisibleInStore !== undefined) body.isVisibleInStore = Boolean(fe.isVisibleInStore);
   if (fe.showWhenUnavailable !== undefined) body.showWhenUnavailable = Boolean(fe.showWhenUnavailable);
@@ -1334,10 +1420,8 @@ const runProductMutationPlan = async (plan, fallbackMessage = 'Unable to save pr
 
 const isAdmin = () => {
   try {
-    const raw = localStorage.getItem('auth-storage');
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    return parsed?.state?.user?.role?.toLowerCase() === 'admin';
+    // Use in-memory auth state instead of localStorage
+    return getStoredAuthState()?.user?.role?.toLowerCase() === 'admin';
   } catch { return false; }
 };
 
@@ -1996,7 +2080,7 @@ const realApi = {
     },
 
     /**
-     * DELETE /admin/providers/:id → soft delete (sets deletedAt + isActive=false)
+     * DELETE /admin/providers/:id → safe delete (detaches linked products first)
      */
     delete: async (id, _actorContext) => {
       const res = await http.delete(`/admin/providers/${id}`);
@@ -2593,7 +2677,7 @@ const realApi = {
     /**
      * POST /me/orders — place a new order.
      *
-     * BE accepts: { productId, quantity, orderFieldsValues }
+     * BE accepts: { productId, quantity, orderFieldsValues, customInputs }
      * FE sends a full orderWithSnapshot object.
      * We strip it down to only what the BE expects.
      */
@@ -2602,9 +2686,18 @@ const realApi = {
         productId: orderData.productId,
         quantity: Number(orderData.quantity) || 1,
       };
-      // Include dynamic order field values if present
+      const customInputsPayload = (
+        orderData.customInputs !== undefined
+          ? orderData.customInputs
+          : (orderData.orderFieldsValues || orderData.orderFields)
+      );
+      if (customInputsPayload !== undefined) {
+        body.customInputs = customInputsPayload;
+      }
       if (orderData.orderFieldsValues) {
         body.orderFieldsValues = orderData.orderFieldsValues;
+      } else if (customInputsPayload && typeof customInputsPayload === 'object' && !Array.isArray(customInputsPayload)) {
+        body.orderFieldsValues = customInputsPayload;
       }
 
       const endpoints = isAdmin() ? ['/orders', '/me/orders'] : ['/me/orders', '/orders'];
@@ -2910,16 +3003,34 @@ const realApi = {
           ? `/admin/targets/${id}/reject`
           : null;
 
-      if (!endpoint) {
+      if (!endpoint && normalizedStatus !== 'pending') {
         throw new Error(`Unsupported target order status: ${status}`);
       }
 
       const body = normalizedStatus === 'rejected'
         ? { adminNotes: payload.adminNotes ?? payload.rejectionReason ?? payload.reason ?? '' }
         : {};
-      const res = await http.patch(endpoint, body);
-      const data = unwrap(res);
-      return normaliseTargetOrder(data?.order || data?.request || data);
+      const pendingBody = { status: 'PENDING' };
+
+      const requests = endpoint
+        ? [{ url: endpoint, body }]
+        : [
+            { url: `/admin/targets/${id}/status`, body: pendingBody },
+            { url: `/admin/targets/${id}`, body: pendingBody },
+          ];
+
+      let lastError = null;
+      for (const request of requests) {
+        try {
+          const res = await http.patch(request.url, request.body);
+          const data = unwrap(res);
+          return normaliseTargetOrder(data?.order || data?.request || data);
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error(`Unsupported target order status: ${status}`);
     },
   },
 
@@ -3008,28 +3119,21 @@ const realApi = {
      */
     paymentSettings: async () => {
       const role = getStoredRole() || 'CUSTOMER';
-      const cachedSettings = normalizePaymentSettingsResponse(readCachedPaymentSettings());
-
-      if (role !== 'ADMIN' && cachedSettings.paymentGroups.length) {
-        return cachedSettings;
-      }
+      const shouldUseAdminSettings = role && role !== 'CUSTOMER';
+      prepareFreshPaymentSettingsRequest();
 
       // Customer sessions: try the public payment settings endpoint.
-      if (role !== 'ADMIN') {
+      if (!shouldUseAdminSettings) {
         try {
           const res = await http.get('/settings/payment');
           const data = unwrap(res);
-          const normalized = normalizePaymentSettingsResponse(data);
-          writeCachedPaymentSettings(normalized);
-          return normalized;
+          return normalizePaymentSettingsResponse(data);
         } catch (_publicErr) {
-          // Fallback to cached or built-in defaults
-          if (cachedSettings.paymentGroups.length) return cachedSettings;
           return {
             countryAccounts: [],
             instructions: '',
             whatsappNumber: '',
-            paymentGroups: normalizePaymentGroups(null, { fallbackToDefault: true }),
+            paymentGroups: [],
           };
         }
       }
@@ -3045,26 +3149,31 @@ const realApi = {
           whatsappNumber: find('whatsappNumber'),
           paymentGroups: find('paymentGroups'),
         });
-        writeCachedPaymentSettings(normalized);
         return normalized;
       } catch (error) {
         const status = Number(error?.response?.status || error?.status || 0);
         if (status === 403) {
-          // Token is valid but role isn't actually admin — treat as customer.
-          if (cachedSettings.paymentGroups.length) return cachedSettings;
+          // Token is valid but role isn't actually admin — try the public endpoint.
+          try {
+            const res = await http.get('/settings/payment');
+            return normalizePaymentSettingsResponse(unwrap(res));
+          } catch {
+            return {
+              countryAccounts: [],
+              instructions: '',
+              whatsappNumber: '',
+              paymentGroups: [],
+            };
+          }
+        }
+
+        if (!shouldUseAdminSettings) {
           return {
             countryAccounts: [],
             instructions: '',
             whatsappNumber: '',
-            paymentGroups: normalizePaymentGroups(null, { fallbackToDefault: true }),
+            paymentGroups: [],
           };
-        }
-        if (cachedSettings.paymentGroups.length || cachedSettings.countryAccounts.length || cachedSettings.instructions || cachedSettings.whatsappNumber) {
-          return cachedSettings;
-        }
-
-        if (role !== 'ADMIN') {
-          return { countryAccounts: [], instructions: '', whatsappNumber: '', paymentGroups: [] };
         }
 
         throw error;
@@ -3081,7 +3190,7 @@ const realApi = {
      * parallel PATCH requests for each changed value.
      */
     updatePaymentSettings: async (payload, _actorContext) => {
-      const currentCachedSettings = normalizePaymentSettingsResponse(readCachedPaymentSettings());
+      prepareFreshPaymentSettingsRequest();
       const normalizedPayload = {
         ...(payload?.countryAccounts !== undefined ? {
           countryAccounts: normalizePaymentSettingsResponse({ countryAccounts: payload.countryAccounts }).countryAccounts,
@@ -3108,38 +3217,16 @@ const realApi = {
 
       if (updates.length > 0) await Promise.all(updates);
 
-      // ── Invalidate stale cache and re-fetch from server ────────────
-      // Previously we optimistically wrote the sent payload to cache.
-      // If the backend silently failed (e.g. Mongoose Mixed type bug),
-      // the cache would hold data that was never persisted.
-      // Now we invalidate first, then fetch the confirmed server state.
-      try {
-        localStorage.removeItem(PAYMENT_SETTINGS_CACHE_KEY);
-      } catch { /* ignore storage errors */ }
-
-      // Re-fetch from server to get the actual persisted state
-      try {
-        const freshRes = await http.get('/admin/settings');
-        const freshData = unwrap(freshRes);
-        const allSettings = freshData?.settings || (Array.isArray(freshData) ? freshData : []);
-        const find = (k) => allSettings.find((s) => s.key === k)?.value;
-        const nextSettings = normalizePaymentSettingsResponse({
-          countryAccounts: find('paymentCountryAccounts'),
-          instructions: find('paymentInstructions'),
-          whatsappNumber: find('whatsappNumber'),
-          paymentGroups: find('paymentGroups'),
-        });
-        writeCachedPaymentSettings(nextSettings);
-        return nextSettings;
-      } catch {
-        // If re-fetch fails, fall back to the payload we sent (best-effort)
-        const nextSettings = normalizePaymentSettingsResponse({
-          ...currentCachedSettings,
-          ...normalizedPayload,
-        });
-        writeCachedPaymentSettings(nextSettings);
-        return nextSettings;
-      }
+      const freshRes = await http.get('/admin/settings');
+      const freshData = unwrap(freshRes);
+      const allSettings = freshData?.settings || (Array.isArray(freshData) ? freshData : []);
+      const find = (k) => allSettings.find((s) => s.key === k)?.value;
+      return normalizePaymentSettingsResponse({
+        countryAccounts: find('paymentCountryAccounts'),
+        instructions: find('paymentInstructions'),
+        whatsappNumber: find('whatsappNumber'),
+        paymentGroups: find('paymentGroups'),
+      });
     },
 
     /**

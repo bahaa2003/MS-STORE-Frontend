@@ -6,12 +6,21 @@ const toLogString = (value) => {
   if (value instanceof Error) return value.message;
   if (value && typeof value === 'object') {
     try {
-      return JSON.stringify(value);
+      return JSON.stringify(value, (_key, entry) => {
+        if (entry instanceof Error) {
+          return { name: entry.name, message: entry.message, code: entry.code, status: entry.status };
+        }
+        return entry;
+      });
     } catch {
-      return String(value);
+      return Object.prototype.toString.call(value);
     }
   }
-  return String(value);
+  try {
+    return String(value);
+  } catch {
+    return Object.prototype.toString.call(value);
+  }
 };
 
 const buildLogKey = (args) => args.map(toLogString).join('|');

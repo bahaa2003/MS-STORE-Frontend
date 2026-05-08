@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import './i18n';
 import { devLogger } from './utils/devLogger';
+import { cleanupVolatileAppStorage } from './utils/storageMaintenance';
 
 const isExternalExtensionPermissionError = (value) => {
   const message = String(
@@ -54,29 +55,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// ============================================
-// تنظيف البيانات القديمة من localStorage
-// ============================================
-function cleanupOldData() {
-  try {
-    const stored = localStorage.getItem('products-storage');
-    if (!stored) return false;
-
-    const data = JSON.parse(stored);
-    const firstProduct = data?.state?.products?.[0];
-
-    if (firstProduct && !firstProduct.minimumOrderQty) {
-      localStorage.removeItem('products-storage');
-      return true;
-    }
-  } catch (error) {
-    devLogger.error('Cleanup error:', error);
-  }
-
-  return false;
-}
-
-cleanupOldData();
+// No localStorage usage: skip old persistent cleanup.
+// Keep call to cleanupVolatileAppStorage for compatibility (it is a no-op when storage removed).
+cleanupVolatileAppStorage && typeof cleanupVolatileAppStorage === 'function' && cleanupVolatileAppStorage();
 
 const hideBootLoader = () => {
   if (typeof window === 'undefined') return;

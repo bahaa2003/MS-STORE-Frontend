@@ -23,7 +23,6 @@ export const LanguageProvider = ({ children }) => {
     (nextLanguage) => {
       const normalized = normalizeLanguage(nextLanguage);
       i18n.changeLanguage(normalized);
-      localStorage.setItem('language', normalized);
     },
     [i18n]
   );
@@ -55,7 +54,6 @@ export const LanguageProvider = ({ children }) => {
   useEffect(() => {
     document.documentElement.dir = dir;
     document.documentElement.lang = language;
-    localStorage.setItem('language', language);
   }, [dir, language]);
 
   const value = useMemo(

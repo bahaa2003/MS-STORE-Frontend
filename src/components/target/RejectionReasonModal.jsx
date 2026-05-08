@@ -32,6 +32,7 @@ const RejectionReasonModal = ({
       title={title}
       size="xxs"
       placement="center"
+      className="z-[260]"
       footer={(
         <div className="flex flex-row justify-end gap-2">
           <Button type="button" size="sm" variant="secondary" className="h-8 rounded-lg px-3 text-xs" onClick={onClose}>

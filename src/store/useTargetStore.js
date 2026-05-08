@@ -1,41 +1,6 @@
 import { create } from 'zustand';
 import apiClient from '../services/client';
-
-export const TARGET_PAYMENT_METHODS = [
-  { id: 'Vodafone Cash', name: 'Vodafone Cash', accountLabel: 'Transfer number', accountValue: '' },
-  { id: 'InstaPay', name: 'InstaPay', accountLabel: 'Transfer account', accountValue: '' },
-  { id: 'Binance', name: 'Binance', accountLabel: 'Transfer ID', accountValue: '' },
-];
-
-const initialApps = [
-  {
-    id: 'pubg-target',
-    name: 'PUBG Mobile',
-    image: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?auto=format&fit=crop&w=600&q=80',
-    unitPrice: 1.35,
-    allowedPaymentMethods: ['Vodafone Cash', 'InstaPay', 'Binance'],
-    paymentMethodIds: ['Vodafone Cash', 'InstaPay', 'Binance'],
-    isActive: true,
-  },
-  {
-    id: 'free-fire-target',
-    name: 'Free Fire',
-    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=600&q=80',
-    unitPrice: 1.1,
-    allowedPaymentMethods: ['Vodafone Cash', 'InstaPay'],
-    paymentMethodIds: ['Vodafone Cash', 'InstaPay'],
-    isActive: true,
-  },
-  {
-    id: 'tiktok-target',
-    name: 'TikTok Coins',
-    image: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?auto=format&fit=crop&w=600&q=80',
-    unitPrice: 0.92,
-    allowedPaymentMethods: ['InstaPay', 'Binance'],
-    paymentMethodIds: ['InstaPay', 'Binance'],
-    isActive: true,
-  },
-];
+import { normalizeTargetOrderStatus } from '../utils/targetOrders';
 
 const normalizeApp = (app = {}) => {
   const allowedPaymentMethods = Array.isArray(app.allowedPaymentMethods)
@@ -58,6 +23,17 @@ const normalizeApp = (app = {}) => {
 const normalizeOrder = (order = {}) => {
   const coinAmount = Number(order.coinAmount ?? order.quantity ?? order.coins ?? 0);
   const unitPrice = Number(order.unitPriceSnapshot ?? order.unitPrice ?? 0);
+  const userRecord = (() => {
+    if (order.user && typeof order.user === 'object') return order.user;
+    if (order.userId && typeof order.userId === 'object') return order.userId;
+    if (order.customer && typeof order.customer === 'object') return order.customer;
+    if (order.customerId && typeof order.customerId === 'object') return order.customerId;
+    return {};
+  })();
+  const userId = String(userRecord.id || userRecord._id || (typeof order.userId === 'string' ? order.userId : '') || '').trim();
+  const userName = String(order.userName || order.customerName || userRecord.name || userRecord.fullName || userRecord.username || '').trim();
+  const userEmail = String(order.userEmail || order.customerEmail || order.email || userRecord.email || '').trim();
+
   return {
     ...order,
     id: order.id || order._id,
@@ -76,7 +52,10 @@ const normalizeOrder = (order = {}) => {
     transferFromId: order.senderId || order.transferFromId || '',
     screenshotProof: order.screenshotProof || order.proofImage || '',
     proofImage: order.screenshotProof || order.proofImage || '',
-    status: String(order.status || 'PENDING').toUpperCase(),
+    status: normalizeTargetOrderStatus(order.status),
+    userId,
+    userName,
+    userEmail,
   };
 };
 
@@ -88,10 +67,11 @@ const toApiStatus = (status) => {
 };
 
 const useTargetStore = create((set, get) => ({
-  apps: initialApps,
-  products: initialApps,
+  apps: [],
+  products: [],
   requests: [],
-  paymentMethods: TARGET_PAYMENT_METHODS,
+  myRequests: [],
+  paymentMethods: [],
   isLoading: false,
   isSubmitting: false,
 
@@ -101,7 +81,7 @@ const useTargetStore = create((set, get) => ({
       const apps = includeInactive
         ? await apiClient.targetApps?.list?.()
         : await apiClient.targetApps?.listActive?.();
-      const normalizedApps = (Array.isArray(apps) && apps.length ? apps : initialApps).map(normalizeApp);
+      const normalizedApps = Array.isArray(apps) ? apps.map(normalizeApp) : [];
       set({ apps: normalizedApps, products: normalizedApps });
       return normalizedApps;
     } finally {
@@ -115,6 +95,18 @@ const useTargetStore = create((set, get) => ({
       const requests = await apiClient.targetPurchases?.list?.(params);
       const normalizedRequests = Array.isArray(requests) ? requests.map(normalizeOrder) : [];
       set({ requests: normalizedRequests });
+      return normalizedRequests;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  loadMyRequests: async (params = {}) => {
+    set({ isLoading: true });
+    try {
+      const requests = await apiClient.targetPurchases?.listMine?.(params);
+      const normalizedRequests = Array.isArray(requests) ? requests.map(normalizeOrder) : [];
+      set({ myRequests: normalizedRequests });
       return normalizedRequests;
     } finally {
       set({ isLoading: false });
@@ -152,7 +144,10 @@ const useTargetStore = create((set, get) => ({
     set({ isSubmitting: true });
     try {
       const created = normalizeOrder(await apiClient.targetPurchases.create(payload));
-      set((state) => ({ requests: [created, ...state.requests] }));
+      set((state) => ({
+        requests: [created, ...state.requests],
+        myRequests: [created, ...state.myRequests],
+      }));
       return created;
     } finally {
       set({ isSubmitting: false });
@@ -163,6 +158,7 @@ const useTargetStore = create((set, get) => ({
     const updated = normalizeOrder(await apiClient.targetPurchases.updateStatus(id, toApiStatus(status), payload));
     set((state) => ({
       requests: state.requests.map((item) => (String(item.id) === String(id) ? { ...item, ...updated } : item)),
+      myRequests: state.myRequests.map((item) => (String(item.id) === String(id) ? { ...item, ...updated } : item)),
     }));
     return updated;
   },

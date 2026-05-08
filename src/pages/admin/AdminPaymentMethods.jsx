@@ -5,6 +5,7 @@ import { uploadImage } from '../../services/realApi';
 import Button from '../../components/ui/Button';
 import Input, { selectClassName, textareaClassName } from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/account/ConfirmDialog';
 import { useToast } from '../../components/ui/Toast';
 import useAuthStore from '../../store/useAuthStore';
 import useSystemStore from '../../store/useSystemStore';
@@ -81,11 +82,13 @@ const AdminPaymentMethods = () => {
   const [methodModalOpen, setMethodModalOpen] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState(null);
   const [editingMethodRef, setEditingMethodRef] = useState({ groupId: '', methodId: '' });
+  const [deleteGroupConfirm, setDeleteGroupConfirm] = useState({ open: false, groupId: '' });
+  const [deleteMethodConfirm, setDeleteMethodConfirm] = useState({ open: false, groupId: '', methodId: '' });
   const [groupForm, setGroupForm] = useState(defaultGroupForm);
   const [methodForm, setMethodForm] = useState(defaultMethodForm);
 
   useEffect(() => {
-    loadPaymentSettings();
+    loadPaymentSettings({ force: true });
   }, [loadPaymentSettings]);
 
   useEffect(() => {
@@ -93,7 +96,7 @@ const AdminPaymentMethods = () => {
   }, [loadCurrencies]);
 
   useEffect(() => {
-    setPaymentGroups(normalizePaymentGroups(paymentSettings?.paymentGroups));
+    setPaymentGroups(normalizePaymentGroups(paymentSettings?.paymentGroups, { fallbackToDefault: false }));
   }, [paymentSettings]);
 
   const methodTypeOptions = useMemo(
@@ -124,18 +127,26 @@ const AdminPaymentMethods = () => {
   const persistPaymentGroups = async (nextGroups, successMessage) => {
     setIsPersisting(true);
     try {
-      const normalizedGroups = normalizePaymentGroups(nextGroups);
-      await savePaymentSettings(
+      const normalizedGroups = normalizePaymentGroups(nextGroups, { fallbackToDefault: false });
+      const savedSettings = await savePaymentSettings(
         { paymentGroups: normalizedGroups },
         user
       );
-      setPaymentGroups(normalizedGroups);
+      const freshSettings = await loadPaymentSettings({ force: true }).catch(() => savedSettings);
+      setPaymentGroups(normalizePaymentGroups(freshSettings?.paymentGroups || savedSettings?.paymentGroups, { fallbackToDefault: false }));
       addToast(successMessage, 'success');
+      return true;
     } catch (error) {
       addToast(error?.message || tx('فشل حفظ إعدادات طرق الدفع', 'Failed to save payment methods settings'), 'error');
+      return false;
     } finally {
       setIsPersisting(false);
     }
+  };
+
+  const getFreshPaymentGroups = async () => {
+    const freshSettings = await loadPaymentSettings({ force: true });
+    return normalizePaymentGroups(freshSettings?.paymentGroups, { fallbackToDefault: false });
   };
 
   const openAddGroupModal = () => {
@@ -246,14 +257,18 @@ const AdminPaymentMethods = () => {
   };
 
   const handleDeleteGroup = async (groupId) => {
-    if (!window.confirm(tx('هل أنت متأكد من حذف هذه المجموعة؟', 'Are you sure you want to delete this group?'))) {
-      return;
-    }
+    setDeleteGroupConfirm({ open: true, groupId });
+  };
 
-    await persistPaymentGroups(
-      paymentGroups.filter((group) => group.id !== groupId),
+  const confirmDeleteGroup = async () => {
+    const { groupId } = deleteGroupConfirm;
+    const freshGroups = await getFreshPaymentGroups().catch(() => paymentGroups);
+
+    const didSave = await persistPaymentGroups(
+      freshGroups.filter((group) => group.id !== groupId),
       tx('تم حذف مجموعة الدفع', 'Payment group deleted')
     );
+    if (didSave) setDeleteGroupConfirm({ open: false, groupId: '' });
   };
 
   const handleToggleGroup = async (groupId) => {
@@ -398,18 +413,22 @@ const AdminPaymentMethods = () => {
   };
 
   const handleDeleteMethod = async (groupId, methodId) => {
-    if (!window.confirm(tx('هل أنت متأكد من حذف طريقة الدفع هذه؟', 'Are you sure you want to delete this payment method?'))) {
-      return;
-    }
+    setDeleteMethodConfirm({ open: true, groupId, methodId });
+  };
 
-    await persistPaymentGroups(
-      paymentGroups.map((group) => (
+  const confirmDeleteMethod = async () => {
+    const { groupId, methodId } = deleteMethodConfirm;
+    const freshGroups = await getFreshPaymentGroups().catch(() => paymentGroups);
+
+    const didSave = await persistPaymentGroups(
+      freshGroups.map((group) => (
         group.id === groupId
           ? { ...group, methods: group.methods.filter((method) => method.id !== methodId) }
           : group
       )),
       tx('تم حذف طريقة الدفع', 'Payment method deleted')
     );
+    if (didSave) setDeleteMethodConfirm({ open: false, groupId: '', methodId: '' });
   };
 
   const handleToggleMethod = async (groupId, methodId) => {
@@ -480,6 +499,28 @@ const AdminPaymentMethods = () => {
           <span>{tx('إضافة مجموعة جديدة', 'Add New Group')}</span>
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={deleteGroupConfirm.open}
+        title={tx('هل أنت متأكد من حذف هذه المجموعة؟', 'Are you sure you want to delete this group?')}
+        description={tx('سيتم حذف المجموعة وكل طرق الدفع داخلها نهائيًا.', 'This group and all payment methods inside it will be removed.')}
+        confirmLabel={tx('حذف', 'Delete')}
+        cancelLabel={tx('إلغاء', 'Cancel')}
+        onConfirm={confirmDeleteGroup}
+        onCancel={() => setDeleteGroupConfirm({ open: false, groupId: '' })}
+        isLoading={isPersisting}
+      />
+
+      <ConfirmDialog
+        open={deleteMethodConfirm.open}
+        title={tx('هل أنت متأكد من حذف طريقة الدفع هذه؟', 'Are you sure you want to delete this payment method?')}
+        description={tx('سيتم حذف طريقة الدفع نهائيًا من هذه المجموعة.', 'This payment method will be removed from the group.')}
+        confirmLabel={tx('حذف', 'Delete')}
+        cancelLabel={tx('إلغاء', 'Cancel')}
+        onConfirm={confirmDeleteMethod}
+        onCancel={() => setDeleteMethodConfirm({ open: false, groupId: '', methodId: '' })}
+        isLoading={isPersisting}
+      />
 
       <div className="space-y-4">
         {paymentGroups.map((group) => (

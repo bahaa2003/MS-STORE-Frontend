@@ -29,23 +29,7 @@ const Settings = () => {
   });
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SETTINGS_PREFS_KEY);
-      if (!stored) return;
-      const parsed = JSON.parse(stored);
-      setNotifications((prev) => ({
-        ...prev,
-        ...parsed
-      }));
-    } catch {
-      setNotifications({ orders: true, balance: true, offers: false });
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(SETTINGS_PREFS_KEY, JSON.stringify(notifications));
-  }, [notifications]);
+  // No localStorage persistence: keep settings in-memory only for this session.
 
   const isEnglish = language === 'en';
   const text = useMemo(

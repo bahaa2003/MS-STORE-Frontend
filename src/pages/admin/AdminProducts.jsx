@@ -8,6 +8,7 @@ import useAuthStore from '../../store/useAuthStore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/account/ConfirmDialog';
 import Input, { inputBaseClassName, selectClassName } from '../../components/ui/Input';
 import Badge from '../../components/ui/Badge';
 import { useToast } from '../../components/ui/Toast';
@@ -48,10 +49,7 @@ const getProviderProductIdentifiers = (product) => Array.from(new Set(
         product?.providerProductId,
         product?.externalProductId,
     ]
-        .map((value) => String(value || '').trim())
-        .filter(Boolean)
 ));
-
 const hasMatchingProviderProduct = (product, ...selectedValues) => {
     const identifiers = getProviderProductIdentifiers(product);
     if (!identifiers.length) return false;
@@ -218,6 +216,79 @@ const formatProviderProductPrice = (value, language) => {
     return language === 'en' ? `$${formatted} USD` : `${formatted} دولار`;
 };
 
+const DYNAMIC_FIELD_TYPES = ['text', 'number', 'email', 'select'];
+
+const normalizeDynamicFieldType = (value) => {
+    const normalized = String(value || 'text').trim().toLowerCase();
+    return DYNAMIC_FIELD_TYPES.includes(normalized) ? normalized : 'text';
+};
+
+const createDynamicFieldRow = (seed = {}) => {
+    const rowId = String(seed.id || `dynamic-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+    return {
+        id: rowId,
+        name: String(seed.name || seed.key || '').trim(),
+        label: String(seed.label || seed.labelAr || '').trim(),
+        type: normalizeDynamicFieldType(seed.type),
+        required: seed.required !== false,
+    };
+};
+
+const extractDynamicFieldRows = (product = {}) => {
+    const dynamicFields = Array.isArray(product?.dynamicFields) ? product.dynamicFields : [];
+    if (dynamicFields.length > 0) {
+        return dynamicFields.map((field, index) => createDynamicFieldRow({
+            id: field?.name || field?.key || `dynamic-${index + 1}`,
+            name: field?.name || field?.key || '',
+            label: field?.label || field?.labelAr || field?.name || '',
+            type: field?.type,
+            required: field?.required,
+        }));
+    }
+
+    const legacyFields = Array.isArray(product?.orderFields) ? product.orderFields : [];
+    return legacyFields
+        .filter((field) => field?.enabled !== false)
+        .map((field, index) => createDynamicFieldRow({
+            id: field?.id || field?.name || field?.key || `dynamic-${index + 1}`,
+            name: field?.name || field?.key || field?.id || '',
+            label: field?.labelAr || field?.label || field?.name || field?.key || '',
+            type: field?.type || 'text',
+            required: field?.required,
+        }))
+        .filter((field) => field.name && field.label);
+};
+
+const buildDynamicFieldsPayload = (fieldRows = []) => (
+    Array.isArray(fieldRows) ? fieldRows : []
+).map((row) => {
+    const safeName = String(row?.name || '')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, '_');
+    const label = String(row?.label || '').trim();
+    return {
+        name: safeName,
+        label,
+        type: normalizeDynamicFieldType(row?.type),
+        required: row?.required !== false,
+    };
+}).filter((field) => field.name && field.label);
+
+const buildOrderFieldsPayloadFromDynamic = (dynamicFields = []) => (
+    Array.isArray(dynamicFields) ? dynamicFields : []
+).map((field) => ({
+    key: field.name,
+    name: field.name,
+    id: field.name,
+    label: field.label,
+    labelAr: field.label,
+    placeholder: '',
+    placeholderAr: '',
+    enabled: true,
+    required: field.required !== false,
+    type: normalizeDynamicFieldType(field.type),
+}));
+
 const AdminProducts = () => {
     const {
         products,
@@ -245,6 +316,8 @@ const AdminProducts = () => {
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
     const [isSavingCategory, setIsSavingCategory] = useState(false);
+    const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+    const [categoryToDelete, setCategoryToDelete] = useState(null);
     const [categoryForm, setCategoryForm] = useState({
         name: '',
         sortOrder: 0,
@@ -275,6 +348,7 @@ const AdminProducts = () => {
         enableManualPrice: false,
         manualPriceAdjustment: '',
         syncedProviderBasePrice: '',
+        costPrice: '',
         originalPriceCoins: '',
         basePriceCoins: '',
         minQty: 1,
@@ -306,6 +380,7 @@ const AdminProducts = () => {
         lowStockThreshold: 50,
         hideWhenOutOfStock: false,
         showOutOfStockLabel: true,
+        dynamicFields: [],
     });
 
     const sortedAdminProducts = useMemo(() => (
@@ -337,7 +412,7 @@ const AdminProducts = () => {
     }), [categories, isEnglish]);
 
     useEffect(() => {
-        loadProducts();
+        loadProducts({ force: true });
     }, [loadProducts]);
 
     useEffect(() => {
@@ -442,6 +517,14 @@ const AdminProducts = () => {
             || providerId
         );
     };
+
+    const expectedProfitValue = useMemo(() => {
+        if (productForm.connectionType !== 'manual') return null;
+        const sellingPrice = Number(normalizePriceInput(productForm.basePriceCoins) || 0);
+        const costPrice = Number(normalizePriceInput(productForm.costPrice) || 0);
+        if (!Number.isFinite(sellingPrice) || !Number.isFinite(costPrice)) return null;
+        return sellingPrice - costPrice;
+    }, [productForm.basePriceCoins, productForm.connectionType, productForm.costPrice]);
 
     const syncProviderPrice = async (manualOverride, supplierIdOverride, providerProductIdOverride) => {
         const supplierId = supplierIdOverride || productForm.supplierId || productForm.providerId;
@@ -580,13 +663,15 @@ const AdminProducts = () => {
     };
 
     const handleResetData = () => {
-        if (window.confirm('This will restore default products and categories. Continue?')) {
-            resetProducts();
-            addToast('تمت إعادة ضبط البيانات بنجاح، وسيتم عرض الحقول بشكل صحيح', 'success');
-            // مسح localStorage أيضاً
-            localStorage.removeItem('products-storage');
-            window.location.reload();
-        }
+        setResetConfirmOpen(true);
+    };
+
+    const confirmResetData = () => {
+        resetProducts();
+        addToast('تمت إعادة ضبط البيانات بنجاح، وسيتم عرض الحقول بشكل صحيح', 'success');
+        setResetConfirmOpen(false);
+        // No persistent storage to clear: runtime-only state now.
+        window.location.reload();
     };
 
     const handleImageUpload = async (e, setForm, uploadCategory = 'products') => {
@@ -639,6 +724,7 @@ const AdminProducts = () => {
                 enableManualPrice: Number(product.manualPriceAdjustment || 0) !== 0,
                 manualPriceAdjustment: normalizePriceInput(product.manualPriceAdjustment ?? ''),
                 syncedProviderBasePrice: normalizePriceInput(product.syncedProviderBasePrice ?? product.basePriceCoins ?? ''),
+                costPrice: normalizePriceInput(product.costPrice ?? product.originalPriceCoins ?? product.originalPrice ?? ''),
                 originalPriceCoins: normalizePriceInput(product.originalPriceCoins ?? product.originalPrice ?? product.costPrice ?? ''),
                 basePriceCoins: normalizePriceInput(product.basePriceCoins ?? ''),
                 minQty: product.minQty ?? 1,
@@ -646,11 +732,11 @@ const AdminProducts = () => {
                 displayOrder: product.displayOrder ?? 0,
                 image: product.image || '',
                 status: product.status || 'active',
-                productStatus: product.productStatus || 'available',
-                isVisibleInStore: product.isVisibleInStore !== false,
-                showWhenUnavailable: product.showWhenUnavailable || false,
-                pauseSales: product.pauseSales || false,
-                pauseReason: product.pauseReason || '',
+                   productStatus: 'available',
+                   isVisibleInStore: true,
+                   showWhenUnavailable: false,
+                   pauseSales: false,
+                   pauseReason: '',
                 internalNotes: product.internalNotes || '',
                 enableSchedule: false,
                 scheduledStartAt: '',
@@ -664,6 +750,7 @@ const AdminProducts = () => {
                 lowStockThreshold: 50,
                 hideWhenOutOfStock: false,
                 showOutOfStockLabel: true,
+                dynamicFields: extractDynamicFieldRows(product),
             });
         } else {
             setEditingProduct(null);
@@ -687,6 +774,7 @@ const AdminProducts = () => {
                 enableManualPrice: false,
                 manualPriceAdjustment: '',
                 syncedProviderBasePrice: '',
+                costPrice: '',
                 originalPriceCoins: '',
                 basePriceCoins: '',
                 minQty: 1,
@@ -712,6 +800,7 @@ const AdminProducts = () => {
                 lowStockThreshold: 50,
                 hideWhenOutOfStock: false,
                 showOutOfStockLabel: true,
+                dynamicFields: [],
             });
         }
         setIsProductModalOpen(true);
@@ -805,6 +894,9 @@ const AdminProducts = () => {
             return;
         }
 
+        const dynamicFieldsPayload = buildDynamicFieldsPayload(productForm.dynamicFields || []);
+        const orderFieldsPayload = buildOrderFieldsPayloadFromDynamic(dynamicFieldsPayload);
+
         const payload = {
             // معلومات أساسية
             name: fallbackName,
@@ -829,6 +921,8 @@ const AdminProducts = () => {
             supplierMarginValue: Number(productForm.supplierMarginValue || 0),
             fallbackSupplierId: '',
             supplierNotes: '',
+            orderFields: orderFieldsPayload,
+            dynamicFields: dynamicFieldsPayload,
             syncPriceWithProvider: shouldSyncWithProvider,
             enableManualPrice: productForm.enableManualPrice,
             manualPriceAdjustment,
@@ -988,11 +1082,15 @@ const AdminProducts = () => {
 
     const handleDeleteCategory = async (category) => {
         if (!category) return;
-        const label = String(category?.nameAr || category?.name || '').trim() || (isEnglish ? 'this category' : 'هذا القسم');
-        if (!window.confirm(isEnglish ? `Delete ${label}?` : `حذف ${label}؟`)) return;
+        setCategoryToDelete(category);
+    };
 
+    const confirmDeleteCategory = async () => {
+        const category = categoryToDelete;
+        if (!category) return;
         try {
             await deleteCategory(category.id);
+            setCategoryToDelete(null);
             addToast(isEnglish ? 'Category deleted' : 'تم حذف القسم', 'success');
         } catch (error) {
             addToast(getReadableErrorMessage(
@@ -1113,15 +1211,31 @@ const AdminProducts = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedAdminProducts.map((product) => (
+                        {sortedAdminProducts.map((product) => {
+                            const isUnavailable = product.productStatus !== 'available';
+                            return (
                             <TableRow key={product.id}>
                                         <TableCell>
                                             <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 overflow-hidden rounded-lg bg-gray-100">
-                                                    <img src={resolveImageUrl(product.image)} alt={product.name} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                                                <div className={`relative h-10 w-10 overflow-hidden rounded-lg bg-gray-100 ${isUnavailable ? 'opacity-60' : ''}`}>
+                                                    <img 
+                                                        src={resolveImageUrl(product.image)} 
+                                                        alt={product.name} 
+                                                        loading="lazy" 
+                                                        decoding="async" 
+                                                        referrerPolicy="no-referrer" 
+                                                        className={`h-full w-full object-cover ${isUnavailable ? 'blur-sm' : ''}`}
+                                                        style={isUnavailable ? { filter: 'grayscale(100%) blur(2px)' } : {}}
+                                                    />
+                                                    {isUnavailable && (
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                                            <span className="text-[8px] font-bold text-white text-center leading-none px-0.5">غ.متوفر</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div>
-                                                    <div className="font-medium text-gray-900 dark:text-white">{product.name}</div>
+                                                    <div className={`font-medium ${isUnavailable ? 'text-gray-500 line-through' : 'text-gray-900 dark:text-white'}`}>{product.name}</div>
+                                                    {isUnavailable && <div className="text-xs text-red-500 font-semibold">غير متوفر</div>}
                                                     <div className="text-xs text-gray-500">{categories.find((c) => c.id === product.category)?.name || product.category}</div>
                                                 </div>
                                             </div>
@@ -1179,7 +1293,8 @@ const AdminProducts = () => {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                        ))}
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </div>
@@ -1320,7 +1435,7 @@ const AdminProducts = () => {
                                                     autoFulfillmentEnabled: option.value === 'auto',
                                                     syncPriceWithProvider: option.value === 'auto' ? prev.syncPriceWithProvider : false,
                                                     externalPricingMode: option.value === 'auto' ? prev.externalPricingMode : 'use_local_price',
-                                                    originalPriceCoins: option.value === 'manual' ? prev.originalPriceCoins : '',
+                                                    costPrice: option.value === 'manual' ? prev.costPrice : '',
                                                 }))}
                                                 className={`h-11 rounded-[0.95rem] border px-3 text-sm font-semibold transition-all ${
                                                     isSelected
@@ -1794,6 +1909,121 @@ const AdminProducts = () => {
                         </div>
                     </div>
 
+                    {/* ========== 4. اضافات اخري ========== */}
+                    <div>
+                        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">4</span>
+                            الحقول الديناميكية
+                        </h3>
+                        <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">إدارة حقول الطلب</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">هذه الحقول تظهر للعميل في نموذج شراء المنتج.</p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => setProductForm((prev) => ({
+                                        ...prev,
+                                        dynamicFields: [
+                                            ...(prev.dynamicFields || []),
+                                            { name: '', label: '', type: 'text', required: true },
+                                        ],
+                                    }))}
+                                >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    إضافة حقل
+                                </Button>
+                            </div>
+
+                            {(productForm.dynamicFields || []).length > 0 ? (
+                                <div className="space-y-2">
+                                    {(productForm.dynamicFields || []).map((item, index) => (
+                                        <div
+                                            key={`${item?.name || 'dynamic'}-${index}`}
+                                            className="grid grid-cols-1 gap-2 rounded-lg border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-900/40 md:grid-cols-12"
+                                        >
+                                            <Input
+                                                label="العنوان"
+                                                value={item.label || ''}
+                                                onChange={(e) => setProductForm((prev) => ({
+                                                    ...prev,
+                                                    dynamicFields: (prev.dynamicFields || []).map((row, rowIndex) => (
+                                                        rowIndex === index ? { ...row, label: e.target.value } : row
+                                                    )),
+                                                }))}
+                                                className="md:col-span-3"
+                                            />
+
+                                            <Input
+                                                label="الاسم البرمجي"
+                                                value={item.name || ''}
+                                                onChange={(e) => setProductForm((prev) => ({
+                                                    ...prev,
+                                                    dynamicFields: (prev.dynamicFields || []).map((row, rowIndex) => (
+                                                        rowIndex === index ? { ...row, name: e.target.value } : row
+                                                    )),
+                                                }))}
+                                                className="md:col-span-3"
+                                            />
+
+                                            <div className="md:col-span-3">
+                                                <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)] sm:text-sm">
+                                                    النوع
+                                                </label>
+                                                <select
+                                                    value={item.type || 'text'}
+                                                    onChange={(e) => setProductForm((prev) => ({
+                                                        ...prev,
+                                                        dynamicFields: (prev.dynamicFields || []).map((row, rowIndex) => (
+                                                            rowIndex === index ? { ...row, type: e.target.value } : row
+                                                        )),
+                                                    }))}
+                                                    className={`${selectClassName} h-10`}
+                                                >
+                                                    <option value="text">Text</option>
+                                                    <option value="number">Number</option>
+                                                    <option value="email">Email</option>
+                                                </select>
+                                            </div>
+
+                                            <label className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 md:col-span-2 md:self-end md:pb-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(item.required)}
+                                                    onChange={(e) => setProductForm((prev) => ({
+                                                        ...prev,
+                                                        dynamicFields: (prev.dynamicFields || []).map((row, rowIndex) => (
+                                                            rowIndex === index ? { ...row, required: e.target.checked } : row
+                                                        )),
+                                                    }))}
+                                                />
+                                                مطلوب
+                                            </label>
+
+                                            <div className="flex items-end md:col-span-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    className="w-full"
+                                                    onClick={() => setProductForm((prev) => ({
+                                                        ...prev,
+                                                        dynamicFields: (prev.dynamicFields || []).filter((_, rowIndex) => rowIndex !== index),
+                                                    }))}
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">لا توجد حقول ديناميكية بعد. اضغط "إضافة حقل".</p>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Preview حالة المنتج النهائية */}
                     <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-900/20">
                         <h4 className="font-semibold text-blue-900 dark:text-blue-100">معاينة: كيف سيبدو المنتج للعميل</h4>
@@ -1828,6 +2058,31 @@ const AdminProducts = () => {
                     </div>
                 </form>
             </Modal>
+
+            <ConfirmDialog
+                open={resetConfirmOpen}
+                title={isEnglish ? 'Restore default data?' : 'إعادة ضبط البيانات'}
+                description={isEnglish ? 'This will restore default products and categories.' : 'سيتم إعادة المنتجات والأقسام الافتراضية وتحديث الصفحة.'}
+                confirmLabel={isEnglish ? 'Restore' : 'إعادة ضبط'}
+                cancelLabel={isEnglish ? 'Cancel' : 'إلغاء'}
+                onConfirm={confirmResetData}
+                onCancel={() => setResetConfirmOpen(false)}
+            />
+
+            <ConfirmDialog
+                open={Boolean(categoryToDelete)}
+                title={isEnglish ? 'Delete category?' : 'حذف القسم'}
+                description={categoryToDelete ? (
+                    isEnglish
+                        ? `Delete ${String(categoryToDelete?.name || categoryToDelete?.nameAr || 'this category').trim()}?`
+                        : `حذف ${String(categoryToDelete?.nameAr || categoryToDelete?.name || 'هذا القسم').trim()}؟`
+                ) : ''}
+                confirmLabel={isEnglish ? 'Delete' : 'حذف'}
+                cancelLabel={isEnglish ? 'Cancel' : 'إلغاء'}
+                onConfirm={confirmDeleteCategory}
+                onCancel={() => setCategoryToDelete(null)}
+                isLoading={isSavingCategory}
+            />
 
         </div>
     );

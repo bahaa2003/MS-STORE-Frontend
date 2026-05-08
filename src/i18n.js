@@ -14,6 +14,7 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
+    lng: 'ar',
     fallbackLng: 'ar',
     supportedLngs: ['ar', 'en'],
     nonExplicitSupportedLngs: true,
@@ -21,9 +22,8 @@ i18n
       escapeValue: false
     },
     detection: {
-      order: ['localStorage'],
-      lookupLocalStorage: 'language',
-      caches: ['localStorage']
+      // Avoid persisting language in localStorage — rely on navigator or explicit selection in-memory
+      order: ['navigator'],
     },
     react: {
       useSuspense: false
@@ -33,7 +33,6 @@ i18n
 const detectedLanguage = (i18n.resolvedLanguage || i18n.language || '').toLowerCase();
 if (!['ar', 'en'].includes(detectedLanguage)) {
   i18n.changeLanguage('ar');
-  localStorage.setItem('language', 'ar');
 }
 
 export default i18n;

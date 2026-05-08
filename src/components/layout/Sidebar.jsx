@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Building2,
   ChevronLeft,
+  Check,
   Coins,
+  Copy,
   CreditCard,
   Home,
   LayoutDashboard,
@@ -35,15 +37,53 @@ import { PERMISSIONS, hasPermission } from '../../utils/permissions';
 
 const ADMIN_NAV_ROLES = ['admin', 'super_admin', ...SUPERVISOR_ROLES];
 
+const copyToClipboard = async (value) => {
+  const text = String(value || '').trim();
+  if (!text) return false;
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall back to the hidden textarea copy path below.
+  }
+
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-9999px';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return copied;
+  } catch {
+    return false;
+  }
+};
+
 const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [copiedUserId, setCopiedUserId] = useState(false);
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const { dir } = useLanguage();
   const { t } = useTranslation();
 
   const isExpanded = isOpen || isMobile || isPreviewExpanded;
+  const userId = String(user?.id || user?._id || user?.userId || '').trim();
+
+  useEffect(() => {
+    if (!copiedUserId) return undefined;
+    const timer = window.setTimeout(() => setCopiedUserId(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [copiedUserId]);
 
   const closeSidebarOnMobile = () => {
     if (isMobile) {
@@ -71,6 +111,17 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
     navigate('/account');
   };
 
+  const handleCopyUserId = async () => {
+    if (!userId) return;
+
+    if (await copyToClipboard(userId)) {
+      setCopiedUserId(true);
+      return;
+    }
+
+    setCopiedUserId(false);
+  };
+
   const handleContactClick = () => {
     navigate('/contact-us');
     closeSidebarOnMobile();
@@ -89,12 +140,6 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
       path: '/admin/wallet',
       roles: ADMIN_NAV_ROLES,
       permission: PERMISSIONS.ADMIN_WALLET,
-    },
-    {
-      icon: LayoutDashboard,
-      label: t('sidebar.dashboard', { defaultValue: dir === 'rtl' ? 'لوحة التحكم' : 'Dashboard' }),
-      path: '/admin/dashboard',
-      roles: SUPERVISOR_ROLES
     },
     {
       icon: LayoutDashboard,
@@ -155,7 +200,7 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
     <>
       {isMobile && isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/72 backdrop-blur-sm"
+          className="fixed inset-0 z-[80] bg-black/72 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -178,7 +223,7 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
           }
         }}
         className={cn(
-          'fixed top-4 z-50 h-[calc(100vh-4rem)] overflow-hidden',
+          'fixed top-4 z-[90] h-[calc(100vh-4rem)] overflow-hidden',
           dir === 'rtl' ? 'right-4' : 'left-4',
           isMobile && !isOpen && 'hidden'
         )}
@@ -221,18 +266,32 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
                   <LanguageSwitcher variant="sidebar" className="w-full justify-center bg-[color:rgb(var(--color-surface-rgb)/0.5)]" />
                 </div>
 
-                <div className="mt-4 flex items-center gap-3">
-                  <img
-                    src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || 'User')}&background=random`}
-                    alt={user?.name || 'User'}
-                    className="h-10 w-10 rounded-full object-cover"
-                    onClick={handleOpenMyAccount}
-                    style={{ cursor: 'pointer' }}
-                  />
+                <div className="mt-4 flex items-end gap-3">
+                  <div className="flex shrink-0 flex-col items-center gap-1">
+                    {userId ? (
+                      <button
+                        type="button"
+                        onClick={handleCopyUserId}
+                        className="group inline-flex max-w-[4.9rem] items-center gap-1 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[var(--color-primary)] shadow-[0_10px_18px_-16px_rgb(var(--color-primary-rgb)/0.55)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.34)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.13)]"
+                        title={copiedUserId ? 'تم نسخ ID المستخدم' : 'اضغط لنسخ ID المستخدم'}
+                        aria-label={copiedUserId ? 'تم نسخ ID المستخدم' : 'نسخ ID المستخدم'}
+                      >
+                        {copiedUserId ? <Check className="h-2.5 w-2.5 shrink-0" /> : <Copy className="h-2.5 w-2.5 shrink-0 opacity-75" />}
+                        <span className="truncate">{copiedUserId ? 'تم النسخ' : `ID ${userId}`}</span>
+                      </button>
+                    ) : null}
+                    <img
+                      src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || 'User')}&background=random`}
+                      alt={user?.name || 'User'}
+                      className="h-10 w-10 rounded-full object-cover"
+                      onClick={handleOpenMyAccount}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </div>
 
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-[var(--color-text)]">{user?.name || user?.email || 'حسابي'}</div>
-                      </div>
+                  <div className="min-w-0 pb-1.5">
+                    <div className="truncate text-sm font-medium text-[var(--color-text)]">{user?.name || user?.email || 'حسابي'}</div>
+                  </div>
                   <button
                     type="button"
                     onClick={handleLogoutClick}

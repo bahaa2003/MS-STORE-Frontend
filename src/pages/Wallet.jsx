@@ -48,6 +48,27 @@ const buildLookupKeys = (...values) => Array.from(new Set(
     .filter(Boolean)
 ));
 
+const getShortLookupKeys = (value) => {
+  const normalized = normalizeLookupKey(value);
+  if (!normalized || normalized.length < 6) return [];
+
+  return Array.from(new Set([
+    normalized.slice(-6),
+    normalized.length >= 8 ? normalized.slice(-8) : '',
+  ].filter(Boolean)));
+};
+
+const extractDepositLookupKeys = (value) => {
+  const text = String(value || '').trim();
+  if (!text) return [];
+
+  const matches = Array.from(text.matchAll(/#([a-z0-9]{6,})/gi))
+    .map((match) => match?.[1])
+    .filter(Boolean);
+
+  return buildLookupKeys(...matches, ...matches.flatMap(getShortLookupKeys));
+};
+
 const findLinkedRecord = (tx, lookupMap) => {
   if (!(lookupMap instanceof Map) || lookupMap.size === 0) return null;
 
@@ -59,7 +80,8 @@ const findLinkedRecord = (tx, lookupMap) => {
     tx?.depositId,
     tx?.topupId,
     tx?.id,
-    tx?._id
+    tx?._id,
+    ...extractDepositLookupKeys(tx?.description)
   );
 
   for (const key of keys) {
@@ -97,7 +119,9 @@ const buildTopupLookupMap = (items = []) => {
       topup?.id,
       topup?._id,
       topup?.reference,
-      topup?.referenceId
+      topup?.referenceId,
+      ...getShortLookupKeys(topup?.id || topup?._id),
+      ...getShortLookupKeys(topup?.reference || topup?.referenceId)
     ).forEach((key) => {
       if (!map.has(key)) map.set(key, topup);
     });
@@ -242,6 +266,7 @@ const convertAmountBetweenCurrencies = (amount, fromCurrencyCode, toCurrencyCode
 const Wallet = () => {
   const { dir } = useLanguage();
   const { t } = useTranslation();
+  const isRTL = dir === 'rtl';
   const navigate = useNavigate();
   const { user, refreshProfile, isAuthenticated } = useAuthStore();
   const { currencies, loadCurrencies } = useSystemStore();
@@ -355,11 +380,14 @@ const Wallet = () => {
         const relatedOrders = ordersResult.status === 'fulfilled'
           ? (Array.isArray(ordersResult.value) ? ordersResult.value : [])
           : [];
-        const relatedTopups = topupsResult.status === 'fulfilled'
-          ? (Array.isArray(topupsResult.value) ? topupsResult.value : []).filter(
+        const topupItems = topupsResult.status === 'fulfilled'
+          ? (Array.isArray(topupsResult.value)
+            ? topupsResult.value
+            : (topupsResult.value?.items || topupsResult.value?.data || topupsResult.value?.deposits || []))
+          : [];
+        const relatedTopups = topupItems.filter(
               (entry) => String(entry?.userId || '') === String(userId || '')
             )
-          : [];
         const orderLookup = buildOrderLookupMap(relatedOrders);
         const topupLookup = buildTopupLookupMap(relatedTopups);
         const mapped = items.map((tx) => {
@@ -426,10 +454,20 @@ const Wallet = () => {
           return {
             id: tx._id || tx.id,
             type: feType,
-            description: tx.description || feType,
+            description: linkedTopup
+              ? t('wallet.addBalance', { defaultValue: 'Add Balance' })
+              : (tx.description || feType),
             amount: convertedSignedAmount,
             currency: userCurrency,
             originalCurrency: resolveWalletTransactionOriginalCurrency(enrichedTx) || null,
+            originalAmount: linkedTopup
+              ? toFiniteNumber(
+                linkedTopup?.actualPaidAmount
+                ?? linkedTopup?.requestedAmount
+                ?? linkedTopup?.amount
+                ?? 0
+              )
+              : null,
             currentCurrency: userCurrency,
             status: resolvedStatus,
             date: tx.createdAt || tx.date,
@@ -451,18 +489,25 @@ const Wallet = () => {
             })(),
           };
         });
+        const linkedTopupIds = new Set(
+          mapped
+            .map((transaction) => String(transaction?.sourceType || '').toLowerCase() === 'topup' ? transaction?.sourceId : null)
+            .filter(Boolean)
+            .map((value) => String(value))
+        );
+
         const fallbackTransactions = mergeTransactions(
           relatedTopups
-            // Only show approved/completed deposits as wallet entries.
-            // PENDING deposits must NOT appear as wallet transactions.
             .filter((topup) => {
               const s = String(topup?.status || '').toLowerCase();
-              return s === 'approved' || s === 'completed';
+              const topupId = String(topup?.id || topup?._id || '');
+              if (linkedTopupIds.has(topupId)) return false;
+              return ['approved', 'completed', 'pending', 'processing', 'requested', 'under_review', 'queued', 'rejected', 'denied'].includes(s);
             })
             .map((topup) => ({
             id: `topup-${topup?.id || topup?._id || Math.random()}`,
             type: 'deposit',
-            description: topup?.paymentChannel || topup?.method || t('wallet.typeDeposit', { defaultValue: 'Deposit' }),
+            description: t('wallet.addBalance', { defaultValue: 'Add Balance' }),
             // requestedAmount is already in the user's local currency — no conversion needed
             amount: Math.abs(toFiniteNumber(
               topup?.requestedAmount
@@ -471,6 +516,12 @@ const Wallet = () => {
             )),
             currency: userCurrency,
             originalCurrency: resolveTopupExecutionCurrency(topup, userCurrency),
+            originalAmount: toFiniteNumber(
+              topup?.actualPaidAmount
+              ?? topup?.requestedAmount
+              ?? topup?.amount
+              ?? 0
+            ),
             currentCurrency: userCurrency,
             status: normalizeWalletStatus(topup?.status || 'completed'),
             date: topup?.createdAt || topup?.date,
@@ -534,7 +585,17 @@ const Wallet = () => {
   const handleFilterChange = (filters) => {
     let filtered = [...transactions];
 
-    if (filters.period !== 'all') {
+    if (filters.startDate || filters.endDate) {
+      const startTime = filters.startDate ? new Date(`${filters.startDate}T00:00:00`).getTime() : null;
+      const endTime = filters.endDate ? new Date(`${filters.endDate}T23:59:59.999`).getTime() : null;
+      filtered = filtered.filter((tx) => {
+        const txTime = new Date(tx.date).getTime();
+        if (!Number.isFinite(txTime)) return false;
+        if (startTime !== null && txTime < startTime) return false;
+        if (endTime !== null && txTime > endTime) return false;
+        return true;
+      });
+    } else if (filters.period && filters.period !== 'all') {
       const now = new Date();
       const periodMap = { today: 1, week: 7, month: 30, year: 365 };
       const days = periodMap[filters.period];
@@ -556,9 +617,12 @@ const Wallet = () => {
   const handleAddBalance = () => navigate('/wallet/add-balance');
 
   return (
-    <div className="min-h-screen bg-transparent" dir={dir}>
-      <div className="mx-auto max-w-7xl px-4 py-5 sm:py-6">
-        <div className="mb-6 sm:mb-7">
+    <div
+      className="min-h-screen bg-transparent"
+      dir={dir}
+    >
+      <div className="mx-auto max-w-7xl px-4 pb-18 pt-4 sm:pb-20 sm:pt-5">
+        <div className="mb-5 sm:mb-6">
           <BalanceCard
             balance={balance}
             currency={userCurrency}
@@ -574,21 +638,30 @@ const Wallet = () => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.6 }}
-          className="mb-4"
+          className="mb-2.5"
         >
-          <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white sm:text-xl">{t('wallet.recentTransactions')}</h2>
+          <div className={`flex flex-wrap items-end justify-between gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <h2 className="text-[15px] font-bold text-gray-900 dark:text-white sm:text-lg">
+              {t('wallet.recentTransactions')}
+            </h2>
+            <p className="text-[11px] text-[#8a6528] dark:text-[#d5c396] sm:text-xs">
+              {isRTL
+                ? `${formatWalletNumber(filteredTransactions.length)} من ${formatWalletNumber(transactions.length)} عملية`
+                : `${formatWalletNumber(filteredTransactions.length)} of ${formatWalletNumber(transactions.length)} transactions`}
+            </p>
+          </div>
         </motion.div>
 
         <FilterBar onFilterChange={handleFilterChange} />
 
         {txLoading ? (
-          <div className="rounded-[1.2rem] border border-[color:rgb(var(--color-border-rgb)/0.82)] bg-[color:rgb(var(--color-card-rgb)/0.76)]">
+          <div className="rounded-[1rem] border border-[color:rgb(var(--color-border-rgb)/0.82)] bg-[color:rgb(var(--color-card-rgb)/0.76)]">
             <Loader />
           </div>
         ) : filteredTransactions.length === 0 ? (
           <EmptyTransactions onAddBalance={handleAddBalance} />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {filteredTransactions.map((transaction, index) => (
               <TransactionCard key={transaction.id} transaction={transaction} index={index} />
             ))}
@@ -602,7 +675,7 @@ const Wallet = () => {
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.9 }}
           onClick={handleAddBalance}
-          className="sidebar-wallet-shimmer fixed bottom-5 left-5 z-50 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[#d3b171]/70 bg-[linear-gradient(145deg,rgba(93,72,33,0.2),rgba(246,215,148,0.78)_42%,rgba(255,251,236,0.98)_100%)] text-[#8c631f] shadow-[0_18px_28px_-18px_rgba(125,92,33,0.92)] transition-all before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top_right,rgba(255,243,200,0.58),transparent_48%)] before:opacity-85 hover:-translate-y-0.5 hover:brightness-[1.03] sm:h-14 sm:w-14"
+          className="sidebar-wallet-shimmer fixed bottom-5 left-5 z-50 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[#d3b171]/70 bg-[linear-gradient(145deg,rgba(93,72,33,0.2),rgba(246,215,148,0.78)_42%,rgba(255,251,236,0.98)_100%)] text-[#8c631f] shadow-[0_18px_28px_-18px_rgba(125,92,33,0.92)] transition-all before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top_right,rgba(255,243,200,0.58),transparent_48%)] before:opacity-85 hover:-translate-y-0.5 hover:brightness-[1.03] dark:border-[#9f834f]/70 dark:bg-[linear-gradient(145deg,rgba(61,47,21,0.82),rgba(154,114,38,0.7)_48%,rgba(210,173,96,0.78)_100%)] dark:text-[#ffe7b7] sm:h-14 sm:w-14"
           aria-label={t('wallet.addBalance')}
         >
           <Plus className="relative z-10 h-5 w-5 drop-shadow-[0_1px_0_rgba(255,255,255,0.35)] sm:h-6 sm:w-6" />

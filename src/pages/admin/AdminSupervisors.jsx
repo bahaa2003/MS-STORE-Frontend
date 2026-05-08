@@ -8,6 +8,7 @@ import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/account/ConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import {
   getAccountStatusBadgeVariant,
@@ -37,11 +38,12 @@ const AdminSupervisors = () => {
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isPromotingSupervisor, setIsPromotingSupervisor] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [demoteTarget, setDemoteTarget] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     setIsLoading(true);
-    Promise.resolve(loadUsers()).finally(() => {
+    Promise.resolve(loadUsers({ force: true })).finally(() => {
       if (mounted) setIsLoading(false);
     });
     return () => {
@@ -163,20 +165,23 @@ const AdminSupervisors = () => {
     try {
       await updateUserStatus(target.id, nextStatus, actor);
       addToast(nextStatus === 'approved' ? 'تم تفعيل المشرف.' : 'تم حظر المشرف.', 'success');
-      await loadUsers();
+      await loadUsers({ force: true });
     } catch (error) {
       addToast(error?.message || 'فشل تحديث الحالة.', 'error');
     }
   };
 
   const handleDemoteSupervisor = async (target) => {
-    const shouldDemote = window.confirm(`تحويل المشرف ${target.name} إلى عميل؟`);
-    if (!shouldDemote) return;
+    setDemoteTarget(target);
+  };
 
+  const confirmDemoteSupervisor = async () => {
+    if (!demoteTarget?.id) return;
     try {
-      await updateUserRole(target.id, 'CUSTOMER', actor);
-      await updateUserPermissions(target.id, [], actor);
+      await updateUserRole(demoteTarget.id, 'CUSTOMER', actor);
+      await updateUserPermissions(demoteTarget.id, [], actor);
       addToast('تم تحويل المشرف إلى عميل.', 'success');
+      setDemoteTarget(null);
       await loadUsers({ force: true });
     } catch (error) {
       addToast(error?.message || 'فشل تحويل المشرف إلى عميل.', 'error');
@@ -203,7 +208,7 @@ const AdminSupervisors = () => {
       await updateUserPermissions(permissionTarget.id, selectedPermissions, actor);
       addToast('تم تحديث صلاحيات المشرف.', 'success');
       setPermissionTarget(null);
-      await loadUsers();
+      await loadUsers({ force: true });
     } catch (error) {
       addToast(error?.message || 'فشل تحديث الصلاحيات.', 'error');
     } finally {
@@ -317,9 +322,9 @@ const AdminSupervisors = () => {
                   >
                     <option value="manager">مانجر</option>
                     <option value="moderator">مشرف</option>
-                    <option value="supervisor">Supervisor</option>
-                    <option value="customer">Customer</option>
-                    <option value="admin">Admin</option>
+                    <option value="supervisor">سوبرفايزر</option>
+                    <option value="customer">عميل</option>
+                    <option value="admin">أدمن</option>
                   </select>
                 </TableCell>
                 <TableCell className="text-center">
@@ -477,7 +482,7 @@ const AdminSupervisors = () => {
       <Modal
         isOpen={Boolean(activityTarget)}
         onClose={() => setActivityTarget(null)}
-        title={activityTarget ? `Activity Logs - ${activityTarget.name}` : 'Activity Logs'}
+        title={activityTarget ? `سجلات النشاط - ${activityTarget.name}` : 'سجلات النشاط'}
         footer={<Button variant="ghost" onClick={() => setActivityTarget(null)}>إغلاق</Button>}
       >
         <div className="max-h-[50vh] space-y-2 overflow-y-auto pe-1">
@@ -491,6 +496,16 @@ const AdminSupervisors = () => {
           )) : null}
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(demoteTarget)}
+        title="تحويل المشرف إلى عميل"
+        description={demoteTarget ? `تحويل المشرف ${demoteTarget.name || demoteTarget.email || ''} إلى عميل؟` : ''}
+        confirmLabel="تحويل"
+        cancelLabel="إلغاء"
+        onConfirm={confirmDemoteSupervisor}
+        onCancel={() => setDemoteTarget(null)}
+      />
     </div>
   );
 };

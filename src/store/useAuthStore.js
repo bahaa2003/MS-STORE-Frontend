@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import useAdminStore from './useAdminStore';
 import apiClient from '../services/client';
 import {
@@ -12,8 +11,44 @@ import { getDefaultRouteForRole } from '../utils/authRoles';
 import { formatAuthErrorMessage } from '../utils/authErrorMessages';
 import { devLogger } from '../utils/devLogger';
 
-const PROFILE_CACHE_TTL = 60 * 1000;
+const AUTH_STORAGE_KEY = 'auth-storage';
+const PROFILE_CACHE_TTL = 0; // disable short-lived profile caching; always fetch fresh by default
 let profileRefreshRequest = null;
+
+const readStoredAuthState = () => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return {};
+
+  try {
+    const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed?.state || {};
+  } catch {
+    return {};
+  }
+};
+
+const writeStoredAuthState = (nextState = {}) => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+
+  try {
+    const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const currentState = parsed?.state || {};
+    window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ state: { ...currentState, ...nextState } }));
+  } catch {
+    // Best-effort only.
+  }
+};
+
+const clearStoredAuthState = () => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+
+  try {
+    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+};
 
 const buildAuthOutcome = (user) => {
   const status = normalizeAccountStatus(user?.status);
@@ -44,17 +79,51 @@ const buildVerificationRequiredOutcome = (user = null) => ({
   canAccessApp: false,
 });
 
-const useAuthStore = create(
-  persist(
-    (set, get) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
+const pickPersistedUser = (user) => {
+  if (!user) return null;
+
+  return {
+    id: user.id || user._id || user.userId || '',
+    _id: user._id || user.id || user.userId || '',
+    name: user.name || '',
+    username: user.username || '',
+    email: user.email || '',
+    avatar: user.avatar || '',
+    role: user.role || 'customer',
+    permissions: Array.isArray(user.permissions) ? user.permissions : [],
+    status: normalizeAccountStatus(user.status),
+    verified: user.verified !== undefined ? Boolean(user.verified) : undefined,
+    signupMethod: user.signupMethod || '',
+    authProvider: user.authProvider || '',
+    coins: user.coins ?? user.walletBalance ?? user.balance ?? 0,
+    walletBalance: user.walletBalance ?? user.coins ?? user.balance ?? 0,
+    balance: user.balance ?? user.walletBalance ?? user.coins ?? 0,
+    currency: user.currency || 'USD',
+    group: user.group || '',
+    groupName: user.groupName || user.group || '',
+    groupId: user.groupId || '',
+    groupPercentage: user.groupPercentage ?? null,
+    creditLimit: user.creditLimit ?? 0,
+    phone: user.phone || '',
+    twoFactorEnabled: user.twoFactorEnabled !== undefined ? Boolean(user.twoFactorEnabled) : undefined,
+    emailChangedPending: user.emailChangedPending !== undefined ? Boolean(user.emailChangedPending) : undefined,
+    createdAt: user.createdAt || '',
+    updatedAt: user.updatedAt || '',
+  };
+};
+
+  const persistedAuthState = readStoredAuthState();
+  const persistedAuthUser = pickPersistedUser(persistedAuthState.user);
+
+const useAuthStore = create((set, get) => ({
+    user: persistedAuthUser,
+    token: persistedAuthState.token || null,
+    isAuthenticated: Boolean(persistedAuthState.token),
       isLoading: false,
       error: null,
-      blockedStatus: null,
-      blockedUser: null,
-      profileLastLoadedAt: 0,
+    blockedStatus: persistedAuthState.blockedStatus || null,
+    blockedUser: persistedAuthState.blockedUser || null,
+    profileLastLoadedAt: persistedAuthState.profileLastLoadedAt || 0,
 
       setBlockedAccess: (status, user = null) => {
         const normalizedStatus = normalizeAccountStatus(status);
@@ -104,6 +173,14 @@ const useAuthStore = create(
             token: response.token || null,
             isAuthenticated: true,
             isLoading: false,
+            blockedStatus: outcome.canAccessApp ? null : outcome.status,
+            blockedUser: outcome.canAccessApp ? null : response.user,
+            profileLastLoadedAt: Date.now(),
+          });
+          writeStoredAuthState({
+            user: response.user,
+            token: response.token || null,
+            isAuthenticated: true,
             blockedStatus: outcome.canAccessApp ? null : outcome.status,
             blockedUser: outcome.canAccessApp ? null : response.user,
             profileLastLoadedAt: Date.now(),
@@ -160,6 +237,14 @@ const useAuthStore = create(
             blockedUser: outcome.canAccessApp ? null : response.user,
             profileLastLoadedAt: Date.now(),
           });
+          writeStoredAuthState({
+            user: response.user,
+            token: response.token || null,
+            isAuthenticated: true,
+            blockedStatus: outcome.canAccessApp ? null : outcome.status,
+            blockedUser: outcome.canAccessApp ? null : response.user,
+            profileLastLoadedAt: Date.now(),
+          });
           return outcome;
         } catch (err) {
           const formattedError = formatAuthErrorMessage(err, { action: 'login' });
@@ -211,7 +296,6 @@ const useAuthStore = create(
             blockedUser: outcome.canAccessApp ? null : response.user,
             profileLastLoadedAt: Date.now(),
           });
-
           await useAdminStore.getState().loadUsers({ force: true });
           return outcome;
         } catch (err) {
@@ -262,6 +346,13 @@ const useAuthStore = create(
               token: response.token,
               isAuthenticated: true,
               isLoading: false,
+              blockedUser: outcome.canAccessApp ? null : response.user,
+              profileLastLoadedAt: Date.now(),
+            });
+            writeStoredAuthState({
+              user: response.user,
+              token: response.token,
+              isAuthenticated: true,
               blockedStatus: outcome.canAccessApp ? null : outcome.status,
               blockedUser: outcome.canAccessApp ? null : response.user,
               profileLastLoadedAt: Date.now(),
@@ -291,6 +382,7 @@ const useAuthStore = create(
                 })
               : null,
           });
+          clearStoredAuthState();
 
           if (requiresEmailVerification) {
             return buildVerificationRequiredOutcome(response?.user || {
@@ -330,6 +422,7 @@ const useAuthStore = create(
           blockedUser: null,
           profileLastLoadedAt: 0,
         });
+        clearStoredAuthState();
 
         try {
           await apiClient.auth.logout?.();
@@ -340,6 +433,14 @@ const useAuthStore = create(
 
       updateUserSession: (updates) => {
         const { user } = get();
+          writeStoredAuthState({
+            user: response.user,
+            token: response.token || null,
+            isAuthenticated: true,
+            blockedStatus: outcome.canAccessApp ? null : outcome.status,
+            blockedUser: outcome.canAccessApp ? null : response.user,
+            profileLastLoadedAt: Date.now(),
+          });
         if (user) {
           const nextUser = { ...user, ...updates };
           const nextStatus = normalizeAccountStatus(nextUser?.status);
@@ -352,7 +453,7 @@ const useAuthStore = create(
         }
       },
 
-      refreshProfile: async ({ force = false } = {}) => {
+      refreshProfile: async ({ force = true } = {}) => {
         try {
           const currentState = get();
           const currentUserId = currentState.user?.id;
@@ -361,7 +462,6 @@ const useAuthStore = create(
           const hasFreshProfile = (
             !force
             && currentState.user
-            && (Date.now() - Number(currentState.profileLastLoadedAt || 0) < PROFILE_CACHE_TTL)
           );
 
           if (hasFreshProfile) {
@@ -382,7 +482,6 @@ const useAuthStore = create(
                 blockedUser: isApprovedAccountStatus(nextStatus) ? null : { ...state.user, ...profile },
                 profileLastLoadedAt: Date.now(),
               }));
-
               return profile;
             })
             .catch((err) => {
@@ -399,19 +498,6 @@ const useAuthStore = create(
           return null;
         }
       },
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        isAuthenticated: state.isAuthenticated,
-        blockedStatus: state.blockedStatus,
-        blockedUser: state.blockedUser,
-        profileLastLoadedAt: state.profileLastLoadedAt,
-      }),
-    }
-  )
-);
+}));
 
 export default useAuthStore;

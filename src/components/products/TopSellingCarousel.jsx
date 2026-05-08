@@ -2,6 +2,8 @@ import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, ShoppingBag, TrendingUp } from 'lucide-react';
 import Button, { cn } from '../ui/Button';
+import { resolveImageUrl } from '../../utils/imageUrl';
+import coinsImage from '../../assets/عملات.PNG';
 
 const TopSellingCarousel = ({
   products,
@@ -72,7 +74,7 @@ const TopSellingCarousel = ({
             >
               <div className="relative overflow-hidden rounded-[1.4rem]">
                 <img
-                  src={product.image}
+                  src={product.image ? resolveImageUrl(product.image) : coinsImage}
                   alt={product.displayName}
                   className={cn(
                     'aspect-[1.14] w-full object-cover transition duration-500',

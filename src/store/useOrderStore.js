@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { mockOrders } from '../data/mockData';
 import apiClient from '../services/client';
 import useNotificationStore from './useNotificationStore';
@@ -11,13 +10,11 @@ const dataProvider = (import.meta.env.VITE_DATA_PROVIDER || 'mock').toLowerCase(
 const isRealProvider = dataProvider === 'real';
 const fetchedOrderScopesThisSession = new Set();
 
-const ORDERS_CACHE_TTL = 60 * 1000;
+const ORDERS_CACHE_TTL = 0; // disable caching; always fetch fresh by default
 let ordersRequest = null;
 let ordersRequestScope = '';
 
-const useOrderStore = create(
-  persist(
-    (set, get) => ({
+const useOrderStore = create((set, get) => ({
       // =====================================================================================
       // FINANCIAL SNAPSHOT SYSTEM - CRITICAL BUSINESS LOGIC
       // =====================================================================================
@@ -30,7 +27,7 @@ const useOrderStore = create(
       // This ensures orders maintain their prices even if product prices or
       // exchange rates change after order creation.
       // =====================================================================================
-      orders: mockOrders,
+      orders: isRealProvider ? [] : mockOrders,
       ordersLastLoadedAt: 0,
       ordersLastLoadedScope: '',
 
@@ -59,21 +56,12 @@ const useOrderStore = create(
         }
       },
 
-      loadOrders: async (userId, { force = false } = {}) => {
+      loadOrders: async (userId, { force = true } = {}) => {
         const scope = userId ? `user:${userId}` : 'all';
-        const { orders, ordersLastLoadedAt, ordersLastLoadedScope } = get();
-        const hasOrders = Array.isArray(orders) && orders.length > 0;
-        const shouldBypassHydratedCache = isRealProvider && !fetchedOrderScopesThisSession.has(scope);
-        const hasFreshOrders = (
-          !shouldBypassHydratedCache
-          && hasOrders
-          && ordersLastLoadedScope === scope
-          && (Date.now() - Number(ordersLastLoadedAt || 0) < ORDERS_CACHE_TTL)
-        );
 
-        if (!force && hasFreshOrders) {
-          return orders;
-        }
+        const { orders } = get();
+        const hasOrders = Array.isArray(orders) && orders.length > 0;
+        if (!force && hasOrders) return orders;
 
         if (ordersRequest && ordersRequestScope === scope) {
           return ordersRequest;
@@ -82,7 +70,7 @@ const useOrderStore = create(
         ordersRequestScope = scope;
         ordersRequest = apiClient.orders.list(userId)
           .then((items) => {
-            const nextOrders = Array.isArray(items) ? items : mockOrders;
+            const nextOrders = Array.isArray(items) ? items : (isRealProvider ? [] : mockOrders);
             set({
               orders: nextOrders,
               ordersLastLoadedAt: Date.now(),
@@ -101,7 +89,7 @@ const useOrderStore = create(
                 : mockOrders;
 
               set({
-                orders: fallbackOrders,
+                orders: isRealProvider ? [] : fallbackOrders,
                 ordersLastLoadedScope: scope,
               });
             }
@@ -141,9 +129,19 @@ const useOrderStore = create(
       
       addOrder: async (order) => {
         try {
-          const orderFieldsValues = order?.orderFieldsValues || order?.orderFields || {};
+          const rawCustomInputs = (
+            order?.customInputs !== undefined
+              ? order.customInputs
+              : (order?.orderFieldsValues || order?.orderFields || {})
+          );
+          const customInputsObject = (rawCustomInputs && typeof rawCustomInputs === 'object' && !Array.isArray(rawCustomInputs))
+            ? rawCustomInputs
+            : {};
+          const orderFieldsValues = customInputsObject;
           const playerId = String(
             order?.playerId ||
+            customInputsObject?.playerId ||
+            customInputsObject?.player_id ||
             orderFieldsValues?.playerId ||
             orderFieldsValues?.uid ||
             ''
@@ -173,6 +171,7 @@ const useOrderStore = create(
           const orderWithSnapshot = {
             ...order,
             playerId,
+            customInputs: rawCustomInputs,
             orderFields: orderFieldsValues,
             orderFieldsValues,
             financialSnapshot: {
@@ -201,6 +200,7 @@ const useOrderStore = create(
           const nextOrder = {
             ...orderWithSnapshot,
             ...createdOrder,
+            customInputs: createdOrder?.customInputs ?? orderWithSnapshot.customInputs,
             orderFields: createdOrder?.orderFields || createdOrder?.orderFieldsValues || orderWithSnapshot.orderFields,
             orderFieldsValues: createdOrder?.orderFieldsValues || createdOrder?.orderFields || orderWithSnapshot.orderFieldsValues,
             customerInput: createdOrder?.customerInput || orderWithSnapshot.customerInput,
@@ -240,6 +240,9 @@ const useOrderStore = create(
         if (!currentOrder) return;
 
         const normalizedStatus = normalizeManualOrderStatus(status);
+        const currentActor = useAuthStore.getState().user || null;
+        const actorRole = String(currentActor?.role || '').trim().toLowerCase();
+        const isAdminActor = ['admin', 'supervisor', 'manager', 'moderator'].includes(actorRole);
 
         // Merge rejectionReason into the context so realApi can read it
         const contextWithReason = {
@@ -249,6 +252,15 @@ const useOrderStore = create(
 
         const updated = await apiClient.orders.updateStatus(id, normalizedStatus, contextWithReason);
         const nextOrder = updated || { ...currentOrder, status: normalizedStatus };
+        if (isAdminActor) {
+          nextOrder.updatedBy = currentActor?.id || currentActor?._id || nextOrder.updatedBy || null;
+          nextOrder.updatedByName = currentActor?.name || nextOrder.updatedByName || '';
+          nextOrder.reviewerName = currentActor?.name || nextOrder.reviewerName || '';
+          nextOrder.reviewedBy = nextOrder.reviewedBy || currentActor?.id || currentActor?._id || null;
+          nextOrder.approvedBy = ['completed', 'approved'].includes(normalizedStatus) ? (currentActor?.id || currentActor?._id || nextOrder.approvedBy || null) : nextOrder.approvedBy || null;
+          nextOrder.rejectedBy = normalizedStatus === 'rejected' ? (currentActor?.id || currentActor?._id || nextOrder.rejectedBy || null) : nextOrder.rejectedBy || null;
+          nextOrder.reviewedAt = new Date().toISOString();
+        }
         set(state => ({
           orders: state.orders.map((o) => (
             o.id === id
@@ -262,6 +274,19 @@ const useOrderStore = create(
           )),
           ordersLastLoadedAt: Date.now(),
         }));
+
+        if (isAdminActor) {
+          useAdminStore.getState().appendAdminActivity?.({
+            action: `order_${normalizedStatus}`,
+            title: normalizedStatus === 'completed' || normalizedStatus === 'approved' ? 'قبول طلب' : normalizedStatus === 'rejected' ? 'رفض طلب' : 'تحديث طلب',
+            description: `${currentActor?.name || actorRole || 'مشرف'} ${normalizedStatus === 'rejected' ? 'رفض' : 'قبل/حدّث'} الطلب ${target?.id || id}`,
+            actor: currentActor,
+            entityType: 'order',
+            entityId: target?.id || id,
+            status: normalizedStatus,
+            source: 'order_review',
+          });
+        }
 
         if (useAdminStore.getState().loadUsers) {
           await useAdminStore.getState().loadUsers();
@@ -315,11 +340,6 @@ const useOrderStore = create(
         }));
         return synced;
       }
-    }),
-    {
-      name: 'orders-storage',
-    }
-  )
-);
+}));
 
 export default useOrderStore;

@@ -12,7 +12,7 @@ const ProductDetails = () => {
 
   useEffect(() => {
     if (!products.length) {
-      loadProducts();
+      loadProducts({ force: true });
     }
   }, [loadProducts, products.length]);
 

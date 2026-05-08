@@ -33,7 +33,7 @@ const Dashboard = () => {
   }, [refreshProfile]);
 
   useEffect(() => {
-    loadProducts();
+    loadProducts({ force: true });
   }, [loadProducts]);
 
   const heroSlides = useMemo(() => ([

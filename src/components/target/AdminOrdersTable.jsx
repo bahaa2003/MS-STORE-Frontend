@@ -4,6 +4,11 @@ import Badge from '../ui/Badge';
 import { selectClassName } from '../ui/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table';
 import { formatDateTime, formatNumber } from '../../utils/intl';
+import {
+  getTargetOrderStatusLabel,
+  getTargetOrderStatusVariant,
+  normalizeTargetOrderStatus,
+} from '../../utils/targetOrders';
 
 const copyText = (value) => {
   const text = String(value || '').trim();
@@ -11,47 +16,54 @@ const copyText = (value) => {
   navigator.clipboard.writeText(text).catch(() => null);
 };
 
-const getStatusVariant = (status) => {
-  const value = String(status || '').toLowerCase();
-  if (value === 'done' || value === 'approved') return 'success';
-  if (value === 'rejected') return 'danger';
-  return 'warning';
-};
-
-const getStatusLabel = (status) => {
-  const value = String(status || '').toLowerCase();
-  if (value === 'done' || value === 'approved') return 'Approved';
-  if (value === 'rejected') return 'Rejected';
-  return 'Pending';
-};
-
-const AdminOrdersTable = ({ requests = [], onStatusChange, canConfirm = true }) => (
+const AdminOrdersTable = ({ requests = [], onStatusChange, onViewDetails, canConfirm = true, showHeader = true }) => (
   <section className="space-y-4">
-    <div>
-      <h2 className="text-xl font-black text-[var(--color-text)]">Target Orders</h2>
-      <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Review transfer proof and approve or reject target orders.</p>
-    </div>
+    {showHeader ? (
+      <div>
+        <h2 className="text-xl font-black text-[var(--color-text)]">طلبات التارجت</h2>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">راجع إثبات التحويل واقبل أو ارفض طلبات التارجت.</p>
+      </div>
+    ) : null}
 
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>App</TableHead>
-          <TableHead>Sender ID</TableHead>
-          <TableHead>Coins</TableHead>
-          <TableHead>Total</TableHead>
-          <TableHead>Payment</TableHead>
-          <TableHead>Transfer Number</TableHead>
-          <TableHead>Proof</TableHead>
-          <TableHead>Status</TableHead>
+          <TableHead>التطبيق</TableHead>
+          <TableHead>معرّف الحساب</TableHead>
+          <TableHead>الكوينز</TableHead>
+          <TableHead>الإجمالي</TableHead>
+          <TableHead>الدفع</TableHead>
+          <TableHead>رقم التحويل</TableHead>
+          <TableHead>الإثبات</TableHead>
+          <TableHead>الحالة</TableHead>
+          <TableHead>التفاصيل</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {requests.map((request) => (
+        {requests.map((request) => {
+          const normalizedStatus = normalizeTargetOrderStatus(request.status);
+          return (
           <TableRow key={request.id}>
             <TableCell>
               <div>
                 <p className="font-bold text-[var(--color-text)]">{request.appNameSnapshot || request.productName}</p>
                 <p className="text-xs text-[var(--color-text-secondary)]">{formatDateTime(request.createdAt, 'en-US')}</p>
+                {(request.userId || request.userName || request.userEmail) ? (
+                  <div className="mt-1.5 max-w-52 text-[10px] text-[var(--color-text-secondary)]">
+                    {request.userId ? (
+                      <button
+                        type="button"
+                        onClick={() => copyText(request.userId)}
+                        className="inline-flex max-w-full items-center gap-1 rounded-md border border-[color:rgb(var(--color-primary-rgb)/0.2)] px-1.5 py-0.5 font-bold text-[var(--color-primary)]"
+                        title="نسخ ID الحساب"
+                      >
+                        <span className="truncate">ID: {request.userId}</span>
+                      </button>
+                    ) : null}
+                    {request.userName ? <p className="mt-1 truncate font-bold text-[var(--color-text)]">{request.userName}</p> : null}
+                    {request.userEmail ? <p className="truncate">{request.userEmail}</p> : null}
+                  </div>
+                ) : null}
               </div>
             </TableCell>
             <TableCell>
@@ -67,7 +79,7 @@ const AdminOrdersTable = ({ requests = [], onStatusChange, canConfirm = true }) 
                 type="button"
                 onClick={() => copyText(request.transferNumber || request.paymentAccount)}
                 className="max-w-40 truncate rounded-lg border border-[color:rgb(var(--color-primary-rgb)/0.2)] px-2 py-1 text-xs font-bold text-[var(--color-primary)] transition hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)]"
-                title="Copy"
+                title="نسخ"
               >
                 {request.transferNumber || request.paymentAccount || '-'}
               </button>
@@ -81,40 +93,51 @@ const AdminOrdersTable = ({ requests = [], onStatusChange, canConfirm = true }) 
                   className="inline-flex items-center gap-2 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.28)] px-3 py-1.5 text-xs font-bold text-[var(--color-primary)] transition hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)]"
                 >
                   <Eye className="h-3.5 w-3.5" />
-                  View
+                  عرض
                 </a>
               ) : (
                 <span className="inline-flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                   <ReceiptText className="h-4 w-4" />
-                  Missing
+                  غير مرفق
                 </span>
               )}
             </TableCell>
             <TableCell>
               <div className="flex min-w-36 items-center gap-2">
-                <Badge variant={getStatusVariant(request.status)}>{getStatusLabel(request.status)}</Badge>
+                <Badge variant={getTargetOrderStatusVariant(normalizedStatus)}>{getTargetOrderStatusLabel(normalizedStatus)}</Badge>
                 <select
-                  value={String(request.status || 'PENDING').toUpperCase()}
+                  value={normalizedStatus}
                   onChange={(event) => onStatusChange(request.id, event.target.value)}
                   className={cnStatusSelect}
                   disabled={!canConfirm}
                 >
-                  <option value="PENDING" disabled>Pending</option>
-                  <option value="APPROVED">Approved</option>
-                  <option value="REJECTED">Rejected</option>
+                  <option value="PENDING">قيد الانتظار</option>
+                  <option value="APPROVED">قبول</option>
+                  <option value="REJECTED">رفض</option>
                 </select>
               </div>
-              {String(request.status).toUpperCase() === 'REJECTED' && (request.rejectionReason || request.adminNotes) ? (
+              {normalizedStatus === 'REJECTED' && (request.rejectionReason || request.adminNotes) ? (
                 <p className="mt-2 max-w-48 text-xs text-[var(--color-error)]">{request.rejectionReason || request.adminNotes}</p>
               ) : null}
             </TableCell>
+            <TableCell>
+              <button
+                type="button"
+                onClick={() => onViewDetails?.(request)}
+                className="inline-flex items-center gap-2 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.28)] px-3 py-1.5 text-xs font-bold text-[var(--color-primary)] transition hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)]"
+              >
+                <ReceiptText className="h-3.5 w-3.5" />
+                تفاصيل
+              </button>
+            </TableCell>
           </TableRow>
-        ))}
+          );
+        })}
 
         {!requests.length && (
           <TableRow>
-            <TableCell colSpan={8} className="py-10 text-center text-[var(--color-text-secondary)]">
-              No target orders yet.
+            <TableCell colSpan={9} className="py-10 text-center text-[var(--color-text-secondary)]">
+              لا توجد طلبات تارجت حتى الآن.
             </TableCell>
           </TableRow>
         )}

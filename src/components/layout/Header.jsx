@@ -108,17 +108,17 @@ const Header = ({ toggleSidebar }) => {
   };
 
   return (
-    <header dir={isRTL ? 'rtl' : 'ltr'} className="w-full">
+    <header dir={isRTL ? 'rtl' : 'ltr'} className="w-full max-w-full">
       <div className={cn(
-        'app-shell-header-panel rounded-[24px] border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.74),rgb(var(--color-elevated-rgb)/0.58))] px-2.5 py-1.5 shadow-[var(--shadow-medium)] backdrop-blur-[22px] sm:rounded-[28px] sm:px-4 sm:py-2',
+        'app-shell-header-panel w-full max-w-full overflow-visible rounded-[20px] border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.74),rgb(var(--color-elevated-rgb)/0.58))] px-2.5 py-1.5 shadow-[var(--shadow-medium)] backdrop-blur-[22px] sm:rounded-[28px] sm:px-4 sm:py-2',
         isAdmin && 'border-[color:rgb(var(--color-primary-rgb)/0.22)] bg-[linear-gradient(180deg,rgb(255_255_255/0.86),rgb(245_241_231/0.7))] shadow-[0_24px_64px_-46px_rgb(80_64_24/0.32)] dark:bg-[linear-gradient(180deg,rgb(26_26_26/0.82),rgb(12_12_12/0.68))] dark:shadow-[0_28px_72px_-48px_rgb(0_0_0/0.9)]'
       )}>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+          <div className="flex min-w-0 shrink items-center gap-1 sm:shrink-0 sm:gap-2">
             <button
               type="button"
               onClick={toggleSidebar}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] text-[var(--color-text)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.26)] hover:text-[var(--color-primary)] sm:h-10 sm:w-10"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] text-[var(--color-text)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.26)] hover:text-[var(--color-primary)] min-[380px]:h-9 min-[380px]:w-9 sm:h-10 sm:w-10"
               aria-label={language === 'ar' ? 'فتح القائمة' : 'Open menu'}
             >
               <Menu className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
@@ -129,8 +129,18 @@ const Header = ({ toggleSidebar }) => {
               onClick={() => navigate(getDefaultRouteForRole(user?.role))}
               className="rounded-[14px] px-0 py-0 transition-all hover:-translate-y-0.5"
             >
-              <span className="sm:hidden scale-90 origin-left">
-                <BrandMark size="xs" showCaption={false} />
+              <span className="sm:hidden flex min-w-0 items-center gap-1">
+                <span className="scale-[0.78] min-[380px]:scale-[0.86]">
+                  <BrandMark size="xs" compact showCaption={false} />
+                </span>
+                <span className="header-mobile-brand inline-flex max-w-[5.2rem] items-baseline gap-0.5 leading-none">
+                  <span className="header-mobile-brand-store text-[0.56rem] font-extrabold tracking-[0.12em] text-[color:rgb(var(--color-text-secondary)/0.72)]">
+                    STORE
+                  </span>
+                  <span className="header-mobile-brand-ms text-[0.98rem] font-black tracking-[0.03em] text-transparent bg-clip-text bg-[linear-gradient(120deg,#fff7cf_0%,#f3de9b_28%,#d4af37_52%,#fff3bf_76%,#f0cf66_100%)] animate-shimmer-slow min-[380px]:text-[1.05rem]">
+                    MS
+                  </span>
+                </span>
               </span>
               <span className="hidden sm:block">
                 <BrandMark size="xs" showCaption={false} />
@@ -138,19 +148,22 @@ const Header = ({ toggleSidebar }) => {
             </button>
           </div>
 
-          <div className={isRTL ? 'mr-auto flex items-center gap-1.5 sm:gap-2' : 'ml-auto flex items-center gap-1.5 sm:gap-2'}>
+          <div className={cn(
+            'header-mobile-actions flex min-w-0 shrink-0 items-center gap-0.5 px-1 min-[380px]:gap-1 min-[380px]:px-1.5 sm:gap-2 sm:px-0',
+            isRTL ? 'mr-auto' : 'ml-auto'
+          )}>
             {shouldShowWallet && (
               <>
                 <button
                   type="button"
                   onClick={() => navigate(walletTargetPath)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[linear-gradient(180deg,rgb(var(--color-primary-rgb)/0.12),rgb(var(--color-primary-rgb)/0.06))] px-1.5 py-1 text-start shadow-[0_18px_34px_-28px_rgb(var(--color-primary-rgb)/0.32)] transition-all hover:-translate-y-0.5 sm:hidden"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[linear-gradient(180deg,rgb(var(--color-primary-rgb)/0.12),rgb(var(--color-primary-rgb)/0.06))] px-0.5 py-0.5 text-start shadow-[0_18px_34px_-28px_rgb(var(--color-primary-rgb)/0.32)] transition-all hover:-translate-y-0.5 min-[380px]:px-1 min-[380px]:py-1 sm:hidden"
                   aria-label={language === 'ar' ? 'الرصيد' : 'Balance'}
                 >
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.2)] text-[var(--color-primary)]">
                     <Wallet className="h-3.5 w-3.5" />
                   </span>
-                  <span className="header-wallet-balance max-w-[78px] truncate text-[0.72rem] font-semibold text-transparent bg-clip-text bg-[linear-gradient(120deg,#fff7cf_0%,#f3de9b_28%,#d4af37_52%,#fff3bf_76%,#f0cf66_100%)] animate-shimmer-slow">
+                  <span className="header-wallet-balance hidden max-w-[72px] truncate text-[0.72rem] font-semibold text-transparent bg-clip-text bg-[linear-gradient(120deg,#fff7cf_0%,#f3de9b_28%,#d4af37_52%,#fff3bf_76%,#f0cf66_100%)] animate-shimmer-slow min-[380px]:block">
                     {walletDisplayValue}
                   </span>
                 </button>
@@ -180,8 +193,8 @@ const Header = ({ toggleSidebar }) => {
               <button
                 type="button"
                 onClick={handleNotificationsToggle}
-                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] text-[var(--color-text)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.26)] hover:text-[var(--color-primary)] sm:h-10 sm:w-10"
-                aria-label={language === 'ar' ? 'الإشعارات' : 'Notifications'}
+                className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] text-[var(--color-text)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.26)] hover:text-[var(--color-primary)] min-[380px]:h-9 min-[380px]:w-9 sm:h-10 sm:w-10"
+                aria-label="الإشعارات"
               >
                 <Bell className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5" />
                 {unreadCount > 0 ? (
@@ -194,7 +207,7 @@ const Header = ({ toggleSidebar }) => {
               {isNotificationsOpen ? (
                 <div className={`absolute top-12 z-50 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[color:rgb(var(--color-card-rgb)/0.96)] shadow-[0_26px_70px_-42px_rgb(0_0_0/0.92)] backdrop-blur-xl ${isRTL ? 'left-0' : 'right-0'}`}>
                   <div className="border-b border-[color:rgb(var(--color-border-rgb)/0.68)] px-4 py-3">
-                    <p className="text-sm font-bold text-[var(--color-text)]">{language === 'ar' ? 'الإشعارات' : 'Notifications'}</p>
+                    <p className="text-sm font-bold text-[var(--color-text)]">الإشعارات</p>
                   </div>
                   <div className="max-h-[calc(50vh-3.25rem)] overflow-y-auto p-2">
                     {notifications.length ? notifications.map((notification) => (
@@ -219,7 +232,7 @@ const Header = ({ toggleSidebar }) => {
                       </button>
                     )) : (
                       <p className="px-3 py-6 text-center text-sm text-[var(--color-text-secondary)]">
-                        {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
+                        لا توجد إشعارات
                       </p>
                     )}
                   </div>
@@ -227,7 +240,7 @@ const Header = ({ toggleSidebar }) => {
               ) : null}
             </div>
 
-            <ThemeToggle compact className="h-9 w-9 sm:h-11 sm:w-11" />
+            <ThemeToggle compact className="h-8 w-8 shrink-0 min-[380px]:h-9 min-[380px]:w-9 sm:h-11 sm:w-11" />
           </div>
         </div>
       </div>

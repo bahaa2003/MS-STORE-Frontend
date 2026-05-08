@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
+import ConfirmDialog from '../../components/account/ConfirmDialog';
 import { useToast } from '../../components/ui/Toast';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatDate, formatNumber, formatTime } from '../../utils/intl';
@@ -21,9 +22,10 @@ const AdminTopups = () => {
   const [amount, setAmount] = useState('');
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [detailsTopup, setDetailsTopup] = useState(null);
+  const [rejectTopupId, setRejectTopupId] = useState('');
 
   useEffect(() => {
-    loadTopups();
+    loadTopups({ force: true });
   }, [loadTopups]);
 
   const getStatusVariant = (status) => {
@@ -66,10 +68,14 @@ const AdminTopups = () => {
   };
 
   const handleReject = (id) => {
-    if (window.confirm(t('deleteConfirm') || 'هل تريد رفض الطلب؟')) {
-      updateTopupStatus(id, 'rejected');
-      addToast(t('reject'), 'info');
-    }
+    setRejectTopupId(id);
+  };
+
+  const confirmRejectTopup = async () => {
+    if (!rejectTopupId) return;
+    await updateTopupStatus(rejectTopupId, 'rejected');
+    addToast(t('reject'), 'info');
+    setRejectTopupId('');
   };
 
   const handleViewDetails = (topup) => {
@@ -362,6 +368,16 @@ const AdminTopups = () => {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(rejectTopupId)}
+        title="رفض طلب الشحن"
+        description={t('deleteConfirm') || 'هل تريد رفض الطلب؟'}
+        confirmLabel={t('reject') || 'رفض'}
+        cancelLabel="إلغاء"
+        onConfirm={confirmRejectTopup}
+        onCancel={() => setRejectTopupId('')}
+      />
     </div>
   );
 };

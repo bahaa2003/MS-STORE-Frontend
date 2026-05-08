@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, Check, X } from 'lucide-react';
+import { resolveImageUrl } from '../../utils/imageUrl';
+import coinsImage from '../../assets/عملات.PNG';
 import useAuthStore from '../../store/useAuthStore';
 import useGroupStore from '../../store/useGroupStore';
 import useOrderStore from '../../store/useOrderStore';
@@ -304,7 +306,7 @@ const ProductPurchaseModal = ({ isOpen, onClose, product }) => {
                 </div>
 
                 <div className="relative overflow-hidden rounded-2xl border border-red-400/35 bg-black p-1">
-                  <img src={product.image} alt={productTitle} className="h-44 w-full rounded-xl object-cover" />
+                  <img src={product.image ? resolveImageUrl(product.image) : coinsImage} alt={productTitle} className="h-44 w-full rounded-xl object-cover" />
                 </div>
 
                 <div className="mt-4 flex items-start justify-between gap-3">

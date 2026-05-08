@@ -10,6 +10,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import { resolveImageUrl } from '../../utils/imageUrl';
 import Button, { cn } from '../ui/Button';
 import Badge from '../ui/Badge';
 import Input from '../ui/Input';
@@ -18,6 +19,7 @@ import useAuthStore from '../../store/useAuthStore';
 import useGroupStore from '../../store/useGroupStore';
 import useOrderStore from '../../store/useOrderStore';
 import useSystemStore from '../../store/useSystemStore';
+import useMediaStore from '../../store/useMediaStore';
 import { useLanguage } from '../../context/LanguageContext';
 import {
   calculateProductPrice,
@@ -25,6 +27,7 @@ import {
   getCurrencyMeta,
   resolveProductUnitPrice,
 } from '../../utils/pricing';
+import coinsImage from '../../assets/عملات.PNG';
 import { normalizeMoneyAmount } from '../../utils/money';
 import { getProductStatus } from '../../utils/productStatus';
 import {
@@ -53,6 +56,8 @@ const getCopy = (language = 'ar') => {
       step: 'Step',
       total: 'Total',
       totalHint: 'Updated automatically based on quantity.',
+      auto24Hint: 'This product runs automatically 24/7.',
+      userIdLabel: 'User ID',
       buy: 'Buy',
       cancel: 'Cancel',
       processing: 'Processing...',
@@ -92,6 +97,8 @@ const getCopy = (language = 'ar') => {
     step: 'الزيادة',
     total: 'الإجمالي',
     totalHint: 'يتحدث تلقائيًا حسب الكمية المختارة.',
+    auto24Hint: 'هذا المنتج يعمل اوتوماتيكي 24ساعه',
+    userIdLabel: 'ايدي مستخدم',
     buy: 'شراء',
     cancel: 'إلغاء',
     processing: 'جارٍ تنفيذ الطلب...',
@@ -117,10 +124,105 @@ const getCopy = (language = 'ar') => {
 };
 
 const resolveFieldLabel = (field, language = 'ar') => {
-  if (field?.key === 'playerId') {
-    return language === 'en' ? 'User ID' : 'ايدي مستخدم';
-  }
   return field?.label || field?.key || '';
+};
+
+const resolveFieldType = (field) => {
+  const type = String(field?.type || 'text').trim().toLowerCase();
+  if (['text', 'number', 'email', 'select'].includes(type)) return type;
+  return 'text';
+};
+
+const isFieldRequired = (field) => field?.required !== false;
+
+const resolveSelectOptions = (field) => {
+  const source = Array.isArray(field?.options) ? field.options : [];
+  return source
+    .map((option) => {
+      if (typeof option === 'string' || typeof option === 'number') {
+        return { value: String(option), label: String(option) };
+      }
+      if (option && typeof option === 'object') {
+        const rawValue = option.value ?? option.id ?? option.key ?? option.label;
+        if (rawValue === undefined || rawValue === null) return null;
+        return {
+          value: String(rawValue),
+          label: String(option.label ?? option.name ?? rawValue),
+        };
+      }
+      return null;
+    })
+    .filter((option) => option?.value);
+};
+
+const resolveProductId = (item) => String(item?.id || item?._id || '').trim();
+
+const isManualPurchaseProduct = (item) => {
+  const executionType = String(item?.executionType || '').trim().toLowerCase();
+  const hasProviderLink = Boolean(String(item?.supplierId || item?.providerId || '').trim());
+
+  if (executionType === 'manual') return true;
+  if (executionType === 'automatic') return false;
+  if (item?.autoFulfillmentEnabled === false) return true;
+  if (item?.autoFulfillmentEnabled === true) return false;
+
+  return !hasProviderLink;
+};
+
+const isProductExplicitlyInactive = (item) => {
+  if (!item || typeof item !== 'object') return false;
+  if (item?.isActive === false) return true;
+
+  const status = String(item?.status || '').trim().toLowerCase();
+  return Boolean(status) && status !== 'active';
+};
+
+const resolvePurchaseState = (item, language, copy) => {
+  if (isProductExplicitlyInactive(item)) {
+    return {
+      isVisible: true,
+      isPurchasable: false,
+      isDisabled: true,
+      badge: 'unavailable',
+      badgeLabel: copy.unavailable,
+      badgeColor: 'danger',
+      helperText: copy.unavailableMessage,
+      reason: copy.unavailableTitle,
+      scheduleStatus: null,
+      isOutOfStock: false,
+      isLowStock: false,
+      inSchedule: true,
+      isSalesEnabled: false,
+    };
+  }
+
+  const status = getProductStatus(item, language);
+
+  if (!isManualPurchaseProduct(item)) {
+    return status;
+  }
+
+  if (status.isPurchasable) {
+    return {
+      ...status,
+      isPurchasable: true,
+      isDisabled: false,
+      badgeLabel: copy.available,
+      badgeColor: 'success',
+      helperText: '',
+      reason: '',
+    };
+  }
+
+  return {
+    ...status,
+    isPurchasable: false,
+    isDisabled: true,
+    badgeLabel: copy.unavailable,
+    badgeColor: status.badgeColor || 'danger',
+    helperText: status.helperText || copy.unavailableMessage,
+    reason: status.reason || copy.unavailableMessage,
+  };
 };
 
 const statusToneStyles = {
@@ -145,6 +247,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   const updateUserSession = useAuthStore((state) => state.updateUserSession);
   const groupsLastLoadedAt = useGroupStore((state) => state.groupsLastLoadedAt);
   const addOrder = useOrderStore((state) => state.addOrder);
+  const loadProducts = useMediaStore((state) => state.loadProducts);
   const currencies = useSystemStore((state) => state.currencies);
   const loadCurrencies = useSystemStore((state) => state.loadCurrencies);
 
@@ -190,6 +293,14 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     if (language === 'en') return String(product?.description || product?.descriptionAr || '').trim();
     return String(product?.descriptionAr || product?.description || '').trim();
   }, [language, product?.description, product?.descriptionAr]);
+
+  const isAutoSupplierProduct = useMemo(() => {
+    const supplierId = String(product?.supplierId || product?.providerId || '').trim();
+    const supplierProductId = String(product?.providerProductId || product?.externalProductId || '').trim();
+    const isLinked = Boolean(supplierId && supplierProductId);
+    const isAuto = product?.autoFulfillmentEnabled !== false;
+    return isLinked && isAuto;
+  }, [product?.autoFulfillmentEnabled, product?.externalProductId, product?.providerId, product?.providerProductId, product?.supplierId]);
 
   useEffect(() => {
     if (!product) return;
@@ -267,7 +378,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
 
   if (!isOpen || !product) return null;
 
-  const productState = getProductStatus(product, language);
+  const productState = resolvePurchaseState(product, language, copy);
   const isApproved = isApprovedAccountStatus(user?.status);
   const userCurrency = getCurrencyMeta(userCurrencyCode, currencies);
   const unitPriceBase = pricingSnapshot.unitPriceBase;
@@ -279,8 +390,17 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   const spendableBalance = normalizeMoneyAmount(balance + creditLimit);
   const canAfford = spendableBalance >= totalPrice;
 
-  const formattedUnitPrice = formatCurrencyAmount(unitPrice, userCurrencyCode, currencies, locale);
-  const formattedTotalPrice = formatCurrencyAmount(totalPrice, userCurrencyCode, currencies, locale);
+  const unitPriceNumber = Number(unitPrice);
+  const formattedUnitPrice = Number.isFinite(unitPriceNumber)
+    ? formatCurrencyAmount(unitPriceNumber, userCurrencyCode, currencies, locale, {
+      maximumFractionDigits: 5,
+      minimumFractionDigits: 0,
+    })
+    : formatCurrencyAmount(unitPrice, userCurrencyCode, currencies, locale);
+  const formattedTotalPrice = formatCurrencyAmount(totalPrice, userCurrencyCode, currencies, locale, {
+    maximumFractionDigits: 4,
+    minimumFractionDigits: 0,
+  });
   const missingAmount = formatCurrencyAmount(Math.max(0, totalPrice - spendableBalance), userCurrencyCode, currencies, locale);
 
   const hasQuantityInput = String(quantityInput ?? '').trim().length > 0;
@@ -410,7 +530,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     const nextErrors = {};
     orderFields.forEach((field) => {
       const label = resolveFieldLabel(field, language);
-      if (!String(fieldValues[field.key] || '').trim()) {
+      if (isFieldRequired(field) && !String(fieldValues[field.key] || '').trim()) {
         nextErrors[field.key] = copy.fieldRequired(label);
       }
     });
@@ -454,6 +574,40 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setStatusCard({ tone: 'info', title: copy.preparingTitle, message: copy.preparingMessage });
 
     try {
+      const freshCatalog = await loadProducts({ force: true }).catch(() => null);
+      const selectedProductId = resolveProductId(product);
+      const freshProduct = (freshCatalog?.products || []).find((item) => resolveProductId(item) === selectedProductId) || null;
+
+      if (!freshProduct) {
+        const message = language === 'en'
+          ? 'This product is no longer available. The catalog has been refreshed.'
+          : 'هذا المنتج لم يعد متاحًا. تم تحديث المنتجات من السيرفر.';
+        setStatusCard({ tone: 'warning', title: copy.unavailableTitle, message });
+        addToast(message, 'warning');
+        return;
+      }
+
+      const freshProductState = resolvePurchaseState(freshProduct, language, copy);
+      if (!freshProductState.isPurchasable) {
+        const message = freshProductState.helperText || copy.unavailableMessage;
+        setStatusCard({ tone: 'warning', title: copy.unavailableTitle, message });
+        addToast(message, 'warning');
+        return;
+      }
+
+      const freshUnitPriceBase = calculateProductPrice(freshProduct, pricingGroup, pricingGroupPercentage);
+      const freshUnitPrice = resolveProductUnitPrice(freshProduct, userCurrencyCode, currencies, pricingGroup, pricingGroupPercentage);
+      const freshTotalPrice = normalizeMoneyAmount(freshUnitPrice * quantity);
+
+      if (freshTotalPrice !== totalPrice) {
+        const message = language === 'en'
+          ? 'The product price has changed. Review the updated price before buying.'
+          : 'سعر المنتج اتغير. راجع السعر الجديد قبل تنفيذ الطلب.';
+        setStatusCard({ tone: 'warning', title: language === 'en' ? 'Price updated' : 'تم تحديث السعر', message });
+        addToast(message, 'warning');
+        return;
+      }
+
       const normalizedFields = Object.fromEntries(
         orderFields.map((field) => [
           field.key,
@@ -461,40 +615,52 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
         ])
       );
 
+      const firstCustomInputValue = Object.values(normalizedFields)
+        .map((value) => String(value || '').trim())
+        .find(Boolean) || '';
       const userIdentifier = String(
         normalizedFields.playerId
         || normalizedFields.uid
+        || normalizedFields.email
+        || normalizedFields.phone
+        || normalizedFields.username
+        || firstCustomInputValue
         || ''
       ).trim();
-      const fieldsSnapshot = Array.isArray(product?.orderFields) && product.orderFields.length > 0
-        ? product.orderFields.map((field) => ({ ...field }))
-        : orderFields.map((field) => ({
+      const dynamicFieldSnapshot = Array.isArray(freshProduct?.dynamicFields) && freshProduct.dynamicFields.length > 0
+        ? freshProduct.dynamicFields.map((field) => ({ ...field }))
+        : null;
+      const fieldsSnapshot = Array.isArray(freshProduct?.orderFields) && freshProduct.orderFields.length > 0
+        ? freshProduct.orderFields.map((field) => ({ ...field }))
+        : (dynamicFieldSnapshot || orderFields.map((field) => ({
           key: field.key,
           label: field.label,
           placeholder: field.placeholder,
-        }));
+        })));
+      const freshQuantityMeta = getProductQuantityMeta(freshProduct);
 
       const createResult = await addOrder({
         id: `ord-${Date.now()}`,
         userId: user.id,
-        productId: product.id,
-        productName: product.name,
-        productNameAr: product.nameAr,
+        productId: freshProduct.id,
+        productName: freshProduct.name,
+        productNameAr: freshProduct.nameAr,
         quantity,
-        unitPrice,
-        unitPriceBase,
-        priceCoins: totalPrice,
+        unitPrice: freshUnitPrice,
+        unitPriceBase: freshUnitPriceBase,
+        priceCoins: freshTotalPrice,
         currencyCode: userCurrencyCode,
         exchangeRateAtExecution: userCurrency.rate,
         playerId: userIdentifier,
+        customInputs: normalizedFields,
         orderFields: normalizedFields,
         orderFieldsValues: normalizedFields,
         customerInput: {
           values: normalizedFields,
           fieldsSnapshot,
-          quantitySnapshot: quantityMeta,
+          quantitySnapshot: freshQuantityMeta,
         },
-        quantitySnapshot: quantityMeta,
+        quantitySnapshot: freshQuantityMeta,
         status: 'pending',
         createdAt: new Date().toISOString(),
         idempotencyKey: `${user.id}-${product.id}-${userIdentifier}-${Date.now()}`,
@@ -566,7 +732,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 22, scale: 0.99 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="relative flex max-h-[min(92vh,48rem)] w-full max-w-xl flex-col overflow-hidden rounded-[1.6rem] border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.94),rgb(var(--color-surface-rgb)/0.56))] text-[var(--color-text)] shadow-[var(--shadow-medium)] sm:rounded-[2rem]"
+              className="relative flex max-h-[min(94vh,56rem)] w-full max-w-[24rem] flex-col overflow-hidden rounded-[1.6rem] border border-[color:rgb(var(--color-border-rgb)/0.92)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.94),rgb(var(--color-surface-rgb)/0.56))] text-[var(--color-text)] shadow-[var(--shadow-medium),var(--shadow-gold),0_0_24px_rgba(255,214,102,0.32)] ring-1 ring-[color:rgb(var(--color-primary-rgb)/0.56)] sm:rounded-[2rem]"
             >
               <button
                 type="button"
@@ -585,17 +751,13 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                     <p className="mt-0.5 text-[13px] font-bold tracking-tight text-[color:rgb(var(--color-primary-rgb)/0.92)] sm:mt-1 sm:text-base">{formattedUnitPrice}</p>
                   </div>
                   <Badge variant={availabilityVariant} className="px-1.5 py-0.5 text-[9px] sm:px-2.5 sm:py-1 sm:text-[11px]">{availabilityLabel}</Badge>
-                  <Badge variant="premium" className="gap-1 px-1.5 py-0.5 text-[9px] sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[11px]">
-                    <Zap className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" />
-                    {copy.quickOrder}
-                  </Badge>
                 </div>
 
                 <div className={cn('flex items-center gap-2 sm:gap-3', isRTL ? 'flex-row-reverse text-right' : 'text-left')}>
                   {product?.image ? (
                     <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-[color:rgb(var(--color-border-rgb)/0.56)] bg-[color:rgb(var(--color-surface-rgb)/0.42)] sm:h-16 sm:w-16 sm:rounded-2xl">
                       <img
-                        src={product.image}
+                        src={resolveImageUrl(product.image)}
                         alt={productTitle}
                         loading="eager"
                         decoding="async"
@@ -609,6 +771,13 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                   )}
 
                   <div className="min-w-0 flex-1">
+                    <img
+                      src={coinsImage}
+                      alt="عملات"
+                      loading="eager"
+                      decoding="async"
+                      className="mx-auto mb-1.5 h-20 w-auto scale-[1.45] object-contain sm:h-24"
+                    />
                     <h2 className="line-clamp-2 text-base font-bold leading-5 tracking-[-0.02em] text-[var(--color-text)] sm:text-2xl sm:leading-8">
                       {productTitle}
                     </h2>
@@ -627,11 +796,98 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
               </header>
 
               <div className="flex-1 space-y-2 overflow-y-auto px-2.5 py-2.5 sm:space-y-3 sm:px-4 sm:py-3">
-                <section className="rounded-xl border border-[color:rgb(var(--color-primary-rgb)/0.28)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] p-2.5 sm:rounded-2xl sm:p-3">
-                  <p className="text-[11px] font-semibold text-[color:rgb(var(--color-primary-rgb)/0.84)]">{copy.total}</p>
-                  <p className="mt-1 text-lg font-bold text-[var(--color-text)] sm:mt-1.5 sm:text-xl">{formattedTotalPrice}</p>
-                  <p className="mt-0.5 hidden text-[11px] text-[color:rgb(var(--color-text-rgb)/0.70)] sm:block">{copy.totalHint}</p>
-                </section>
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  <div className="space-y-2">
+                    <Input
+                      label={copy.quantityTitle}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={quantityInput}
+                      onChange={(event) => applyQuantity(event.target.value)}
+                      onBlur={handleQuantityBlur}
+                      disabled={isSubmitting}
+                      placeholder={language === 'en' ? 'Enter quantity' : 'اكتب الكمية'}
+                      className="h-9 rounded-md border-white/15 bg-white/8 text-xs text-white placeholder:text-white/45 focus:bg-white/12 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:rounded-lg sm:text-[13px]"
+                    />
+
+                    <p className="text-[11px] font-medium text-[color:rgb(var(--color-text-rgb)/0.65)]">
+                      {copy.min} {quantityMeta.minQty} • {copy.max} {quantityMeta.maxQty}
+                    </p>
+
+                    {quantityError ? (
+                      <p className="text-[11px] font-medium text-[#ffb4b4]">{quantityError}</p>
+                    ) : null}
+                  </div>
+
+                  <Input
+                    label={copy.total}
+                    type="text"
+                    value={formattedTotalPrice}
+                    readOnly
+                    disabled
+                    className="h-9 rounded-md border-white/15 bg-white/8 text-xs text-white placeholder:text-white/45 focus:bg-white/12 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:rounded-lg sm:text-[13px]"
+                  />
+
+                  {orderFields.length > 0 ? (
+                    <section className="col-span-2 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.48)] bg-[color:rgb(var(--color-surface-rgb)/0.32)] p-2.5 sm:rounded-2xl sm:p-3">
+                      <div className="space-y-2">
+                        {orderFields.map((field) => {
+                          const label = resolveFieldLabel(field, language);
+                          const fieldType = resolveFieldType(field);
+                          const options = resolveSelectOptions(field);
+                          const fallbackAsInput = fieldType === 'select' && options.length === 0;
+
+                          if (fieldType === 'select' && !fallbackAsInput) {
+                            return (
+                              <div key={field.key}>
+                                <label className="mb-1.5 block text-xs font-medium text-white/80 sm:text-sm">
+                                  {label}
+                                  {isFieldRequired(field) ? ' *' : ''}
+                                </label>
+                                <select
+                                  value={fieldValues[field.key] || ''}
+                                  onChange={(event) => handleFieldChange(field.key, event.target.value)}
+                                  disabled={isSubmitting || statusCard.tone === 'success'}
+                                  className="h-9 w-full rounded-md border border-white/15 bg-white/8 px-3 text-xs text-white outline-none transition-colors focus:border-[#d4af37]/45 focus:bg-white/12 sm:h-10 sm:rounded-lg sm:text-[13px]"
+                                >
+                                  <option value="" className="bg-[rgb(var(--color-card-rgb))] text-white/80">
+                                    {field.placeholder || copy.placeholder(label)}
+                                  </option>
+                                  {options.map((option) => (
+                                    <option key={option.value} value={option.value} className="bg-[rgb(var(--color-card-rgb))] text-white">
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                {fieldErrors[field.key] ? (
+                                  <p className="mt-1 text-xs text-[#ffb4b4]">{fieldErrors[field.key]}</p>
+                                ) : null}
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <Input
+                              key={field.key}
+                              label={`${label}${isFieldRequired(field) ? ' *' : ''}`}
+                              type={fieldType === 'number' ? 'number' : fieldType === 'email' ? 'email' : 'text'}
+                              inputMode={fieldType === 'number' ? 'decimal' : undefined}
+                              value={fieldValues[field.key] || ''}
+                              onChange={(event) => handleFieldChange(field.key, event.target.value)}
+                              error={fieldErrors[field.key]}
+                              placeholder={field.placeholder || copy.placeholder(label)}
+                              autoComplete="off"
+                              spellCheck={false}
+                              disabled={isSubmitting || statusCard.tone === 'success'}
+                              className="h-9 rounded-md border-white/15 bg-white/8 text-xs text-white placeholder:text-white/45 focus:border-[#d4af37]/45 focus:bg-white/12 sm:h-10 sm:rounded-lg sm:text-[13px]"
+                            />
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
 
                 {!canAfford && isApproved && productState.isPurchasable ? (
                   <div className="rounded-xl border border-[color:rgb(var(--color-error-rgb)/0.38)] bg-[color:rgb(var(--color-error-rgb)/0.14)] p-2.5 sm:rounded-2xl sm:p-3">
@@ -654,66 +910,6 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                   </div>
                 ) : null}
 
-                <section className="space-y-1.5 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.48)] bg-[color:rgb(var(--color-surface-rgb)/0.32)] p-2.5 sm:space-y-2 sm:rounded-2xl sm:p-3">
-                  <div className={cn('flex items-center justify-between gap-3', isRTL ? 'flex-row-reverse' : 'flex-row')}>
-                    <div>
-                      <h3 className="text-[11px] font-semibold text-[var(--color-text)] sm:text-xs">{copy.orderFields}</h3>
-                      <p className="mt-0.5 hidden text-[11px] text-[color:rgb(var(--color-text-rgb)/0.65)] sm:block">{copy.orderFieldsHint}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 sm:space-y-2">
-                    {orderFields.map((field) => {
-                      const label = resolveFieldLabel(field, language);
-                      return (
-                        <Input
-                          key={field.key}
-                          label={label}
-                          value={fieldValues[field.key] || ''}
-                          onChange={(event) => handleFieldChange(field.key, event.target.value)}
-                          error={fieldErrors[field.key]}
-                          placeholder={field.placeholder || copy.placeholder(label)}
-                          autoComplete="off"
-                          spellCheck={false}
-                          disabled={isSubmitting || statusCard.tone === 'success'}
-                          className="h-9 rounded-md border-white/15 bg-white/8 text-xs text-white placeholder:text-white/45 focus:border-[#d4af37]/45 focus:bg-white/12 sm:h-10 sm:rounded-lg sm:text-[13px]"
-                        />
-                      );
-                    })}
-                  </div>
-                </section>
-
-                <section className="space-y-1.5 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.48)] bg-[color:rgb(var(--color-surface-rgb)/0.32)] p-2.5 sm:space-y-2 sm:rounded-2xl sm:p-3">
-                  <div className={cn('flex items-center justify-between gap-3', isRTL ? 'flex-row-reverse' : 'flex-row')}>
-                    <p className="text-[11px] font-semibold text-[var(--color-text)] sm:text-xs">{copy.quantityTitle}</p>
-                    <div className={cn('flex items-center gap-1 text-[9px] text-[color:rgb(var(--color-text-rgb)/0.65)] sm:gap-1 sm:text-[10px]', isRTL ? 'flex-row-reverse' : 'flex-row')}>
-                      <span>{copy.min} {quantityMeta.minQty}</span>
-                      <span>•</span>
-                      <span>{copy.max} {quantityMeta.maxQty}</span>
-                      <span>•</span>
-                      <span>{copy.step} {quantityMeta.stepQty}</span>
-                    </div>
-                  </div>
-
-                  <Input
-                    label={language === 'en' ? 'Add' : 'إضافة'}
-                    type="number"
-                    inputMode="numeric"
-                    min={quantityMeta.minQty}
-                    max={quantityMeta.maxQty}
-                    step={quantityMeta.stepQty}
-                    value={quantityInput}
-                    onChange={(event) => applyQuantity(event.target.value)}
-                    onBlur={handleQuantityBlur}
-                    disabled={isSubmitting}
-                    placeholder={language === 'en' ? 'Enter required quantity' : 'اكتب الكمية اللي محتاجها'}
-                    className="h-9 rounded-md border-white/15 bg-white/8 text-xs text-white placeholder:text-white/45 focus:border-[#d4af37]/45 focus:bg-white/12 sm:h-10 sm:rounded-lg sm:text-[13px]"
-                  />
-
-                  {quantityError ? (
-                    <p className="text-[11px] font-medium text-[#ffb4b4]">{quantityError}</p>
-                  ) : null}
-                </section>
               </div>
 
               <footer className="border-t border-[color:rgb(var(--color-border-rgb)/0.52)] bg-[color:rgb(var(--color-surface-rgb)/0.88)] px-2.5 py-2.5 sm:px-4 sm:py-3">
@@ -745,6 +941,19 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                   >
                     {isSubmitting ? copy.processing : copy.buy}
                   </Button>
+                </div>
+
+                {isAutoSupplierProduct ? (
+                  <p className="mt-2 text-center text-[11px] font-medium text-[color:rgb(var(--color-text-rgb)/0.65)] sm:text-xs">
+                    {copy.auto24Hint}
+                  </p>
+                ) : null}
+
+                <div className="mt-2 flex justify-center">
+                  <Badge variant="premium" className="gap-1 px-2 py-1 text-[9px] sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[11px]">
+                    <Zap className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" />
+                    {copy.quickOrder}
+                  </Badge>
                 </div>
               </footer>
             </motion.section>

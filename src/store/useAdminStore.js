@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { mockUsers } from '../data/mockData';
 import apiClient from '../services/client';
 import useNotificationStore from './useNotificationStore';
@@ -12,8 +11,8 @@ const isRealProvider = dataProvider === 'real';
 let hasFetchedAdminUsersFromBackendThisSession = false;
 let hasFetchedAdminWalletsFromBackendThisSession = false;
 
-const USERS_CACHE_TTL = 90 * 1000;
-const WALLETS_CACHE_TTL = 60 * 1000;
+const USERS_CACHE_TTL = isRealProvider ? 15 * 1000 : 90 * 1000;
+const WALLETS_CACHE_TTL = isRealProvider ? 15 * 1000 : 60 * 1000;
 const USERS_PAGE_LIMIT = 20;
 const USERS_DEFAULT_SORT_BY = 'walletBalance';
 const USERS_DEFAULT_SORT_ORDER = 'desc';
@@ -161,10 +160,51 @@ const removeRecordKey = (record, keyToRemove) => {
   return nextRecord;
 };
 
-const useAdminStore = create(
-  persist(
-    (set, get) => ({
-      users: mockUsers,
+const ADMIN_MONITOR_ROLES = new Set(['admin', 'supervisor', 'manager', 'moderator', 'super_admin', 'superuser']);
+
+const getActorSnapshot = (actor, fallback = null) => {
+  const source = actor || fallback || null;
+  return {
+    id: String(source?._id || source?.id || source?.userId || '').trim(),
+    name: String(source?.name || source?.fullName || source?.email || source?.username || '').trim(),
+    role: String(source?.role || '').trim().toLowerCase(),
+  };
+};
+
+const buildAdminActivity = (entry = {}) => {
+  const actor = getActorSnapshot(entry.actor);
+  const entityType = String(entry.entityType || 'user').trim().toLowerCase();
+  const entityId = String(entry.entityId || '').trim();
+  const action = String(entry.action || 'activity').trim();
+  const createdAt = entry.createdAt || new Date().toISOString();
+
+  return {
+    id: entry.id || `${action}-${entityType}-${entityId || 'global'}-${createdAt}`,
+    action,
+    title: entry.title || action.replaceAll('_', ' '),
+    description: entry.description || '',
+    actorId: actor.id || entry.actorId || '',
+    actorName: actor.name || entry.actorName || 'System',
+    actorRole: actor.role || entry.actorRole || '',
+    isMonitoredActor: ADMIN_MONITOR_ROLES.has(actor.role),
+    entityType,
+    entityId,
+    status: String(entry.status || 'updated').trim().toLowerCase(),
+    createdAt,
+    source: entry.source || 'admin_store',
+  };
+};
+
+const appendAdminActivity = (set, entry) => {
+  const nextEntry = buildAdminActivity(entry);
+  set((state) => ({
+    adminActivities: [nextEntry, ...(state.adminActivities || [])].slice(0, 200),
+  }));
+  return nextEntry;
+};
+
+const useAdminStore = create((set, get) => ({
+      users: isRealProvider ? [] : mockUsers,
       deletedUsers: [],
       usersPagination: null,
       usersCurrentPage: 1,
@@ -174,6 +214,9 @@ const useAdminStore = create(
       walletsLastLoadedAt: 0,
       userWalletTransactions: {},
       walletTransactionsLastLoadedAt: {},
+      adminActivities: [],
+
+      appendAdminActivity: (entry) => appendAdminActivity(set, entry),
 
       loadUsers: async ({ force = false, page } = {}) => {
         const requestedPageCandidate = Number(page ?? get().usersCurrentPage ?? 1);
@@ -207,7 +250,7 @@ const useAdminStore = create(
           .then(async (result) => {
             // Handle both old (array) and new ({ users, pagination }) response shapes
             const items = Array.isArray(result) ? result : (result?.users || []);
-            const nextUsers = sortUsersByBalanceDesc(items.length ? items : mockUsers);
+            const nextUsers = sortUsersByBalanceDesc(items.length ? items : (isRealProvider ? [] : mockUsers));
             const pagination = result?.pagination || null;
             const currentPage = Number.isFinite(Number(pagination?.page))
               ? Math.floor(Number(pagination.page))
@@ -231,7 +274,7 @@ const useAdminStore = create(
           })
           .catch((_error) => {
             if (!hasUsers) {
-              set({ users: sortUsersByBalanceDesc(mockUsers) });
+              set({ users: sortUsersByBalanceDesc(isRealProvider ? [] : mockUsers) });
             }
             set({ isLoadingUsers: false });
             return get().users;
@@ -508,6 +551,17 @@ const useAdminStore = create(
           usersLastLoadedAt: Date.now(),
         }));
 
+        get().appendAdminActivity({
+          action: 'user_status_updated',
+          title: 'تحديث حالة مستخدم',
+          description: `تم تحديث حالة ${target?.name || userId} إلى ${nextStatus}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: nextStatus,
+          source: 'user_management',
+        });
+
         if (nextStatus === 'approved') {
           useNotificationStore.getState().addNotification({
             title: 'تمت الموافقة على الحساب',
@@ -548,6 +602,17 @@ const useAdminStore = create(
           get().getUserWalletTransactions(userId, { force: true }),
         ]);
 
+        get().appendAdminActivity({
+          action: 'user_coins_added',
+          title: 'إضافة رصيد لمستخدم',
+          description: `تمت إضافة ${normalizeMoneyAmount(amountToAdd)} إلى رصيد المستخدم ${userId}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: 'created',
+          source: 'wallet_adjustment',
+        });
+
         if (typeof onSelfUpdate === 'function') onSelfUpdate();
         return apiResult;
       },
@@ -567,6 +632,17 @@ const useAdminStore = create(
           get().getUserWallet(userId, { force: true }),
           get().getUserWalletTransactions(userId, { force: true }),
         ]);
+
+        get().appendAdminActivity({
+          action: 'user_balance_set',
+          title: 'تعديل رصيد مستخدم',
+          description: `تم ضبط رصيد ${userId} إلى ${normalizedBalance}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: 'updated',
+          source: 'wallet_adjustment',
+        });
 
         if (typeof onSelfUpdate === 'function') onSelfUpdate();
         return updatedUser;
@@ -597,9 +673,7 @@ const useAdminStore = create(
           usersLastLoadedAt: Date.now(),
         }));
 
-        try {
-          localStorage.removeItem('products-storage');
-        } catch (_) { /* ignore if storage is unavailable */ }
+        // No persistent storage to clear: runtime-only state now.
 
         try {
           const useAuthStore = (await import('./useAuthStore')).default;
@@ -615,6 +689,17 @@ const useAdminStore = create(
           }
         } catch (_) { /* ignore if auth store unavailable */ }
 
+        get().appendAdminActivity({
+          action: 'user_group_updated',
+          title: 'تغيير مجموعة مستخدم',
+          description: `تم تغيير مجموعة ${updatedUser?.name || userId} إلى ${updatedUser?.groupName || updatedUser?.group || groupName || 'غير محدد'}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: 'updated',
+          source: 'user_management',
+        });
+
         return updatedUser;
       },
 
@@ -626,6 +711,17 @@ const useAdminStore = create(
           )),
           usersLastLoadedAt: Date.now(),
         }));
+
+        get().appendAdminActivity({
+          action: 'user_role_updated',
+          title: 'تغيير دور مستخدم',
+          description: `تم تغيير دور ${updatedUser?.name || userId} إلى ${updatedUser?.role || newRole}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: 'updated',
+          source: 'user_management',
+        });
         return updatedUser;
       },
 
@@ -638,6 +734,17 @@ const useAdminStore = create(
           )),
           usersLastLoadedAt: Date.now(),
         }));
+
+        get().appendAdminActivity({
+          action: 'user_permissions_updated',
+          title: 'تحديث صلاحيات مستخدم',
+          description: `تم تحديث صلاحيات ${updated?.name || userId}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: 'updated',
+          source: 'user_management',
+        });
         return updated;
       },
 
@@ -689,6 +796,17 @@ const useAdminStore = create(
           }
         } catch (_) { /* ignore if auth store unavailable */ }
 
+        get().appendAdminActivity({
+          action: 'user_currency_updated',
+          title: 'تغيير عملة مستخدم',
+          description: `تم تغيير عملة ${updatedCurrencyUser?.name || normalizedUserId} إلى ${nextCurrencyCode}`,
+          actor,
+          entityType: 'user',
+          entityId: normalizedUserId,
+          status: 'updated',
+          source: 'user_management',
+        });
+
         return updatedCurrencyUser;
       },
 
@@ -727,6 +845,17 @@ const useAdminStore = create(
           }
         } catch (_) { /* ignore if auth store unavailable */ }
 
+        get().appendAdminActivity({
+          action: 'user_credit_limit_updated',
+          title: 'تعديل الحد الائتماني',
+          description: `تم تعديل الحد الائتماني للمستخدم ${userId} إلى ${normalizedCreditLimit}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: 'updated',
+          source: 'user_management',
+        });
+
         return updatedUser;
       },
 
@@ -753,6 +882,17 @@ const useAdminStore = create(
           userWalletTransactions: removeRecordKey(state.userWalletTransactions, normalizedUserId),
           walletTransactionsLastLoadedAt: removeRecordKey(state.walletTransactionsLastLoadedAt, normalizedUserId),
         }));
+
+        get().appendAdminActivity({
+          action: 'user_deleted',
+          title: 'حذف مستخدم',
+          description: `تم حذف ${targetUser?.name || userId}`,
+          actor,
+          entityType: 'user',
+          entityId: normalizedUserId,
+          status: 'deleted',
+          source: 'user_management',
+        });
       },
 
       restoreUser: async (userId, actor = null) => {
@@ -769,6 +909,17 @@ const useAdminStore = create(
           usersLastLoadedAt: Date.now(),
         }));
 
+        get().appendAdminActivity({
+          action: 'user_restored',
+          title: 'استرجاع مستخدم',
+          description: `تم استرجاع ${restoredUser?.name || userId}`,
+          actor,
+          entityType: 'user',
+          entityId: normalizedUserId,
+          status: 'restored',
+          source: 'user_management',
+        });
+
         return restoredUser;
       },
 
@@ -780,6 +931,17 @@ const useAdminStore = create(
           )),
           usersLastLoadedAt: Date.now(),
         }));
+
+        get().appendAdminActivity({
+          action: 'user_avatar_updated',
+          title: 'تحديث صورة المستخدم',
+          description: `تم تحديث صورة ${userId}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: 'updated',
+          source: 'user_management',
+        });
 
         if (typeof onSelfUpdate === 'function') onSelfUpdate();
       },
@@ -793,23 +955,21 @@ const useAdminStore = create(
           usersLastLoadedAt: Date.now(),
         }));
 
+        get().appendAdminActivity({
+          action: 'user_profile_updated',
+          title: 'تحديث بيانات المستخدم',
+          description: `تم تحديث بيانات ${updatedUser?.name || userId}`,
+          actor,
+          entityType: 'user',
+          entityId: userId,
+          status: 'updated',
+          source: 'user_management',
+        });
+
         if (typeof onSelfUpdate === 'function') onSelfUpdate(updatedUser);
       },
 
       resetUserPassword: async (userId, actor = null, password = '') => apiClient.users.resetPassword(userId, actor, password),
-    }),
-    {
-      name: 'admin-ui-storage',
-      getStorage: () => localStorage,
-      partialize: (state) => ({
-        // Only persist UI preferences and cache timestamps — NOT sensitive data.
-        // users, deletedUsers, wallets, userWalletTransactions contain PII and
-        // financial data that must not leak through localStorage.
-        usersLastLoadedAt: state.usersLastLoadedAt,
-        walletsLastLoadedAt: state.walletsLastLoadedAt,
-      }),
-    }
-  )
-);
+}));
 
 export default useAdminStore;

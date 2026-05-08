@@ -225,6 +225,23 @@
     animation: shimmer 100s infinite;
   }
 
+  @keyframes digitech-logo-float {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    50% {
+      transform: translate3d(0, -5px, 0) scale(1.01);
+    }
+  }
+
+  .digitech-logo-float {
+    animation: digitech-logo-float 7s ease-in-out infinite;
+    transform-origin: center;
+    will-change: transform;
+  }
+
   .premium-card {
     border: 1px solid rgb(var(--color-border-rgb) / 0.78);
     border-radius: var(--radius-xl);
@@ -636,6 +653,15 @@
   :root:not(.dark) .header-wallet-balance {
     background-image: linear-gradient(120deg, #5b3a0c 0%, #9a6618 34%, #c08a2c 58%, #6f4610 100%) !important;
     filter: drop-shadow(0 1px 0 rgb(255 253 247 / 0.86));
+  }
+
+  :root:not(.dark) .header-mobile-brand-ms {
+    background-image: linear-gradient(120deg, #5b3a0c 0%, #9a6618 34%, #c08a2c 58%, #6f4610 100%) !important;
+    filter: drop-shadow(0 1px 0 rgb(255 253 247 / 0.86));
+  }
+
+  :root:not(.dark) .header-mobile-brand-store {
+    color: #6b5736 !important;
   }
 
   :root:not(.dark) .premium-card,
@@ -1257,6 +1283,11 @@
   .ambient-background__glow,
   .ambient-background__particle {
     animation: none;
+  }
+
+  .digitech-logo-float {
+    animation: none;
+    transform: none;
   }
 }
 

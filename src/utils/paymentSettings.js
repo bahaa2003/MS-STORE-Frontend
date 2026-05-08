@@ -30,58 +30,27 @@ const normalizeFeePercent = (value) => {
 export const getPaymentFieldsForType = (type = 'mobile_wallet') =>
   PAYMENT_METHOD_FIELDS[type] || PAYMENT_METHOD_FIELDS.mobile_wallet;
 
-export const createDefaultPaymentGroups = () => [
-  {
-    id: 'egypt-transfer',
-    name: 'تحويل مصر',
-    description: 'فودافون كاش واتصالات كاش وأورنج كاش والتحويل البنكي',
-    currency: '',
-    isActive: true,
-    methods: [
-      {
-        id: 'vodafone',
-        name: 'فودافون كاش',
-        description: 'الدفع من خلال فودافون كاش',
-        type: 'mobile_wallet',
-        accountNumber: '01012345678',
-        feePercent: 0,
-        instructions: 'حوّل المبلغ ثم ارفع صورة الإيصال',
-        isActive: true,
-      },
-      {
-        id: 'etisalat',
-        name: 'اتصالات كاش',
-        description: 'الدفع من خلال اتصالات كاش',
-        type: 'mobile_wallet',
-        accountNumber: '01112345678',
-        feePercent: 0,
-        instructions: 'حوّل المبلغ ثم ارفع صورة الإيصال',
-        isActive: true,
-      },
-      {
-        id: 'orange',
-        name: 'أورنج كاش',
-        description: 'الدفع من خلال أورنج كاش',
-        type: 'mobile_wallet',
-        accountNumber: '01212345678',
-        feePercent: 0,
-        instructions: 'حوّل المبلغ ثم ارفع صورة الإيصال',
-        isActive: true,
-      },
-      {
-        id: 'bank',
-        name: 'تحويل بنكي',
-        description: 'الدفع من خلال التحويل البنكي',
-        type: 'bank_transfer',
-        accountNumber: 'EG123456789012345678901234567890',
-        bankName: 'National Bank of Egypt',
-        feePercent: 0,
-        instructions: 'حوّل المبلغ للحساب البنكي ثم ارفع صورة الإيصال.',
-        isActive: true,
-      },
-    ],
-  },
-];
+export const createDefaultPaymentGroups = () => [];
+
+export const normalizePaymentMethodToken = (value) =>
+  String(value || '').trim().toLowerCase();
+
+const PAYMENT_METHOD_ALIASES = {
+  'vodafone cash': ['vodafone', 'فودافون كاش'],
+  vodafone: ['vodafone cash', 'فودافون كاش'],
+  'فودافون كاش': ['vodafone', 'vodafone cash'],
+  instapay: ['insta pay', 'إنستا باي'],
+  'insta pay': ['instapay', 'إنستا باي'],
+  'إنستا باي': ['instapay', 'insta pay'],
+  binance: ['بينانس'],
+  'بينانس': ['binance'],
+};
+
+const getPaymentMethodTokenVariants = (value) => {
+  const token = normalizePaymentMethodToken(value);
+  if (!token) return [];
+  return [token, ...(PAYMENT_METHOD_ALIASES[token] || []).map(normalizePaymentMethodToken)];
+};
 
 export const normalizePaymentMethod = (method = {}, index = 0) => {
   const type = ALLOWED_METHOD_TYPES.includes(method?.type) ? method.type : 'mobile_wallet';
@@ -137,17 +106,44 @@ export const normalizePaymentGroups = (groups, { fallbackToDefault = true } = {}
   return fallbackToDefault ? createDefaultPaymentGroups() : [];
 };
 
-export const getActivePaymentGroups = (settings) =>
-  normalizePaymentGroups(settings?.paymentGroups).map((group) => ({
+export const getActivePaymentGroups = (settings, options = {}) =>
+  normalizePaymentGroups(settings?.paymentGroups, options).map((group) => ({
     ...group,
     methods: group.methods.filter((method) => method.isActive !== false),
   })).filter((group) => group.isActive !== false && group.methods.length > 0);
 
-export const findPaymentMethodById = (settings, methodId) => {
+export const getActivePaymentMethods = (settings, options = {}) =>
+  getActivePaymentGroups(settings, options).flatMap((group) => (
+    group.methods.map((method) => ({
+      ...method,
+      groupId: group.id,
+      groupName: group.name,
+      groupCurrency: group.currency,
+    }))
+  ));
+
+export const isPaymentMethodAllowed = (method, allowedValues = []) => {
+  const allowedTokens = new Set(
+    (Array.isArray(allowedValues) ? allowedValues : [])
+      .flatMap(getPaymentMethodTokenVariants)
+      .filter(Boolean)
+  );
+
+  if (!allowedTokens.size) return false;
+
+  return [
+    method?.id,
+    method?.name,
+    method?.paymentMethod,
+    method?.paymentMethodName,
+  ].some((value) => getPaymentMethodTokenVariants(value).some((token) => allowedTokens.has(token)));
+};
+
+export const findPaymentMethodById = (settings, methodId, options = {}) => {
   const targetId = String(methodId || '').trim();
   if (!targetId) return null;
 
-  const groups = normalizePaymentGroups(settings?.paymentGroups);
+  const groups = normalizePaymentGroups(settings?.paymentGroups, options);
   for (const group of groups) {
     if (group.isActive === false) continue;
     const method = group.methods.find((item) => item.id === targetId && item.isActive !== false);

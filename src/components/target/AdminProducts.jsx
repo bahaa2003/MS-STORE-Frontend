@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Edit3, ImagePlus, Plus, Trash2 } from 'lucide-react';
+import { resolveImageUrl } from '../../utils/imageUrl';
+import coinsImage from '../../assets/عملات.PNG';
 import Button, { cn } from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import UploadProof from './UploadProof';
 import { formatNumber } from '../../utils/intl';
+import { isPaymentMethodAllowed } from '../../utils/paymentSettings';
 
 const ProductModal = ({ isOpen, onClose, product, paymentMethods, onSave }) => {
   const [name, setName] = useState('');
@@ -14,10 +17,17 @@ const ProductModal = ({ isOpen, onClose, product, paymentMethods, onSave }) => {
 
   useEffect(() => {
     if (!isOpen) return;
+    const allowedValues = product?.allowedPaymentMethods || product?.paymentMethodIds || [];
+    const selectedIds = product
+      ? paymentMethods
+          .filter((method) => isPaymentMethodAllowed(method, allowedValues))
+          .map((method) => method.id)
+      : paymentMethods.map((method) => method.id);
+
     setName(product?.name || '');
     setUnitPrice(product?.unitPrice ? String(product.unitPrice) : '');
     setImage(product?.image ? { preview: product.image, fileName: 'صورة التطبيق' } : null);
-    setPaymentMethodIds(product?.allowedPaymentMethods || product?.paymentMethodIds || paymentMethods.map((method) => method.id));
+    setPaymentMethodIds(selectedIds);
   }, [isOpen, paymentMethods, product]);
 
   const togglePayment = (id) => {
@@ -49,7 +59,9 @@ const ProductModal = ({ isOpen, onClose, product, paymentMethods, onSave }) => {
       footer={(
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={onClose}>إلغاء</Button>
-          <Button type="button" onClick={handleSave}>{product ? 'حفظ التعديل' : 'حفظ التطبيق'}</Button>
+          <Button type="button" onClick={handleSave} disabled={!paymentMethods.length || !paymentMethodIds.length}>
+            {product ? 'حفظ التعديل' : 'حفظ التطبيق'}
+          </Button>
         </div>
       )}
     >
@@ -63,26 +75,32 @@ const ProductModal = ({ isOpen, onClose, product, paymentMethods, onSave }) => {
 
         <div>
           <p className="mb-2 text-sm font-semibold text-[var(--color-text)]">طرق الدفع المتاحة</p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {paymentMethods.map((method) => {
-              const checked = paymentMethodIds.includes(method.id);
-              return (
-                <button
-                  key={method.id}
-                  type="button"
-                  onClick={() => togglePayment(method.id)}
-                  className={cn(
-                    'rounded-2xl border px-4 py-3 text-sm font-bold transition hover:-translate-y-0.5',
-                    checked
-                      ? 'border-[color:rgb(var(--color-primary-rgb)/0.62)] bg-[color:rgb(var(--color-primary-rgb)/0.12)] text-[var(--color-primary)]'
-                      : 'border-[color:rgb(var(--color-border-rgb)/0.82)] bg-[color:rgb(var(--color-card-rgb)/0.72)] text-[var(--color-text-secondary)]'
-                  )}
-                >
-                  {method.name}
-                </button>
-              );
-            })}
-          </div>
+          {paymentMethods.length ? (
+            <div className="grid gap-2 sm:grid-cols-3">
+              {paymentMethods.map((method) => {
+                const checked = paymentMethodIds.includes(method.id);
+                return (
+                  <button
+                    key={method.id}
+                    type="button"
+                    onClick={() => togglePayment(method.id)}
+                    className={cn(
+                      'rounded-2xl border px-4 py-3 text-sm font-bold transition hover:-translate-y-0.5',
+                      checked
+                        ? 'border-[color:rgb(var(--color-primary-rgb)/0.62)] bg-[color:rgb(var(--color-primary-rgb)/0.12)] text-[var(--color-primary)]'
+                        : 'border-[color:rgb(var(--color-border-rgb)/0.82)] bg-[color:rgb(var(--color-card-rgb)/0.72)] text-[var(--color-text-secondary)]'
+                    )}
+                  >
+                    {method.name}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[color:rgb(var(--color-border-rgb)/0.82)] p-4 text-sm text-[var(--color-text-secondary)]">
+              لا توجد طرق دفع مفعّلة من لوحة طرق الدفع حاليًا.
+            </div>
+          )}
         </div>
       </div>
     </Modal>
@@ -132,10 +150,10 @@ const AdminProducts = ({ products, paymentMethods, onAdd, onUpdate, onDelete }) 
           >
             <div className="relative h-40 overflow-hidden">
               {product.image ? (
-                <img src={product.image} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                <img src={resolveImageUrl(product.image)} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-[color:rgb(var(--color-surface-rgb)/0.78)] text-[var(--color-primary)]">
-                  <ImagePlus className="h-9 w-9" />
+                  <img src={coinsImage} alt="عملات" className="h-20 w-20 object-contain" />
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent" />
@@ -148,7 +166,7 @@ const AdminProducts = ({ products, paymentMethods, onAdd, onUpdate, onDelete }) 
                     {formatNumber(product.unitPrice, 'en-US', { maximumFractionDigits: 2 })} EGP
                   </p>
                   {product.isActive === false ? (
-                    <p className="mt-1 text-xs font-bold text-[var(--color-error)]">Inactive</p>
+                    <p className="mt-1 text-xs font-bold text-[var(--color-error)]">غير نشط</p>
                   ) : null}
                 </div>
                 <div className="flex gap-2">
@@ -162,7 +180,7 @@ const AdminProducts = ({ products, paymentMethods, onAdd, onUpdate, onDelete }) 
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {paymentMethods
-                  .filter((method) => (product.allowedPaymentMethods || product.paymentMethodIds || []).includes(method.id))
+                  .filter((method) => isPaymentMethodAllowed(method, product.allowedPaymentMethods || product.paymentMethodIds || []))
                   .map((method) => (
                     <span key={method.id} className="rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.2)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] px-3 py-1 text-xs font-bold text-[var(--color-primary)]">
                       {method.name}

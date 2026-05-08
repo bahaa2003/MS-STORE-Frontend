@@ -71,8 +71,8 @@ const AdminGroups = () => {
   const { addToast } = useToast();
 
   useEffect(() => {
-    loadGroups();
-    loadUsers();
+    loadGroups({ force: true });
+    loadUsers({ force: true });
   }, [loadGroups, loadUsers]);
 
   const editingMembers = editingGroup ? getGroupMembers(editingGroup, users) : [];

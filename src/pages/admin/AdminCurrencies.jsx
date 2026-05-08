@@ -5,6 +5,7 @@ import useAuthStore from '../../store/useAuthStore';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import ConfirmDialog from '../../components/account/ConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import { useToast } from '../../components/ui/Toast';
 
@@ -29,6 +30,7 @@ const AdminCurrencies = () => {
   const [catalogCurrencies, setCatalogCurrencies] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [selectedCatalogCode, setSelectedCatalogCode] = useState('');
+  const [deleteCurrencyCode, setDeleteCurrencyCode] = useState('');
 
   // Compute rate change percentage dynamically (bidirectional)
   const rateChangePercent = useMemo(() => {
@@ -196,12 +198,16 @@ const AdminCurrencies = () => {
   };
 
   const handleDelete = async (code) => {
-    const ok = window.confirm(`هل تريد حذف العملة ${code}؟`);
-    if (!ok) return;
+    setDeleteCurrencyCode(code);
+  };
 
+  const confirmDeleteCurrency = async () => {
+    const code = deleteCurrencyCode;
+    if (!code) return;
     try {
       await deleteCurrency(code, user);
       addToast('تم حذف العملة', 'success');
+      setDeleteCurrencyCode('');
       if (editingCode === code) resetForm();
     } catch (error) {
       addToast(error?.message || 'فشل حذف العملة', 'error');
@@ -368,6 +374,17 @@ const AdminCurrencies = () => {
           </TableBody>
         </Table>
       </Card>
+
+      <ConfirmDialog
+        open={Boolean(deleteCurrencyCode)}
+        title="حذف العملة"
+        description={deleteCurrencyCode ? `هل تريد حذف العملة ${deleteCurrencyCode}؟` : ''}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        onConfirm={confirmDeleteCurrency}
+        onCancel={() => setDeleteCurrencyCode('')}
+        isLoading={isLoadingCurrencies}
+      />
     </div>
   );
 };

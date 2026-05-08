@@ -29,7 +29,6 @@ const CUSTOMER_SIDEBAR_PATHS = new Set([
 ]);
 
 const MANAGER_SIDEBAR_PATHS = new Set([
-  '/admin/dashboard',
   '/admin/users',
   '/admin/orders',
   '/admin/groups',
@@ -48,7 +47,7 @@ const pathnameHistory = [];
 
 export const getDashboardPathForRole = (role) => {
   if (isAdminRole(role)) return '/admin/dashboard';
-  if (isSupervisorRole(role)) return '/admin/dashboard';
+  if (isSupervisorRole(role)) return '/admin/orders';
   return '/dashboard';
 };
 

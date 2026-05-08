@@ -34,6 +34,7 @@ import { COUNTRY_CATALOG } from '../data/countryCatalog';
 import { getDefaultRouteForRole } from '../utils/authRoles';
 import { getAccountAccessRoute, normalizeAccountStatus } from '../utils/accountStatus';
 import brandIconImage from '../assets/ms-removebg-preview.png';
+import coinsImage from '../assets/عملات.PNG';
 import styles from './Auth.module.css';
 
 const GoogleMark = () => (
@@ -608,7 +609,7 @@ const countryOptions = useMemo(() => {
           <section className={styles.formCard} data-auth-no-sparkle>
             <form onSubmit={handleSubmit} className={styles.formStack}>
               {!isLogin && (
-                <div className={styles.stepProgress} aria-label="Register progress">
+                <div className={styles.stepProgress} aria-label="تقدم التسجيل">
                   {[
                     { index: 1, label: 'البيانات الأساسية' },
                     { index: 2, label: 'إعداد الحساب' },
@@ -992,6 +993,13 @@ const countryOptions = useMemo(() => {
             <div className={styles.visualLogo}>
               <img src={brandIconImage} alt="" />
             </div>
+            <img
+              src={coinsImage}
+              alt="عملات"
+              loading="eager"
+              decoding="async"
+              className="mx-auto h-8 w-auto object-contain"
+            />
             <span className={styles.visualKicker}>MS STORE</span>
             <h2>{isLogin ? modeConfig.description : modeConfig.heading}</h2>
             <p>{modeConfig.description}</p>

@@ -60,6 +60,20 @@ const OrderDetailsDrawer = ({
   const customerFeedback = view === 'customer'
     ? getCustomerOrderFeedback(order, isArabic ? 'ar' : 'en')
     : null;
+  const customerName = order?.customerName || order?.userName || order?.userRecord?.name || '';
+  const customerEmail = order?.customerEmail || order?.userEmail || order?.userRecord?.email || '';
+  const customerAvatar = order?.customerAvatar || order?.userRecord?.avatar || '';
+  const customerSiteId = order?.userId || order?.userRecord?.id || order?.userRecord?._id || '';
+  const copyToClipboard = async (value) => {
+    const text = String(value || '').trim();
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Ignore clipboard failures.
+    }
+  };
   const orderNumber = order?.siteOrderNumber || order?.orderNumber || '';
 
   useEffect(() => {
@@ -213,20 +227,40 @@ const OrderDetailsDrawer = ({
                         </div>
 
                         {view === 'admin' ? (
-                          <div className="rounded-[1rem] border border-[color:rgb(var(--color-border-rgb)/0.88)] bg-[color:rgb(var(--color-card-rgb)/0.78)] px-3 py-2.5">
+                          <div className="rounded-[1rem] border border-[color:rgb(var(--color-border-rgb)/0.88)] bg-[color:rgb(var(--color-card-rgb)/0.78)] px-3 py-3">
                             <div className="flex items-center gap-3">
-                              <img
-                                src={order.customerAvatar}
-                                alt={order.customerName}
-                                loading="lazy"
-                                decoding="async"
-                                referrerPolicy="no-referrer"
-                                className="h-10 w-10 rounded-full border border-[color:rgb(var(--color-border-rgb)/0.9)] object-cover"
-                              />
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-[var(--color-text)]">{order.customerName}</p>
-                                {order.customerEmail ? (
-                                  <p className="truncate text-[11px] text-[var(--color-muted)]">{order.customerEmail}</p>
+                              {customerAvatar ? (
+                                <img
+                                  src={customerAvatar}
+                                  alt={customerName}
+                                  loading="lazy"
+                                  decoding="async"
+                                  referrerPolicy="no-referrer"
+                                  className="h-10 w-10 rounded-full border border-[color:rgb(var(--color-border-rgb)/0.9)] object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-primary-rgb)/0.1)] text-xs font-black text-[var(--color-primary)]">
+                                  {String(customerName || 'U').trim().slice(0, 1).toUpperCase() || 'U'}
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-[var(--color-text)]">{customerName || (isArabic ? 'عميل غير معروف' : 'Unknown customer')}</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--color-muted)]">
+                                  <button type="button" onClick={() => copyToClipboard(customerName)} className="max-w-full truncate hover:text-[var(--color-primary)]">
+                                    {isArabic ? 'اسم الحساب:' : 'Account name:'} {customerName || '-'}
+                                  </button>
+                                  <button type="button" onClick={() => copyToClipboard(customerSiteId)} className="max-w-full truncate hover:text-[var(--color-primary)]">
+                                    {isArabic ? 'المعرف:' : 'ID:'} {customerSiteId || '-'}
+                                  </button>
+                                </div>
+                                {customerEmail ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(customerEmail)}
+                                    className="mt-1 block truncate text-[11px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                                  >
+                                    {customerEmail}
+                                  </button>
                                 ) : null}
                               </div>
                             </div>

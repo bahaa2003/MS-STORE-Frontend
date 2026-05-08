@@ -11,14 +11,47 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { formatDateTime } from '../../utils/intl';
 
 const SUPERVISOR_ROLES = new Set(['manager', 'moderator']);
+const MONITORED_ROLES = new Set(['admin', 'supervisor', 'manager', 'moderator', 'super_admin', 'superuser']);
+const ORDER_TARGET_ENTITY_TYPES = new Set(['order', 'target_order', 'target']);
+const TOPUP_ENTITY_TYPES = new Set(['deposit', 'topup']);
+const ORDER_TARGET_ACTIONS = new Set([
+  'TARGET_ORDER_APPROVED',
+  'TARGET_ORDER_REJECTED',
+  'ADMIN_ORDER_COMPLETED',
+  'ADMIN_ORDER_REFUNDED',
+  'ORDER_REFUNDED',
+  'ORDER_COMPLETED',
+  'ORDER_FAILED',
+]);
+const TOPUP_PAYMENT_ACTIONS = new Set([
+  'DEPOSIT_REQUESTED',
+  'DEPOSIT_APPROVED',
+  'DEPOSIT_REJECTED',
+  'DEPOSIT_UPDATED',
+  'TOPUP_CREATED',
+  'TOPUP_PENDING',
+  'TOPUP_APPROVED',
+  'TOPUP_REJECTED',
+  'TOPUP_UPDATED',
+]);
 
 const getId = (value) => String(value?._id || value?.id || value || '').trim();
+const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+const normalizeAction = (value) => String(value || '').trim().toUpperCase();
+const normalizeEntityType = (value) => String(value || '').trim().toLowerCase();
 
 const getActorName = (actorId, usersById, fallback = '') => {
   const normalizedId = getId(actorId);
   if (!normalizedId) return fallback || 'System';
   const actor = usersById.get(normalizedId);
   return actor?.name || actor?.email || fallback || normalizedId;
+};
+
+const getActorRole = (actorId, usersById, fallback = '') => {
+  const normalizedId = getId(actorId);
+  if (!normalizedId) return String(fallback || '').trim().toLowerCase();
+  const actor = usersById.get(normalizedId);
+  return String(actor?.role || fallback || '').trim().toLowerCase();
 };
 
 const getStatusVariant = (value) => {
@@ -29,12 +62,59 @@ const getStatusVariant = (value) => {
   return 'info';
 };
 
+const buildEntityContext = ({ entityType, entityId, metadata }) => {
+  const details = asObject(metadata);
+  const normalizedType = normalizeEntityType(entityType);
+
+  const orderId = getId(details.orderId || details.order || details.orderNumber);
+  const targetId = getId(details.targetOrderId || details.targetId);
+  const depositId = getId(details.depositId || details.topupId || details.requestId);
+  const userId = getId(details.userId || details.customerId || details.customer);
+  const appId = getId(details.appId);
+
+  if (normalizedType === 'target_order' || normalizedType === 'target') {
+    const primary = targetId || orderId || entityId || '-';
+    return {
+      typeLabel: 'TARGET_ORDER',
+      primary,
+      secondary: userId ? `User: ${userId}` : (appId ? `App: ${appId}` : ''),
+    };
+  }
+
+  if (normalizedType === 'order') {
+    const primary = orderId || entityId || '-';
+    return {
+      typeLabel: 'ORDER',
+      primary,
+      secondary: userId ? `User: ${userId}` : '',
+    };
+  }
+
+  if (normalizedType === 'deposit' || normalizedType === 'topup') {
+    const primary = depositId || entityId || '-';
+    return {
+      typeLabel: 'DEPOSIT',
+      primary,
+      secondary: userId ? `User: ${userId}` : '',
+    };
+  }
+
+  return {
+    typeLabel: String(entityType || 'system').toUpperCase(),
+    primary: entityId || '-',
+    secondary: userId ? `User: ${userId}` : '',
+  };
+};
+
 const normalizeAuditLog = (log, usersById) => {
   const action = log.action || log.event || log.type || 'activity';
   const entityType = log.entityType || log.targetType || log.resourceType || 'system';
   const entityId = log.entityId || log.targetId || log.orderId || log.userId || log.supplierId || '';
   const actorId = log.actorId || log.actor || log.performedBy || log.createdBy || '';
   const actorName = log.actorName || log.performedByName || getActorName(actorId, usersById);
+  const actorRole = log.actorRole || getActorRole(actorId, usersById, log.actorRole || '');
+  const metadata = asObject(log.metadata || log.details || log.data || log.newSummary);
+  const context = buildEntityContext({ entityType, entityId: getId(entityId), metadata });
 
   return {
     id: log.id || `${action}-${entityType}-${entityId}-${log.createdAt || Date.now()}`,
@@ -43,8 +123,13 @@ const normalizeAuditLog = (log, usersById) => {
     description: log.description || log.message || log.newSummary?.message || '',
     actorId: getId(actorId),
     actorName,
+    actorRole,
     entityType,
     entityId: getId(entityId),
+    metadata,
+    contextType: context.typeLabel,
+    contextPrimary: context.primary,
+    contextSecondary: context.secondary,
     status: log.status || action,
     createdAt: log.createdAt || log.date || new Date().toISOString(),
     source: 'audit',
@@ -53,55 +138,71 @@ const normalizeAuditLog = (log, usersById) => {
 
 const buildFallbackLogs = ({ users, orders, topups }) => {
   const usersById = new Map((users || []).map((user) => [String(user.id), user]));
+  const getRole = (actorId) => getActorRole(actorId, usersById);
   const logs = [];
 
   (orders || []).forEach((order) => {
     const creatorId = order.createdBy || order.userId;
-    logs.push({
-      id: `order-created-${order.id}`,
-      action: 'order_created',
+      logs.push({
+        id: `order-created-${order.id}`,
+        action: 'order_created',
       title: 'طلب جديد',
       description: order.productName || order.productNameAr || order.productId || '',
       actorId: getId(creatorId),
       actorName: getActorName(creatorId, usersById, order.userName),
-      entityType: 'order',
-      entityId: order.id,
-      status: 'created',
-      createdAt: order.createdAt || order.date || new Date().toISOString(),
-      source: 'orders',
+      actorRole: getRole(creatorId),
+        entityType: 'order',
+        entityId: order.id,
+        metadata: {
+          orderId: order.id,
+          userId: order.userId || creatorId,
+        },
+        status: 'created',
+        createdAt: order.createdAt || order.date || new Date().toISOString(),
+        source: 'orders',
     });
 
     const reviewerId = order.reviewedBy || order.approvedBy || order.rejectedBy || order.updatedBy;
     if (reviewerId || order.reviewerName) {
-      logs.push({
-        id: `order-reviewed-${order.id}`,
-        action: `order_${order.status || 'updated'}`,
+        logs.push({
+          id: `order-reviewed-${order.id}`,
+          action: `order_${order.status || 'updated'}`,
         title: 'مراجعة طلب',
         description: `تم تحديث حالة الطلب إلى ${order.status || 'updated'}`,
         actorId: getId(reviewerId),
         actorName: order.reviewerName || getActorName(reviewerId, usersById),
-        entityType: 'order',
-        entityId: order.id,
-        status: order.status || 'updated',
-        createdAt: order.updatedAt || order.reviewedAt || order.createdAt || new Date().toISOString(),
-        source: 'orders',
+        actorRole: getRole(reviewerId),
+          entityType: 'order',
+          entityId: order.id,
+          metadata: {
+            orderId: order.id,
+            userId: order.userId || creatorId,
+          },
+          status: order.status || 'updated',
+          createdAt: order.updatedAt || order.reviewedAt || order.createdAt || new Date().toISOString(),
+          source: 'orders',
       });
     }
   });
 
   (topups || []).forEach((topup) => {
-    logs.push({
-      id: `topup-created-${topup.id}`,
-      action: 'topup_created',
+      logs.push({
+        id: `topup-created-${topup.id}`,
+        action: 'topup_created',
       title: 'طلب شحن جديد',
       description: topup.paymentChannel || topup.method || '',
       actorId: getId(topup.createdBy || topup.userId),
       actorName: getActorName(topup.createdBy || topup.userId, usersById, topup.userName),
-      entityType: 'topup',
-      entityId: topup.id,
-      status: 'created',
-      createdAt: topup.createdAt || topup.date || new Date().toISOString(),
-      source: 'topups',
+      actorRole: getRole(topup.createdBy || topup.userId),
+        entityType: 'topup',
+        entityId: topup.id,
+        metadata: {
+          depositId: topup.id,
+          userId: topup.userId,
+        },
+        status: 'created',
+        createdAt: topup.createdAt || topup.date || new Date().toISOString(),
+        source: 'topups',
     });
 
     const reviewerId = topup.reviewedBy || topup.approvedBy || topup.rejectedBy || topup.updatedBy;
@@ -113,8 +214,13 @@ const buildFallbackLogs = ({ users, orders, topups }) => {
         description: topup.adminNote || `تم تحديث حالة طلب الشحن إلى ${topup.status || 'updated'}`,
         actorId: getId(reviewerId),
         actorName: topup.reviewerName || getActorName(reviewerId, usersById),
+        actorRole: getRole(reviewerId),
         entityType: 'topup',
         entityId: topup.id,
+        metadata: {
+          depositId: topup.id,
+          userId: topup.userId,
+        },
         status: topup.status || 'updated',
         createdAt: topup.updatedAt || topup.reviewedAt || topup.createdAt || new Date().toISOString(),
         source: 'topups',
@@ -132,8 +238,12 @@ const buildFallbackLogs = ({ users, orders, topups }) => {
         description: `${supervisor.name || supervisor.email || supervisor.id}`,
         actorId: getId(supervisor.createdBy || supervisor.addedBy || supervisor.id),
         actorName: getActorName(supervisor.createdBy || supervisor.addedBy || supervisor.id, usersById, supervisor.name),
+        actorRole: getRole(supervisor.createdBy || supervisor.addedBy || supervisor.id),
         entityType: 'supervisor',
         entityId: supervisor.id,
+        metadata: {
+          userId: supervisor.id,
+        },
         status: supervisor.status || 'created',
         createdAt: supervisor.createdAt || supervisor.updatedAt || new Date().toISOString(),
         source: 'users',
@@ -144,7 +254,7 @@ const buildFallbackLogs = ({ users, orders, topups }) => {
 };
 
 const SupervisorMonitoring = () => {
-  const { users, loadUsers } = useAdminStore();
+  const { users, loadUsers, adminActivities } = useAdminStore();
   const { adminOrders, loadAdminOrders } = useOrderStore();
   const { topups, loadTopups } = useTopupStore();
   const [auditLogs, setAuditLogs] = useState([]);
@@ -182,15 +292,25 @@ const SupervisorMonitoring = () => {
 
   const rows = useMemo(() => {
     const auditRows = (auditLogs || []).map((log) => normalizeAuditLog(log, usersById));
+    const activityRows = (adminActivities || []).map((activity) => normalizeAuditLog(activity, usersById));
     const fallbackRows = buildFallbackLogs({ users, orders: adminOrders, topups });
-    const baseRows = auditRows.length ? auditRows : fallbackRows;
+    const baseRows = [...auditRows, ...activityRows, ...fallbackRows];
     const term = search.trim().toLowerCase();
 
     return baseRows
-      .filter((row) => sourceFilter === 'all' || row.entityType === sourceFilter || row.source === sourceFilter)
+      .filter((row, index, array) => array.findIndex((item) => item.id === row.id) === index)
+      .filter((row) => MONITORED_ROLES.has(String(row.actorRole || '').toLowerCase()) || row.source === 'admin_store' || row.source === 'audit')
+      .filter((row) => {
+        if (sourceFilter === 'all') return true;
+        const actionKey = normalizeAction(row.action);
+        const entityTypeKey = normalizeEntityType(row.entityType);
+        if (sourceFilter === 'orders') return ORDER_TARGET_ACTIONS.has(actionKey);
+        if (sourceFilter === 'payments') return TOPUP_PAYMENT_ACTIONS.has(actionKey) || TOPUP_ENTITY_TYPES.has(entityTypeKey);
+        return true;
+      })
       .filter((row) => {
         if (!term) return true;
-        return [row.title, row.description, row.actorName, row.entityType, row.entityId, row.status]
+        return [row.title, row.description, row.actorName, row.entityType, row.entityId, row.contextPrimary, row.contextSecondary, row.status, row.action]
           .some((value) => String(value || '').toLowerCase().includes(term));
       })
       .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
@@ -256,11 +376,8 @@ const SupervisorMonitoring = () => {
             className="h-10 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.82)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-primary)]"
           >
             <option value="all">كل العمليات</option>
-            <option value="order">الطلبات</option>
-            <option value="topup">الشحن والمدفوعات</option>
-            <option value="supervisor">المشرفين</option>
-            <option value="supplier">الموردين</option>
-            <option value="user">المستخدمين</option>
+            <option value="orders">الطلبات</option>
+            <option value="payments">الشحن والمدفوعات</option>
           </select>
         </div>
       </Card>
@@ -289,7 +406,7 @@ const SupervisorMonitoring = () => {
                   <TableCell>
                     <div className="flex items-start gap-2">
                       <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl bg-[color:rgb(var(--color-primary-rgb)/0.1)] text-[var(--color-primary)]">
-                        {row.entityType === 'order' ? <ClipboardList className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
+                        {ORDER_TARGET_ENTITY_TYPES.has(normalizeEntityType(row.entityType)) ? <ClipboardList className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
                       </span>
                       <div className="min-w-0">
                         <p className="font-semibold text-[var(--color-text)]">{row.title}</p>
@@ -309,8 +426,11 @@ const SupervisorMonitoring = () => {
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">{row.entityType}</span>
-                    <p className="mt-1 text-xs text-[var(--color-text)]">{row.entityId || '-'}</p>
+                    <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">{row.contextType || row.entityType}</span>
+                    <p className="mt-1 text-xs font-semibold text-[var(--color-text)]">{row.contextPrimary || row.entityId || '-'}</p>
+                    {row.contextSecondary ? (
+                      <p className="mt-1 text-[11px] text-[var(--color-text-secondary)]">{row.contextSecondary}</p>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={getStatusVariant(row.status)}>{row.status}</Badge>

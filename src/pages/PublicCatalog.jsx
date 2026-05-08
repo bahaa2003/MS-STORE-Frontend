@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -44,6 +44,24 @@ const SERVICE_NOTICE_KEY = 'ms-store-public-service-notice-seen';
 const COMMUNITY_NOTICE_KEY = 'ms-store-public-community-notice-seen';
 const WHATSAPP_COMMUNITY_LINK = 'https://chat.whatsapp.com/HMAlI6AfDndJ8VSMiqeHOs';
 
+const getSessionNoticeFlag = (key) => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return false;
+  try {
+    return window.sessionStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const setSessionNoticeFlag = (key) => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    window.sessionStorage.setItem(key, '1');
+  } catch {
+    // Best effort only; the modal still closes in-memory.
+  }
+};
+
 const GoogleMark = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4.5 w-4.5 shrink-0">
     <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.2-1.9 2.9l3.1 2.4c1.8-1.7 2.9-4.1 2.9-7 0-.7-.1-1.4-.2-2H12z" />
@@ -79,7 +97,6 @@ const PublicCatalog = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showServiceNotice, setShowServiceNotice] = useState(false);
   const [showCommunityNotice, setShowCommunityNotice] = useState(false);
-  const communityNoticeTimerRef = useRef(null);
 
   const language = getStorefrontLanguage(i18n);
   const isArabic = language === 'ar';
@@ -91,41 +108,35 @@ const PublicCatalog = () => {
   }, [isAuthenticated, navigate, userRole]);
 
   useEffect(() => {
-    loadProducts();
+    loadProducts({ force: true });
   }, [loadProducts]);
 
   useEffect(() => {
-    const hasSeenServiceNotice = localStorage.getItem(SERVICE_NOTICE_KEY) === 'true';
-    const hasSeenCommunityNotice = localStorage.getItem(COMMUNITY_NOTICE_KEY) === 'true';
+    const serviceSeen = getSessionNoticeFlag(SERVICE_NOTICE_KEY);
+    const communitySeen = getSessionNoticeFlag(COMMUNITY_NOTICE_KEY);
 
-    if (!hasSeenServiceNotice) {
+    if (!serviceSeen) {
       setShowServiceNotice(true);
-    } else if (!hasSeenCommunityNotice) {
-      communityNoticeTimerRef.current = window.setTimeout(() => {
-        setShowCommunityNotice(true);
-      }, 2000);
+      setShowCommunityNotice(false);
+      return;
     }
 
-    return () => {
-      if (communityNoticeTimerRef.current) {
-        window.clearTimeout(communityNoticeTimerRef.current);
-      }
-    };
+    if (!communitySeen) {
+      setShowServiceNotice(false);
+      setShowCommunityNotice(true);
+    }
   }, []);
 
   const handleCloseServiceNotice = useCallback(() => {
-    localStorage.setItem(SERVICE_NOTICE_KEY, 'true');
+    setSessionNoticeFlag(SERVICE_NOTICE_KEY);
     setShowServiceNotice(false);
-
-    if (localStorage.getItem(COMMUNITY_NOTICE_KEY) !== 'true') {
-      communityNoticeTimerRef.current = window.setTimeout(() => {
-        setShowCommunityNotice(true);
-      }, 2000);
+    if (!getSessionNoticeFlag(COMMUNITY_NOTICE_KEY)) {
+      setShowCommunityNotice(true);
     }
   }, []);
 
   const handleCloseCommunityNotice = useCallback(() => {
-    localStorage.setItem(COMMUNITY_NOTICE_KEY, 'true');
+    setSessionNoticeFlag(COMMUNITY_NOTICE_KEY);
     setShowCommunityNotice(false);
   }, []);
 
@@ -243,43 +254,34 @@ const PublicCatalog = () => {
       />
 
       {showServiceNotice && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 px-4 backdrop-blur-[5px]">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/58 px-4 backdrop-blur-[7px]">
           <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            initial={{ opacity: 0, y: 14, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-            className="relative w-full max-w-[21rem] overflow-hidden rounded-[1.45rem] border border-[color:rgb(var(--color-primary-rgb)/0.24)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.96),rgb(var(--color-elevated-rgb)/0.9))] p-4 text-center shadow-[0_26px_70px_-44px_rgb(var(--color-primary-rgb)/0.7)] backdrop-blur-2xl"
+            transition={{ type: 'spring', stiffness: 310, damping: 27 }}
+            className="relative w-full max-w-[20rem] overflow-visible rounded-[1.35rem] border border-[color:rgb(var(--color-warning-rgb)/0.24)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.98),rgb(var(--color-elevated-rgb)/0.92))] p-4 text-center shadow-[0_26px_70px_-44px_rgb(var(--color-warning-rgb)/0.62)] backdrop-blur-2xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="service-notice-title"
           >
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgb(var(--color-primary-rgb)/0.18),transparent_58%)]" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgb(var(--color-warning-rgb)/0.2),transparent_58%)]" />
 
-            <button
-              type="button"
-              onClick={handleCloseServiceNotice}
-              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] text-[var(--color-text-secondary)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.28)] hover:text-[var(--color-primary)]"
-              aria-label={isArabic ? 'إغلاق التنويه' : 'Close notice'}
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            <div className="relative mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[color:rgb(var(--color-primary-rgb)/0.12)] text-[var(--color-primary)] shadow-[0_14px_30px_-24px_rgb(var(--color-primary-rgb)/0.8)]">
+            <div className="relative mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[color:rgb(var(--color-warning-rgb)/0.24)] bg-[color:rgb(var(--color-warning-rgb)/0.12)] text-[var(--color-warning)] shadow-[0_14px_30px_-24px_rgb(var(--color-warning-rgb)/0.8)]">
               <AlertTriangle className="h-5.5 w-5.5" />
             </div>
 
             <div className="relative space-y-3">
-              <h2 id="service-notice-title" className="text-lg font-black leading-7 text-[var(--color-text)]">
+              <h2 id="service-notice-title" className="text-base font-black leading-7 text-[var(--color-text)]">
                 تنويه 📢📢 هام 💡💡
               </h2>
 
-              <div className="space-y-2 rounded-[1.1rem] border border-[color:rgb(var(--color-border-rgb)/0.58)] bg-[color:rgb(var(--color-surface-rgb)/0.5)] p-3 text-sm font-bold leading-6 text-[var(--color-text)]">
-                <p>لا يوجد استرداد لاي منتج لدينا 🚫🚫</p>
+              <div className="space-y-2 rounded-[1rem] border border-[color:rgb(var(--color-border-rgb)/0.58)] bg-[color:rgb(var(--color-surface-rgb)/0.52)] p-3 text-sm font-bold leading-6 text-[var(--color-text)]">
+                <p>لا يوجد استرداد لأي منتج لدينا 🚫🚫</p>
                 <p className="text-[var(--color-text-secondary)]">
                   يرجى قراءة شروط الخدمة 📠
                   <br />
-                  قبل اجراء اي عملية تحويل ♻️
+                  قبل إجراء أي عملية تحويل ♻️
                 </p>
               </div>
 
@@ -291,43 +293,43 @@ const PublicCatalog = () => {
                 موافق
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleCloseServiceNotice}
+              className="absolute -bottom-14 left-1/2 -translate-x-1/2 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[color:rgb(var(--color-error-rgb)/0.32)] bg-[color:rgb(var(--color-card-rgb)/0.96)] text-[var(--color-error)] shadow-[0_14px_30px_-22px_rgb(var(--color-error-rgb)/0.76)] transition-all hover:-translate-y-0.5 hover:bg-[color:rgb(var(--color-error-rgb)/0.12)]"
+              aria-label={isArabic ? 'إغلاق التنويه' : 'Close notice'}
+            >
+              <X className="h-5 w-5" />
+            </button>
           </motion.div>
         </div>
       )}
 
       {showCommunityNotice && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 px-4 backdrop-blur-[5px]">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/58 px-4 backdrop-blur-[7px]">
           <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            initial={{ opacity: 0, y: 14, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-            className="relative w-full max-w-[21rem] overflow-hidden rounded-[1.45rem] border border-[color:rgb(var(--color-primary-rgb)/0.24)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.96),rgb(var(--color-elevated-rgb)/0.9))] p-4 text-center shadow-[0_26px_70px_-44px_rgb(var(--color-primary-rgb)/0.7)] backdrop-blur-2xl"
+            transition={{ type: 'spring', stiffness: 310, damping: 27 }}
+            className="relative w-full max-w-[20rem] overflow-visible rounded-[1.35rem] border border-[rgba(34,197,94,0.24)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.98),rgb(var(--color-elevated-rgb)/0.92))] p-4 text-center shadow-[0_26px_70px_-44px_rgba(34,197,94,0.54)] backdrop-blur-2xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="community-notice-title"
           >
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgb(var(--color-primary-rgb)/0.18),transparent_58%)]" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.16),transparent_58%)]" />
 
-            <button
-              type="button"
-              onClick={handleCloseCommunityNotice}
-              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] text-[var(--color-text-secondary)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.28)] hover:text-[var(--color-primary)]"
-              aria-label={isArabic ? 'إغلاق التنويه' : 'Close notice'}
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            <div className="relative mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[color:rgb(var(--color-primary-rgb)/0.12)] text-[var(--color-primary)] shadow-[0_14px_30px_-24px_rgb(var(--color-primary-rgb)/0.8)]">
+            <div className="relative mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.12)] text-emerald-500 shadow-[0_14px_30px_-24px_rgba(34,197,94,0.78)]">
               <MessageCircle className="h-5.5 w-5.5" />
             </div>
 
             <div className="relative space-y-3">
-              <h2 id="community-notice-title" className="text-lg font-black leading-7 text-[var(--color-text)]">
+              <h2 id="community-notice-title" className="text-base font-black leading-7 text-[var(--color-text)]">
                 تنويه المجتمع
               </h2>
 
-              <div className="space-y-2 rounded-[1.1rem] border border-[color:rgb(var(--color-border-rgb)/0.58)] bg-[color:rgb(var(--color-surface-rgb)/0.5)] p-3 text-sm font-bold leading-6 text-[var(--color-text)]">
+              <div className="space-y-2 rounded-[1rem] border border-[color:rgb(var(--color-border-rgb)/0.58)] bg-[color:rgb(var(--color-surface-rgb)/0.52)] p-3 text-sm font-bold leading-6 text-[var(--color-text)]">
                 <p>عدم متابعتك للمجتمع مسؤوليتك الشخصية</p>
                 <p className="text-[var(--color-text-secondary)]">
                   واي اهمال في المتابعة تعرضك للمخاطر دون اي مسؤولية علينا
@@ -351,6 +353,15 @@ const PublicCatalog = () => {
                 مجتمع الواتساب
               </a>
             </div>
+
+            <button
+              type="button"
+              onClick={handleCloseCommunityNotice}
+              className="absolute -bottom-14 left-1/2 -translate-x-1/2 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[color:rgb(var(--color-error-rgb)/0.32)] bg-[color:rgb(var(--color-card-rgb)/0.96)] text-[var(--color-error)] shadow-[0_14px_30px_-22px_rgb(var(--color-error-rgb)/0.76)] transition-all hover:-translate-y-0.5 hover:bg-[color:rgb(var(--color-error-rgb)/0.12)]"
+              aria-label={isArabic ? 'إغلاق التنويه' : 'Close notice'}
+            >
+              <X className="h-5 w-5" />
+            </button>
           </motion.div>
         </div>
       )}

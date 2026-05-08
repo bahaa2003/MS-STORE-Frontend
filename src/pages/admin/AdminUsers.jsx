@@ -21,6 +21,7 @@ import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/account/ConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import { useToast } from '../../components/ui/Toast';
 import { useLanguage } from '../../context/LanguageContext';
@@ -42,13 +43,13 @@ import {
 const FILTER_OPTIONS = ['all', 'approved', 'rejected', 'deleted'];
 
 const summaryCardClassName =
-  'group relative isolate overflow-hidden rounded-2xl border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[linear-gradient(145deg,rgb(var(--color-card-rgb)/0.94),rgb(var(--color-surface-rgb)/0.7))] p-4 shadow-[0_22px_52px_-42px_rgb(0_0_0/0.85)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.34)] hover:shadow-[0_26px_62px_-42px_rgb(var(--color-primary-rgb)/0.38)] before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:bg-[radial-gradient(circle_at_top_right,rgb(var(--color-primary-rgb)/0.14),transparent_42%)]';
+  'group relative isolate overflow-hidden rounded-xl border border-[color:rgb(var(--color-primary-rgb)/0.16)] bg-[linear-gradient(145deg,rgb(var(--color-card-rgb)/0.92),rgb(var(--color-surface-rgb)/0.64))] p-2.5 shadow-[0_16px_38px_-34px_rgb(0_0_0/0.82)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.3)] hover:shadow-[0_20px_48px_-38px_rgb(var(--color-primary-rgb)/0.32)] before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:bg-[radial-gradient(circle_at_top_right,rgb(var(--color-primary-rgb)/0.12),transparent_42%)]';
 
-const compactButtonClassName = 'h-8 rounded-[var(--radius-sm)] px-2.5 text-[11px]';
+const compactButtonClassName = 'h-7 rounded-[var(--radius-sm)] px-2 text-[10px]';
 const compactFieldClassName =
-  'h-9 rounded-full px-3 text-[11px] shadow-[0_8px_20px_-20px_rgb(0_0_0/0.8)]';
+  'h-8 rounded-full px-2.5 text-[10px] shadow-[0_8px_20px_-20px_rgb(0_0_0/0.8)]';
 const compactTableHeadClassName = 'h-9 px-2.5 text-[10px] tracking-[0.08em]';
-const compactTableCellClassName = 'px-2.5 py-2 text-[11px]';
+const compactTableCellClassName = 'px-2 py-1.5 text-[10px]';
 const detailsMetricClassName =
   'rounded-[var(--radius-md)] border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] p-2.5';
 
@@ -63,6 +64,9 @@ const negativeBalanceBadgeClassName = [
   'border-[rgba(220,38,38,0.26)] bg-[linear-gradient(135deg,rgba(254,226,226,0.96),rgba(248,113,113,0.16))]',
   'text-[#b91c1c] shadow-[0_10px_22px_-20px_rgba(220,38,38,0.85)]',
 ].join(' ');
+
+const userIdButtonClassName =
+  'mt-0.5 block max-w-full truncate rounded-md text-start font-mono text-[8px] leading-3 text-[color:rgb(var(--color-text-rgb)/0.44)] transition hover:text-[var(--color-primary)]';
 
 const resolveInitialGroupValue = (entry, groups) => {
   if (entry?.groupId) return entry.groupId;
@@ -157,8 +161,10 @@ const AdminUsers = () => {
   const [settingsCreditLimit, setSettingsCreditLimit] = useState('0');
   const [temporaryPassword, setTemporaryPassword] = useState('');
   const [manualPassword, setManualPassword] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
+  const [copiedUserId, setCopiedUserId] = useState('');
 
   const isArabic = String(i18n.resolvedLanguage || i18n.language || 'ar').toLowerCase().startsWith('ar');
   const locale = getNumericLocale(isArabic ? 'ar-EG' : 'en-US');
@@ -167,10 +173,10 @@ const AdminUsers = () => {
   const canManageWallet = hasPermission(actor, PERMISSIONS.MANAGE_WALLET);
 
   useEffect(() => {
-    loadUsers();
-    loadGroups();
-    loadCurrencies();
-    Promise.resolve(loadWallets()).catch(() => null);
+    loadUsers({ force: true });
+    loadGroups({ force: true });
+    loadCurrencies({ force: true });
+    Promise.resolve(loadWallets({ force: true })).catch(() => null);
   }, [loadCurrencies, loadGroups, loadUsers, loadWallets]);
 
   useEffect(() => {
@@ -515,22 +521,55 @@ const AdminUsers = () => {
   };
 
   const copyToClipboard = async (value) => {
+    const text = String(value || '').trim();
+    if (!text) return false;
+
     try {
       if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
+        await navigator.clipboard.writeText(text);
         return true;
       }
     } catch (_error) {
-      return false;
+      // Fall back to the textarea copy path below.
     }
 
-    return false;
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.setAttribute('readonly', '');
+      textArea.style.position = 'fixed';
+      textArea.style.top = '-9999px';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return copied;
+    } catch (_error) {
+      return false;
+    }
   };
 
   const handleCopyTemporaryPassword = async () => {
     if (!temporaryPassword) return;
     const copied = await copyToClipboard(temporaryPassword);
     addToast(copied ? 'تم نسخ كلمة المرور.' : 'تعذر نسخ كلمة المرور.', copied ? 'success' : 'error');
+  };
+
+  const handleCopyUserId = async (userId) => {
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedUserId) return;
+
+    const copied = await copyToClipboard(normalizedUserId);
+    if (!copied) {
+      addToast('تعذر نسخ ID المستخدم.', 'error');
+      return;
+    }
+
+    setCopiedUserId(normalizedUserId);
+    window.setTimeout(() => {
+      setCopiedUserId((current) => (current === normalizedUserId ? '' : current));
+    }, 1200);
   };
 
   const handleResetPassword = async () => {
@@ -581,15 +620,18 @@ const AdminUsers = () => {
       addToast('ليس لديك صلاحية حذف المستخدمين.', 'error');
       return;
     }
-    const shouldDelete = window.confirm(`Delete ${selectedUser.name}?`);
-    if (!shouldDelete) return;
+    setDeleteConfirmOpen(true);
+  };
 
+  const confirmDeleteUser = async () => {
+    if (!selectedUser) return;
     try {
       await deleteUser(selectedUser.id, actor);
       addToast('تم حذف المستخدم.', 'success');
+      setDeleteConfirmOpen(false);
       setIsDetailsOpen(false);
       setSelectedUser(null);
-      await loadUsers();
+      await loadUsers({ force: true });
     } catch (error) {
       addToast(error?.message || 'تعذر حذف المستخدم.', 'error');
     }
@@ -633,19 +675,19 @@ const AdminUsers = () => {
     && (!selectedUser?.verified || isPendingAccountStatus(selectedUser?.status));
 
   return (
-    <div className="min-w-0 space-y-3">
-      <section className="admin-premium-hero space-y-2.5">
+    <div className="min-w-0 space-y-2.5">
+      <section className="admin-premium-hero space-y-2">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-lg font-bold text-[var(--color-text)]">
+          <h1 className="text-base font-bold text-[var(--color-text)]">
             {t('userManagement')}
           </h1>
-          <p className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">
+          <p className="mt-0.5 text-[10px] text-[var(--color-text-secondary)]">
             إدارة بيانات حسابات العملاء ومراجعة حالاتها من مكان واحد.
           </p>
         </div>
 
-        <div className="grid gap-1.5 sm:grid-cols-2 lg:min-w-[22rem] lg:grid-cols-[minmax(0,1fr)_118px]">
+        <div className="grid gap-1.5 sm:grid-cols-2 lg:min-w-[20rem] lg:grid-cols-[minmax(0,1fr)_108px]">
           <Input
             placeholder={t('searchUsers')}
             value={search}
@@ -668,63 +710,71 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-3">
         <div className={summaryCardClassName}>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold text-[var(--color-text-secondary)]">حسابات مفعّلة</p>
-              <p className="mt-2 text-2xl font-black leading-none text-[var(--color-text)]">{formatNumber(approvedCount, locale)}</p>
+              <p className="text-[10px] font-semibold text-[var(--color-text-secondary)]">حسابات مفعّلة</p>
+              <p className="mt-1 text-lg font-black leading-none text-[var(--color-text)]">{formatNumber(approvedCount, locale)}</p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:rgb(var(--color-success-rgb)/0.22)] bg-[linear-gradient(135deg,rgb(var(--color-success-rgb)/0.18),rgb(var(--color-success-rgb)/0.06))] text-[var(--color-success)] shadow-[0_18px_36px_-26px_rgb(var(--color-success-rgb)/0.85)]">
-              <CheckCircle2 className="h-5 w-5" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:rgb(var(--color-success-rgb)/0.22)] bg-[linear-gradient(135deg,rgb(var(--color-success-rgb)/0.18),rgb(var(--color-success-rgb)/0.06))] text-[var(--color-success)] shadow-[0_14px_26px_-20px_rgb(var(--color-success-rgb)/0.82)]">
+              <CheckCircle2 className="h-4 w-4" />
             </div>
           </div>
         </div>
 
         <div className={summaryCardClassName}>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold text-[var(--color-text-secondary)]">حسابات مرفوضة</p>
-              <p className="mt-2 text-2xl font-black leading-none text-[var(--color-text)]">{formatNumber(rejectedCount, locale)}</p>
+              <p className="text-[10px] font-semibold text-[var(--color-text-secondary)]">حسابات مرفوضة</p>
+              <p className="mt-1 text-lg font-black leading-none text-[var(--color-text)]">{formatNumber(rejectedCount, locale)}</p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:rgb(var(--color-error-rgb)/0.22)] bg-[linear-gradient(135deg,rgb(var(--color-error-rgb)/0.16),rgb(var(--color-error-rgb)/0.06))] text-[var(--color-error)] shadow-[0_18px_36px_-26px_rgb(var(--color-error-rgb)/0.78)]">
-              <UserX className="h-5 w-5" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:rgb(var(--color-error-rgb)/0.22)] bg-[linear-gradient(135deg,rgb(var(--color-error-rgb)/0.16),rgb(var(--color-error-rgb)/0.06))] text-[var(--color-error)] shadow-[0_14px_26px_-20px_rgb(var(--color-error-rgb)/0.76)]">
+              <UserX className="h-4 w-4" />
             </div>
           </div>
         </div>
 
         <div className={summaryCardClassName}>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[11px] font-semibold text-[var(--color-text-secondary)]">حسابات محذوفة</p>
-              <p className="mt-2 text-2xl font-black leading-none text-[var(--color-text)]">{formatNumber(deletedCount, locale)}</p>
+              <p className="text-[10px] font-semibold text-[var(--color-text-secondary)]">حسابات محذوفة</p>
+              <p className="mt-1 text-lg font-black leading-none text-[var(--color-text)]">{formatNumber(deletedCount, locale)}</p>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:rgb(var(--color-text-rgb)/0.12)] bg-[linear-gradient(135deg,rgb(var(--color-text-rgb)/0.09),rgb(var(--color-surface-rgb)/0.48))] text-[var(--color-text-secondary)] shadow-[0_18px_36px_-28px_rgb(0_0_0/0.72)]">
-              <RotateCcw className="h-5 w-5" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:rgb(var(--color-text-rgb)/0.12)] bg-[linear-gradient(135deg,rgb(var(--color-text-rgb)/0.09),rgb(var(--color-surface-rgb)/0.48))] text-[var(--color-text-secondary)] shadow-[0_14px_26px_-22px_rgb(0_0_0/0.7)]">
+              <RotateCcw className="h-4 w-4" />
             </div>
           </div>
         </div>
       </div>
       </section>
 
-      <div className="space-y-2.5 md:hidden">
+      <div className="space-y-2 md:hidden">
         {filteredUsers.map((entry) => {
           const walletPreview = resolveWalletForEntry(entry);
           const balanceValue = getWalletBalanceValue(entry, walletPreview);
 
           return (
-          <Card key={entry.id} variant="elevated" className="overflow-hidden border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[linear-gradient(145deg,rgb(var(--color-card-rgb)/0.94),rgb(var(--color-surface-rgb)/0.7))] p-3.5 shadow-[0_22px_54px_-44px_rgb(var(--color-primary-rgb)/0.32)]">
-            <div className="flex items-start gap-3">
+          <Card key={entry.id} variant="elevated" className="overflow-hidden border-[color:rgb(var(--color-primary-rgb)/0.16)] bg-[linear-gradient(145deg,rgb(var(--color-card-rgb)/0.94),rgb(var(--color-surface-rgb)/0.66))] p-2.5 shadow-[0_18px_42px_-36px_rgb(var(--color-primary-rgb)/0.28)]">
+            <div className="flex items-start gap-2.5">
               <img
                 src={entry.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.name || 'User')}&background=random`}
                 alt={entry.name}
-                className="h-11 w-11 rounded-2xl border border-[color:rgb(var(--color-primary-rgb)/0.24)] object-cover shadow-[0_16px_32px_-24px_rgb(0_0_0/0.85)]"
+                className="h-9 w-9 rounded-xl border border-[color:rgb(var(--color-primary-rgb)/0.22)] object-cover shadow-[0_14px_28px_-24px_rgb(0_0_0/0.82)]"
               />
               <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2.5">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[var(--color-text)]">{entry.name}</p>
-                    <p className="mt-0.5 truncate text-[11px] text-[var(--color-text-secondary)]">{entry.email}</p>
+                    <p className="truncate text-xs font-semibold text-[var(--color-text)]">{entry.name}</p>
+                    <p className="mt-0.5 truncate text-[10px] text-[var(--color-text-secondary)]">{entry.email}</p>
+                    <button
+                      type="button"
+                      className={userIdButtonClassName}
+                      title="اضغط لنسخ ID المستخدم"
+                      onClick={() => handleCopyUserId(entry.id)}
+                    >
+                      {copiedUserId === String(entry.id || '').trim() ? 'تم النسخ' : `ID: ${entry.id}`}
+                    </button>
                   </div>
                   <span className={`shrink-0 ${getBalanceBadgeTone(balanceValue)}`}>
                     <Wallet className="h-3 w-3" />
@@ -734,7 +784,7 @@ const AdminUsers = () => {
               </div>
             </div>
 
-            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[color:rgb(var(--color-border-rgb)/0.62)] pt-3">
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-[color:rgb(var(--color-border-rgb)/0.62)] pt-2">
               <Badge variant={filter === 'deleted' ? 'secondary' : getAccountStatusBadgeVariant(entry.status)}>
                 {filter === 'deleted' ? 'محذوف' : getAccountStatusLabel(entry.status, isArabic)}
               </Badge>
@@ -772,7 +822,7 @@ const AdminUsers = () => {
       </div>
 
       <div className="admin-premium-panel hidden overflow-hidden border-[color:rgb(var(--color-primary-rgb)/0.16)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.86),rgb(var(--color-surface-rgb)/0.62))] md:block">
-        <Table className="border-separate border-spacing-y-2 px-2 pb-2 text-xs">
+        <Table className="border-separate border-spacing-y-1.5 px-1.5 pb-1.5 text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className={compactTableHeadClassName}>المستخدم</TableHead>
@@ -792,31 +842,39 @@ const AdminUsers = () => {
               const balanceValue = getWalletBalanceValue(entry, walletPreview);
 
               return (
-              <TableRow key={entry.id} className="overflow-hidden rounded-2xl border border-[color:rgb(var(--color-primary-rgb)/0.12)] bg-[color:rgb(var(--color-card-rgb)/0.72)] shadow-[0_16px_38px_-32px_rgb(0_0_0/0.78)] transition-all hover:-translate-y-0.5 hover:bg-[color:rgb(var(--color-card-rgb)/0.92)] hover:shadow-[0_22px_52px_-36px_rgb(var(--color-primary-rgb)/0.28)]">
-                <TableCell className={`${compactTableCellClassName} rounded-s-2xl py-3`}>
-                  <div className="flex items-center gap-3">
+              <TableRow key={entry.id} className="overflow-hidden rounded-xl border border-[color:rgb(var(--color-primary-rgb)/0.11)] bg-[color:rgb(var(--color-card-rgb)/0.7)] shadow-[0_12px_30px_-28px_rgb(0_0_0/0.76)] transition-all hover:-translate-y-0.5 hover:bg-[color:rgb(var(--color-card-rgb)/0.9)] hover:shadow-[0_18px_42px_-34px_rgb(var(--color-primary-rgb)/0.24)]">
+                <TableCell className={`${compactTableCellClassName} rounded-s-xl py-2`}>
+                  <div className="flex items-center gap-2.5">
                     <img
                       src={entry.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.name || 'User')}&background=random`}
                       alt={entry.name}
-                      className="h-11 w-11 rounded-2xl border border-[color:rgb(var(--color-primary-rgb)/0.24)] object-cover shadow-[0_18px_32px_-26px_rgb(0_0_0/0.88)]"
+                      className="h-9 w-9 rounded-xl border border-[color:rgb(var(--color-primary-rgb)/0.22)] object-cover shadow-[0_14px_28px_-24px_rgb(0_0_0/0.84)]"
                     />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--color-text)]">{entry.name}</p>
-                      <p className="mt-1 truncate text-[11px] text-[var(--color-text-secondary)]">{entry.email}</p>
+                      <p className="truncate text-xs font-semibold text-[var(--color-text)]">{entry.name}</p>
+                      <p className="mt-0.5 truncate text-[10px] text-[var(--color-text-secondary)]">{entry.email}</p>
+                      <button
+                        type="button"
+                        className={userIdButtonClassName}
+                        title="اضغط لنسخ ID المستخدم"
+                        onClick={() => handleCopyUserId(entry.id)}
+                      >
+                        {copiedUserId === String(entry.id || '').trim() ? 'تم النسخ' : `ID: ${entry.id}`}
+                      </button>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className={`${compactTableCellClassName} py-3`}>
+                <TableCell className={`${compactTableCellClassName} py-2`}>
                   <Badge variant={filter === 'deleted' ? 'secondary' : getAccountStatusBadgeVariant(entry.status)}>
                     {filter === 'deleted' ? 'محذوف' : getAccountStatusLabel(entry.status, isArabic)}
                   </Badge>
                 </TableCell>
-                <TableCell className={`${compactTableCellClassName} py-3`}>
+                <TableCell className={`${compactTableCellClassName} py-2`}>
                   <span className={`min-w-[6.5rem] justify-center ${getBalanceBadgeTone(balanceValue)}`}>
                     {formatBalance(entry)}
                   </span>
                 </TableCell>
-                <TableCell className={`rounded-e-2xl py-3 text-end ${compactTableCellClassName}`}>
+                <TableCell className={`rounded-e-xl py-2 text-end ${compactTableCellClassName}`}>
                   <div className="flex justify-end gap-1.5">
                     {filter === 'deleted' && canManageUsers ? (
                       <Button size="sm" className={compactButtonClassName} onClick={() => handleRestoreUser(entry)} disabled={isSubmitting}>
@@ -894,7 +952,14 @@ const AdminUsers = () => {
                 <div>
                   <p className="text-sm font-semibold text-[var(--color-text)]">{selectedUser?.name}</p>
                   <p className="text-xs text-[var(--color-text-secondary)]">{selectedUser?.email}</p>
-                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">ID: {selectedUser?.id}</p>
+                  <button
+                    type="button"
+                    className={userIdButtonClassName}
+                    title="اضغط لنسخ ID المستخدم"
+                    onClick={() => handleCopyUserId(selectedUser?.id)}
+                  >
+                    {copiedUserId === String(selectedUser?.id || '').trim() ? 'تم النسخ' : `ID: ${selectedUser?.id}`}
+                  </button>
                 </div>
               </div>
 
@@ -1155,7 +1220,7 @@ const AdminUsers = () => {
                 {temporaryPassword && (
                   <>
                     <Input
-                      label="Temporary Password"
+                      label="كلمة المرور المؤقتة"
                       readOnly
                       value={temporaryPassword}
                       onClick={handleCopyTemporaryPassword}
@@ -1290,6 +1355,17 @@ const AdminUsers = () => {
           سيتم منعه من الوصول إلى الصفحات المحمية حتى تتم إعادة تفعيله يدويًا من الإدارة.
         </p>
       </Modal>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="حذف المستخدم"
+        description={selectedUser ? `هل تريد حذف ${selectedUser.name || selectedUser.email || 'هذا المستخدم'}؟` : ''}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        isLoading={isSubmitting}
+      />
     </div>
   );
 };

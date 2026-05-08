@@ -1,4 +1,5 @@
 const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/g;
+const DYNAMIC_FIELD_TYPES = ['text', 'number', 'email', 'select'];
 
 const FIELD_COPY = {
   playerId: { ar: 'معرف المستخدم', en: 'User ID' },
@@ -42,9 +43,40 @@ export const sanitizeOrderFieldValue = (value, maxLength = 120) => String(value 
   .replace(/\s+/g, ' ')
   .slice(0, maxLength);
 
+const normalizeFieldType = (value) => {
+  const normalized = String(value || 'text').trim().toLowerCase();
+  return DYNAMIC_FIELD_TYPES.includes(normalized) ? normalized : 'text';
+};
+
+const resolveFieldOptions = (field) => {
+  if (Array.isArray(field?.options)) return field.options;
+  if (Array.isArray(field?.choices)) return field.choices;
+  if (Array.isArray(field?.values)) return field.values;
+  return [];
+};
+
 export const resolveProductOrderFields = (product, language = 'ar') => {
+  if (Array.isArray(product?.dynamicFields) && product.dynamicFields.length > 0) {
+    return product.dynamicFields
+      .map((field, index) => {
+        const key = String(field?.name || field?.key || `dynamicField_${index}`);
+        const label = String(field?.label || field?.name || key).trim() || key;
+        return {
+          key,
+          label,
+          placeholder: '',
+          type: normalizeFieldType(field?.type),
+          required: field?.required !== false,
+          options: resolveFieldOptions(field),
+        };
+      })
+      .filter((field) => String(field?.key || '').trim());
+  }
+
   if (Array.isArray(product?.orderFields) && product.orderFields.length > 0) {
-    return product.orderFields.map((field, index) => {
+    const mappedFields = product.orderFields
+      .filter((field) => field?.enabled !== false)
+      .map((field, index) => {
       const key = String(field?.name || field?.key || field?.id || `orderField_${index}`);
       const localizedLabel = language === 'ar'
         ? field?.labelAr || field?.placeholderAr
@@ -54,8 +86,22 @@ export const resolveProductOrderFields = (product, language = 'ar') => {
         key,
         label: localizedLabel || field?.label || field?.placeholder || key,
         placeholder: (language === 'ar' ? field?.placeholderAr : field?.placeholder) || field?.placeholder || '',
+        type: normalizeFieldType(field?.type),
+        required: field?.required !== false,
+        options: resolveFieldOptions(field),
       };
     });
+
+    const hasPlayerId = mappedFields.some((field) => String(field?.key || '').trim().toLowerCase() === 'playerid');
+    if (!hasPlayerId) {
+      return [{
+        key: 'playerId',
+        label: FIELD_COPY.playerId[language] || FIELD_COPY.playerId.en,
+        placeholder: '',
+      }, ...mappedFields];
+    }
+
+    return mappedFields;
   }
 
   if (Array.isArray(product?.supplierFieldMappings) && product.supplierFieldMappings.length > 0) {
@@ -68,6 +114,9 @@ export const resolveProductOrderFields = (product, language = 'ar') => {
         key: field,
         label: FIELD_COPY[field]?.[language] || field,
         placeholder: '',
+        type: 'text',
+        required: true,
+        options: [],
       }));
     }
   }
@@ -76,5 +125,8 @@ export const resolveProductOrderFields = (product, language = 'ar') => {
     key: 'playerId',
     label: FIELD_COPY.playerId[language] || FIELD_COPY.playerId.en,
     placeholder: '',
+    type: 'text',
+    required: true,
+    options: [],
   }];
 };

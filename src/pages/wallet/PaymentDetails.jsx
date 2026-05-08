@@ -22,7 +22,7 @@ const PaymentDetails = () => {
 
   // ── Resolve selected payment method from global state ──────────────────
   const resolved = useMemo(
-    () => findPaymentMethodById(paymentSettings, methodId),
+    () => findPaymentMethodById(paymentSettings, methodId, { fallbackToDefault: false }),
     [paymentSettings, methodId]
   );
   const selectedMethod = resolved?.method ?? null;
@@ -55,7 +55,7 @@ const PaymentDetails = () => {
 
   // ── Ensure payment settings & currencies are loaded ────────────────────
   useEffect(() => {
-    loadPaymentSettings();
+    loadPaymentSettings({ force: true });
     loadCurrencies();
   }, [loadPaymentSettings, loadCurrencies]);
 

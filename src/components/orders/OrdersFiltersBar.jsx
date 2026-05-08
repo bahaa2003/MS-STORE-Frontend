@@ -25,7 +25,7 @@ const FilterField = ({ label, value, onChange, options, compact = false }) => (
       className={cn(
         selectClassName,
         compact
-          ? 'h-10 rounded-xl bg-[color:rgb(var(--color-card-rgb)/0.94)] px-3 text-xs'
+          ? 'h-9 rounded-xl bg-[color:rgb(var(--color-card-rgb)/0.94)] px-2.5 text-[11px] sm:h-10 sm:px-3 sm:text-xs'
           : 'h-11 rounded-[1.05rem] bg-[color:rgb(var(--color-card-rgb)/0.94)] px-3 text-sm'
       )}
     >
@@ -67,7 +67,7 @@ const OrdersFiltersBar = ({
   const sortOptions = createOrderSortOptions(language);
 
   return (
-    <Card variant="default" className={cn(compact ? 'p-3 sm:p-4' : 'p-3 sm:p-4', panelClassName)}>
+    <Card variant="default" className={cn(compact ? 'p-2.5 sm:p-4' : 'p-3 sm:p-4', panelClassName)}>
       <div className={cn('flex flex-col', compact ? 'gap-3' : 'gap-3')}>
         <div className={cn('flex flex-col xl:flex-row xl:items-center', compact ? 'gap-3' : 'gap-3')}>
           <div className="min-w-0 flex-1">
@@ -75,12 +75,12 @@ const OrdersFiltersBar = ({
               value={searchTerm}
               onChange={onSearchChange}
               placeholder={searchPlaceholder}
-              inputClassName={compact ? 'h-10 rounded-xl text-sm shadow-none focus:shadow-none' : ''}
+              inputClassName={compact ? 'h-9 rounded-xl text-xs shadow-none focus:shadow-none sm:h-10 sm:text-sm' : ''}
             />
           </div>
 
           <div className={cn(
-            'grid min-w-0 flex-1 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4',
+            'grid min-w-0 flex-1 grid-cols-2 xl:grid-cols-4',
             compact ? 'gap-2' : 'gap-3'
           )}>
             <FilterField
@@ -124,11 +124,11 @@ const OrdersFiltersBar = ({
         </div>
 
         <div className={cn('flex flex-wrap items-center', compact ? 'gap-1.5' : 'gap-1.5')}>
-          <Badge variant="premium" className={compact ? 'px-2 py-0.5 text-[11px]' : 'px-2 py-0.5 text-[11px]'}>
+          <Badge variant="premium" className={compact ? 'px-1.5 py-0.5 text-[10px] sm:px-2 sm:text-[11px]' : 'px-2 py-0.5 text-[11px]'}>
             {isArabic ? `${resultCount} نتيجة` : `${resultCount} results`}
           </Badge>
           {helperText !== null ? (
-            <span className={cn('text-[var(--color-text-secondary)]', compact ? 'text-xs' : 'text-xs')}>
+            <span className={cn('text-[var(--color-text-secondary)]', compact ? 'text-[10px] leading-5 sm:text-xs' : 'text-xs')}>
               {helperText || (isArabic
                 ? 'ابحث بالمنتج، العميل، البريد الإلكتروني، أو رقم الطلب.'
               : 'Search by product, customer, email, or order number.')}
@@ -138,11 +138,11 @@ const OrdersFiltersBar = ({
 
         {customRange ? (
           <div className={cn(
-            'grid grid-cols-1 border-t border-[color:rgb(var(--color-border-rgb)/0.76)] pt-3 sm:grid-cols-2 xl:grid-cols-4',
+            'grid grid-cols-2 border-t border-[color:rgb(var(--color-border-rgb)/0.76)] pt-2.5 sm:pt-3 xl:grid-cols-4',
             compact ? 'gap-2' : 'gap-3'
           )}>
             <label className="min-w-0">
-              <span className={cn('block font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]', compact ? 'mb-1 text-[11px]' : 'mb-1 text-[11px]')}>
+              <span className={cn('block font-semibold uppercase tracking-[0.08em] text-[var(--color-muted)] sm:tracking-[0.12em]', compact ? 'mb-1 text-[10px] sm:text-[11px]' : 'mb-1 text-[11px]')}>
                 {isArabic ? 'من تاريخ' : 'From'}
               </span>
               <input
@@ -152,14 +152,14 @@ const OrdersFiltersBar = ({
                 className={cn(
                   selectClassName,
                   compact
-                    ? 'h-10 rounded-xl bg-[color:rgb(var(--color-card-rgb)/0.94)] px-3 text-xs'
+                    ? 'h-9 rounded-xl bg-[color:rgb(var(--color-card-rgb)/0.94)] px-2 text-[10px] sm:h-10 sm:px-3 sm:text-xs'
                     : 'h-11 rounded-[1.05rem] bg-[color:rgb(var(--color-card-rgb)/0.94)] px-3 text-sm'
                 )}
               />
             </label>
 
             <label className="min-w-0">
-              <span className={cn('block font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]', compact ? 'mb-1 text-[11px]' : 'mb-1 text-[11px]')}>
+              <span className={cn('block font-semibold uppercase tracking-[0.08em] text-[var(--color-muted)] sm:tracking-[0.12em]', compact ? 'mb-1 text-[10px] sm:text-[11px]' : 'mb-1 text-[11px]')}>
                 {isArabic ? 'إلى تاريخ' : 'To'}
               </span>
               <input
@@ -169,17 +169,17 @@ const OrdersFiltersBar = ({
                 className={cn(
                   selectClassName,
                   compact
-                    ? 'h-10 rounded-xl bg-[color:rgb(var(--color-card-rgb)/0.94)] px-3 text-xs'
+                    ? 'h-9 rounded-xl bg-[color:rgb(var(--color-card-rgb)/0.94)] px-2 text-[10px] sm:h-10 sm:px-3 sm:text-xs'
                     : 'h-11 rounded-[1.05rem] bg-[color:rgb(var(--color-card-rgb)/0.94)] px-3 text-sm'
                 )}
               />
             </label>
 
             {customRange.helperText ? (
-              <div className="sm:col-span-2 xl:col-span-2">
+              <div className="col-span-2 xl:col-span-2">
                 <div className={cn(
                   'flex h-full items-center rounded-[1rem] border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[color:rgb(var(--color-card-rgb)/0.72)] px-3 text-[var(--color-text-secondary)]',
-                  compact ? 'min-h-10 text-xs' : 'min-h-11 text-xs'
+                  compact ? 'min-h-9 text-[10px] leading-5 sm:min-h-10 sm:text-xs' : 'min-h-11 text-xs'
                 )}>
                   {customRange.helperText}
                 </div>

@@ -396,11 +396,6 @@ const getSheetCopy = (language = 'ar') => (
                 />
 
                 <section className="space-y-3 rounded-[1.6rem] border border-white/10 bg-white/5 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-white">{copy.orderFieldsTitle}</p>
-                    <Sparkles className="h-4 w-4 text-red-200/70" />
-                  </div>
-
                   <div className="space-y-3">
                     {orderFields.map((field) => (
                       <Input

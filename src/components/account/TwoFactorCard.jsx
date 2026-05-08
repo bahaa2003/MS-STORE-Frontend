@@ -37,37 +37,37 @@ const TwoFactorCard = ({ email, twoFactorEnabled = false, emailChangedPending = 
 
   const text = useMemo(
     () => ({
-      title: isEnglish ? 'Two-Factor Authentication' : 'Two-Factor Authentication',
+      title: isEnglish ? 'Two-Factor Authentication' : 'المصادقة الثنائية',
       description: isEnglish
         ? 'Use an authenticator app code as an extra security check at sign in.'
-        : 'Use an authenticator app code as an extra security check at sign in.',
-      enabled: isEnglish ? 'Enabled' : 'Enabled',
-      disabled: isEnglish ? 'Disabled' : 'Disabled',
-      generating: isEnglish ? 'Generating QR' : 'Generating QR',
-      ready: isEnglish ? 'Ready to verify' : 'Ready to verify',
-      verifying: isEnglish ? 'Verifying' : 'Verifying',
-      enableBtn: isEnglish ? 'Enable 2FA' : 'Enable 2FA',
-      disableBtn: isEnglish ? 'Disable 2FA' : 'Disable 2FA',
-      generateBtn: isEnglish ? 'Generate QR code' : 'Generate QR code',
-      regenerateBtn: isEnglish ? 'Regenerate QR' : 'Regenerate QR',
-      verifyBtn: isEnglish ? 'Confirm activation' : 'Confirm activation',
+        : 'استخدم كود تطبيق المصادقة كخطوة أمان إضافية عند تسجيل الدخول.',
+      enabled: isEnglish ? 'Enabled' : 'مفعلة',
+      disabled: isEnglish ? 'Disabled' : 'غير مفعلة',
+      generating: isEnglish ? 'Generating QR' : 'جارٍ إنشاء رمز QR',
+      ready: isEnglish ? 'Ready to verify' : 'جاهزة للتحقق',
+      verifying: isEnglish ? 'Verifying' : 'جارٍ التحقق',
+      enableBtn: isEnglish ? 'Enable 2FA' : 'تفعيل المصادقة الثنائية',
+      disableBtn: isEnglish ? 'Disable 2FA' : 'إلغاء المصادقة الثنائية',
+      generateBtn: isEnglish ? 'Generate QR code' : 'إنشاء رمز QR',
+      regenerateBtn: isEnglish ? 'Regenerate QR' : 'إعادة إنشاء رمز QR',
+      verifyBtn: isEnglish ? 'Confirm activation' : 'تأكيد التفعيل',
       scanHint: isEnglish
         ? 'Scan this QR code in your authenticator app, then enter the 6-digit code.'
-        : 'Scan this QR code in your authenticator app, then enter the 6-digit code.',
-      codeHint: isEnglish ? 'Enter the 6-digit code' : 'Enter the 6-digit code',
-      generated: isEnglish ? 'QR code generated.' : 'QR code generated.',
-      activated: isEnglish ? 'Two-factor authentication is enabled.' : 'Two-factor authentication is enabled.',
-      deactivated: isEnglish ? 'Two-factor authentication has been disabled.' : 'Two-factor authentication has been disabled.',
-      invalidCode: isEnglish ? 'Please enter a complete 6-digit code.' : 'Please enter a complete 6-digit code.',
-      saveEmailFirst: isEnglish ? 'Save your email changes first before enabling 2FA.' : 'Save your email changes first before enabling 2FA.',
-      disableTitle: isEnglish ? 'Disable two-factor authentication?' : 'Disable two-factor authentication?',
+        : 'امسح رمز QR داخل تطبيق المصادقة، ثم أدخل الكود المكون من 6 أرقام.',
+      codeHint: isEnglish ? 'Enter the 6-digit code' : 'أدخل الكود المكون من 6 أرقام',
+      generated: isEnglish ? 'QR code generated.' : 'تم إنشاء رمز QR.',
+      activated: isEnglish ? 'Two-factor authentication is enabled.' : 'تم تفعيل المصادقة الثنائية.',
+      deactivated: isEnglish ? 'Two-factor authentication has been disabled.' : 'تم إلغاء المصادقة الثنائية.',
+      invalidCode: isEnglish ? 'Please enter a complete 6-digit code.' : 'أدخل الكود الكامل المكون من 6 أرقام.',
+      saveEmailFirst: isEnglish ? 'Save your email changes first before enabling 2FA.' : 'احفظ تغييرات البريد الإلكتروني أولاً قبل تفعيل المصادقة الثنائية.',
+      disableTitle: isEnglish ? 'Disable two-factor authentication?' : 'إلغاء المصادقة الثنائية؟',
       disableDesc: isEnglish
         ? 'For security, confirm your current password before disabling 2FA.'
-        : 'For security, confirm your current password before disabling 2FA.',
-      currentPassword: isEnglish ? 'Current password' : 'Current password',
-      currentPasswordPlaceholder: isEnglish ? 'Enter your current password' : 'Enter your current password',
-      cancel: isEnglish ? 'Cancel' : 'Cancel',
-      confirmDisable: isEnglish ? 'Disable now' : 'Disable now',
+        : 'لأمان حسابك، أكد كلمة المرور الحالية قبل الإلغاء.',
+      currentPassword: isEnglish ? 'Current password' : 'كلمة المرور الحالية',
+      currentPasswordPlaceholder: isEnglish ? 'Enter your current password' : 'أدخل كلمة المرور الحالية',
+      cancel: isEnglish ? 'Cancel' : 'إلغاء',
+      confirmDisable: isEnglish ? 'Disable now' : 'إلغاء الآن',
     }),
     [isEnglish]
   );
@@ -110,7 +110,7 @@ const TwoFactorCard = ({ email, twoFactorEnabled = false, emailChangedPending = 
       setFeedback({ type: 'success', message: text.generated });
       addToast(text.generated, 'success');
     } catch (error) {
-      const message = error?.message || 'Unable to generate 2FA setup.';
+      const message = error?.message || (isEnglish ? 'Unable to generate 2FA setup.' : 'تعذر إنشاء إعداد المصادقة الثنائية.');
       setStatus(STATUS.ERROR);
       setFeedback({ type: 'error', message });
       addToast(message, 'error');
@@ -137,7 +137,7 @@ const TwoFactorCard = ({ email, twoFactorEnabled = false, emailChangedPending = 
       setFeedback({ type: 'success', message: text.activated });
       addToast(text.activated, 'success');
     } catch (error) {
-      const message = error?.message || 'Invalid 2FA code. Please try again.';
+      const message = error?.message || (isEnglish ? 'Invalid 2FA code. Please try again.' : 'كود المصادقة الثنائية غير صحيح. حاول مرة أخرى.');
       setStatus(STATUS.READY);
       setFeedback({ type: 'error', message });
       addToast(message, 'error');
@@ -163,7 +163,7 @@ const TwoFactorCard = ({ email, twoFactorEnabled = false, emailChangedPending = 
 
   const disableTwoFactor = async () => {
     if (!disablePassword.trim()) {
-      setFeedback({ type: 'error', message: 'Current password is required.' });
+      setFeedback({ type: 'error', message: isEnglish ? 'Current password is required.' : 'كلمة المرور الحالية مطلوبة.' });
       return;
     }
 
@@ -178,7 +178,7 @@ const TwoFactorCard = ({ email, twoFactorEnabled = false, emailChangedPending = 
       setFeedback({ type: 'success', message: text.deactivated });
       addToast(text.deactivated, 'success');
     } catch (error) {
-      const message = error?.message || 'Could not disable 2FA.';
+      const message = error?.message || (isEnglish ? 'Could not disable 2FA.' : 'تعذر إلغاء المصادقة الثنائية.');
       setFeedback({ type: 'error', message });
       addToast(message, 'error');
     } finally {

@@ -234,10 +234,10 @@ const AdminDashboard = () => {
       setIsLoading(true);
 
       const tasks = [];
-      if (canViewUsers || canConfirmAccounts) tasks.push(Promise.resolve(loadUsers()));
-      if (canViewOrders || canConfirmOrders) tasks.push(Promise.resolve(loadOrders()));
-      if (canViewPayments) tasks.push(Promise.resolve(loadTopups()));
-      if (canViewProducts) tasks.push(Promise.resolve(loadProducts()));
+      if (canViewUsers || canConfirmAccounts) tasks.push(Promise.resolve(loadUsers({ force: true })));
+      if (canViewOrders || canConfirmOrders) tasks.push(Promise.resolve(loadOrders(undefined, { force: true })));
+      if (canViewPayments) tasks.push(Promise.resolve(loadTopups({ force: true })));
+      if (canViewProducts) tasks.push(Promise.resolve(loadProducts({ force: true })));
       tasks.push(Promise.resolve(loadCurrencies?.()));
 
       await Promise.allSettled(tasks);

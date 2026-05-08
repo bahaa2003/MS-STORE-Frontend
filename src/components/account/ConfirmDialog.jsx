@@ -21,33 +21,38 @@ const ConfirmDialog = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4"
+          className="fixed inset-0 z-[260] flex items-center justify-center bg-black/68 px-4 backdrop-blur-[8px]"
         >
           <motion.div
-            initial={{ opacity: 0, y: 14, scale: 0.98 }}
+            initial={{ opacity: 0, y: 12, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            className="w-full max-w-md rounded-2xl border border-[color:rgb(var(--color-border-rgb)/0.92)] bg-[color:rgb(var(--color-card-rgb)/0.98)] p-5 shadow-[var(--shadow-medium)] backdrop-blur-md"
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="w-full max-w-[23rem] overflow-hidden rounded-[1.25rem] border border-[color:rgb(var(--color-warning-rgb)/0.2)] bg-[color:rgb(var(--color-card-rgb)/0.98)] shadow-[0_26px_70px_-36px_rgb(0_0_0/0.76)]"
           >
-            <div className="mb-4 flex items-start gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-500/15 text-amber-700 dark:text-amber-200">
-                <AlertTriangle className="h-5 w-5" />
-              </span>
-              <div>
-                <h3 className="text-base font-semibold text-[var(--color-text)]">{title}</h3>
-                {description ? <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{description}</p> : null}
+            <div className="h-1 bg-[linear-gradient(90deg,rgb(var(--color-warning-rgb)/0.95),rgb(var(--color-primary-rgb)/0.58))]" />
+            <div className="p-4 sm:p-5">
+              <div className="mb-3 flex items-start gap-3">
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[color:rgb(var(--color-warning-rgb)/0.22)] bg-[color:rgb(var(--color-warning-rgb)/0.12)] text-[var(--color-warning)] shadow-[0_12px_28px_-20px_rgb(var(--color-warning-rgb)/0.8)]">
+                  <AlertTriangle className="h-4.5 w-4.5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)]">تنبيه</p>
+                  <h3 className="mt-1 text-sm font-black text-[var(--color-text)]">{title}</h3>
+                  {description ? <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-secondary)]">{description}</p> : null}
+                </div>
               </div>
-            </div>
 
-            {children ? <div className="mb-4">{children}</div> : null}
+              {children ? <div className="mb-3">{children}</div> : null}
 
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-                {cancelLabel}
-              </Button>
-              <Button type="button" variant="danger" onClick={onConfirm} disabled={isLoading}>
-                {isLoading ? '...' : confirmLabel}
-              </Button>
+              <div className="flex flex-row justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={isLoading} className="h-8 min-w-20 rounded-lg px-3 text-xs">
+                  {cancelLabel}
+                </Button>
+                <Button type="button" variant="danger" size="sm" onClick={onConfirm} disabled={isLoading} className="h-8 min-w-20 rounded-lg px-3 text-xs">
+                  {isLoading ? '...' : confirmLabel}
+                </Button>
+              </div>
             </div>
           </motion.div>
         </motion.div>

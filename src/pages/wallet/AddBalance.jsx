@@ -43,7 +43,7 @@ const AddBalance = () => {
 
   // ── Ensure payment settings are loaded ─────────────────────────────────
   useEffect(() => {
-    loadPaymentSettings();
+    loadPaymentSettings({ force: true });
   }, [loadPaymentSettings]);
 
   // ── Filter groups + methods by user currency ───────────────────────────

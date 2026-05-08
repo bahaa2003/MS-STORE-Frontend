@@ -27,7 +27,7 @@ export const ToastProvider = ({ children }) => {
       {children}
       <div 
         className={cn(
-          "fixed bottom-4 z-50 flex flex-col gap-2.5 pointer-events-none",
+          "fixed bottom-4 z-[260] flex max-w-[calc(100vw-2rem)] flex-col gap-2.5 pointer-events-none",
           dir === 'rtl' ? "left-4 items-start" : "right-4 items-end"
         )}
       >
@@ -39,7 +39,7 @@ export const ToastProvider = ({ children }) => {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: dir === 'rtl' ? '-130%' : '100%', scale: 0.9 }}
               className={cn(
-                'pointer-events-auto flex min-w-[300px] items-center gap-3 rounded-[1.35rem] border px-4 py-3.5 shadow-[var(--shadow-medium)] backdrop-blur-xl',
+                'pointer-events-auto flex w-full min-w-0 max-w-sm items-center gap-3 rounded-[1.35rem] border px-4 py-3.5 shadow-[var(--shadow-medium)] backdrop-blur-xl sm:min-w-[300px]',
                 toast.type === 'success' &&
                   'border-[color:rgb(var(--color-success-rgb)/0.2)] bg-[color:rgb(var(--color-success-rgb)/0.12)] text-[var(--color-success)]',
                 toast.type === 'error' &&

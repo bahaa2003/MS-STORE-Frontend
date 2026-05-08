@@ -21,23 +21,60 @@ import {
 } from '../utils/transactionCurrency';
 
 const DELAY = 800; // Simulated network latency in ms
+const ACCOUNT_SECURITY_STORAGE_KEY = 'ibra-account-security-v1';
+const AUTH_STORAGE_KEY = 'auth-storage';
 
-// Helper to get simulated "Database" from LocalStorage
+// In-memory simulated "Database" (no localStorage). Keeps runtime-only state.
+const __inMemoryDB = Object.create(null);
+const readAuthSessionStorage = () => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return null;
+  try {
+    const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeAuthSessionStorage = (value) => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // Ignore storage failures.
+  }
+};
+
+const clearAuthSessionStorage = () => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+};
+
 const getDB = (key, defaultData) => {
   try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : defaultData;
+    if (key === AUTH_STORAGE_KEY) {
+      return readAuthSessionStorage() || defaultData;
+    }
+    return __inMemoryDB[key] ? __inMemoryDB[key] : defaultData;
   } catch (error) {
-    devLogger.warnOnce(`Error reading ${key} from storage`, error);
+    devLogger.warnOnce(`Error reading ${key} from in-memory DB`, error);
     return defaultData;
   }
 };
 
 const saveDB = (key, data) => {
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    if (key === AUTH_STORAGE_KEY) {
+      writeAuthSessionStorage(data);
+      return;
+    }
+    __inMemoryDB[key] = data;
   } catch (error) {
-    devLogger.warnOnce(`Error saving ${key} to storage`, error);
+    devLogger.warnOnce(`Error saving ${key} to in-memory DB`, error);
   }
 };
 
@@ -136,10 +173,10 @@ const sanitizeUser = (user) => {
 };
 
 const isMockTwoFactorEnabled = (userId) => {
+  // Moved to in-memory store; no localStorage access.
   try {
-    const raw = localStorage.getItem('ibra-account-security-v1');
-    const parsed = raw ? JSON.parse(raw) : {};
-    return Boolean(parsed?.[userId]?.twoFactorEnabled);
+    const store = __inMemoryDB[ACCOUNT_SECURITY_STORAGE_KEY] || {};
+    return Boolean(store?.[userId]?.twoFactorEnabled);
   } catch {
     return false;
   }
@@ -777,8 +814,9 @@ const mockApi = {
 
     logout: async () => {
       await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 250)));
-      localStorage.removeItem('refresh-token');
-      localStorage.removeItem('refreshToken');
+      // No persistent storage in mock mode; clear in-memory auth if present.
+      try { delete __inMemoryDB['auth-storage']; } catch {}
+      clearAuthSessionStorage();
       return { success: true };
     },
 
@@ -1123,7 +1161,13 @@ const mockApi = {
       const db = getSuppliersDb();
       const supplier = (db.state.suppliers || []).find((s) => s.id === id);
       if (!supplier) throw new Error('Supplier not found');
-      const provider = mockProviderCatalog.find((p) => String(p.id || '').toLowerCase().includes(String(supplier.supplierCode || '').toLowerCase())) || mockProviderCatalog[0];
+      const provider = mockProviderCatalog.find((p) => String(p.id || '').toLowerCase().includes(String(supplier.supplierCode || '').toLowerCase()));
+      if (!provider) {
+        supplier.lastProductSyncAt = new Date().toISOString();
+        supplier.syncedProductsSnapshot = [];
+        saveDB('suppliers-storage', db);
+        return [];
+      }
       const items = provider?.products || [];
       const snapshot = items.map((p) => ({
         externalProductId: p.id,
@@ -1149,11 +1193,9 @@ const mockApi = {
       const supplier = (db.state.suppliers || []).find((s) => s.id === id);
       if (!supplier) throw new Error('Supplier not found');
 
-      if (Array.isArray(supplier.syncedProductsSnapshot) && supplier.syncedProductsSnapshot.length) {
-        return supplier.syncedProductsSnapshot;
-      }
+      const provider = mockProviderCatalog.find((p) => String(p.id || '').toLowerCase().includes(String(supplier.supplierCode || '').toLowerCase()));
+      if (!provider) return [];
 
-      const provider = mockProviderCatalog.find((p) => String(p.id || '').toLowerCase().includes(String(supplier.supplierCode || '').toLowerCase())) || mockProviderCatalog[0];
       return (provider?.products || []).map((p) => ({
         externalProductId: p.id,
         externalProductName: p.name,
@@ -2081,28 +2123,19 @@ const mockApi = {
     listActive: async () => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getDB('target-apps-storage', { state: { apps: [] } });
-      const apps = db.state.apps?.length ? db.state.apps : [
-        { id: 'pubg-target', name: 'PUBG Mobile', unitPrice: 1.35, image: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?auto=format&fit=crop&w=600&q=80', allowedPaymentMethods: ['Vodafone Cash', 'InstaPay', 'Binance'], isActive: true },
-        { id: 'free-fire-target', name: 'Free Fire', unitPrice: 1.1, image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=600&q=80', allowedPaymentMethods: ['Vodafone Cash', 'InstaPay'], isActive: true },
-        { id: 'tiktok-target', name: 'TikTok Coins', unitPrice: 0.92, image: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?auto=format&fit=crop&w=600&q=80', allowedPaymentMethods: ['InstaPay', 'Binance'], isActive: true },
-      ];
+      const apps = Array.isArray(db.state.apps) ? db.state.apps : [];
       return apps.filter((app) => app.isActive !== false);
     },
 
     list: async () => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getDB('target-apps-storage', { state: { apps: [] } });
-      if (!db.state.apps?.length) {
-        db.state.apps = await mockApi.targetApps.listActive();
-        saveDB('target-apps-storage', db);
-      }
-      return db.state.apps || [];
+      return Array.isArray(db.state.apps) ? db.state.apps : [];
     },
 
     create: async (payload = {}) => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getDB('target-apps-storage', { state: { apps: [] } });
-      if (!db.state.apps?.length) db.state.apps = await mockApi.targetApps.listActive();
       const app = {
         id: `target-app-${Date.now()}`,
         name: payload.name || 'Target App',
@@ -2120,7 +2153,6 @@ const mockApi = {
     update: async (id, payload = {}) => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getDB('target-apps-storage', { state: { apps: [] } });
-      if (!db.state.apps?.length) db.state.apps = await mockApi.targetApps.listActive();
       const index = db.state.apps.findIndex((app) => String(app.id) === String(id));
       if (index === -1) throw new Error('Target app not found');
       db.state.apps[index] = {
@@ -2137,7 +2169,6 @@ const mockApi = {
     delete: async (id) => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getDB('target-apps-storage', { state: { apps: [] } });
-      if (!db.state.apps?.length) db.state.apps = await mockApi.targetApps.listActive();
       const index = db.state.apps.findIndex((app) => String(app.id) === String(id));
       if (index === -1) throw new Error('Target app not found');
       db.state.apps[index] = { ...db.state.apps[index], isActive: false, updatedAt: new Date().toISOString() };
@@ -2151,6 +2182,16 @@ const mockApi = {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getDB('target-purchases-storage', { state: { requests: [] } });
       return db.state.requests || [];
+    },
+
+    listMine: async (params = {}) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getDB('target-purchases-storage', { state: { requests: [] } });
+      const userId = String(params.userId || params.customerId || '').trim();
+      const requests = db.state.requests || [];
+      return userId
+        ? requests.filter((request) => String(request.userId || '').trim() === userId)
+        : requests;
     },
 
     create: async (payload) => {
@@ -2169,6 +2210,7 @@ const mockApi = {
         id: `target-${Date.now()}`,
         userId: readValue('userId'),
         userName: readValue('userName'),
+        userEmail: readValue('userEmail'),
         appId,
         appNameSnapshot: app.name || readValue('productName') || '',
         coinAmount,
@@ -2179,6 +2221,7 @@ const mockApi = {
         senderId: readValue('senderId') || readValue('playerId'),
         transferNumber: readValue('transferNumber') || readValue('vodafoneCashNumber'),
         paymentMethod: readValue('paymentMethod') || readValue('paymentMethodName'),
+        paymentMethodId: readValue('paymentMethodId'),
         screenshotName: screenshot?.name || '',
         proofImage: screenshot?.preview || '',
         status: 'PENDING',
@@ -2189,14 +2232,18 @@ const mockApi = {
       return request;
     },
 
-    updateStatus: async (id, status) => {
+    updateStatus: async (id, status, payload = {}) => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getDB('target-purchases-storage', { state: { requests: [] } });
       const index = (db.state.requests || []).findIndex((entry) => String(entry.id) === String(id));
       if (index === -1) throw new Error('Target request not found');
+      const normalizedStatus = String(status || 'PENDING').trim().toUpperCase();
+      const rejectionReason = payload.adminNotes ?? payload.rejectionReason ?? payload.reason ?? '';
       const next = {
         ...db.state.requests[index],
-        status,
+        status: normalizedStatus,
+        adminNotes: normalizedStatus === 'REJECTED' ? rejectionReason : '',
+        rejectionReason: normalizedStatus === 'REJECTED' ? rejectionReason : '',
         reviewedAt: new Date().toISOString(),
       };
       db.state.requests[index] = next;
@@ -2293,7 +2340,7 @@ const mockApi = {
           const countryAccounts = Array.isArray(paymentSettings?.countryAccounts)
             ? paymentSettings.countryAccounts
             : [];
-          const paymentGroups = normalizePaymentGroups(paymentSettings?.paymentGroups);
+          const paymentGroups = normalizePaymentGroups(paymentSettings?.paymentGroups, { fallbackToDefault: false });
           return {
             ...defaultPaymentSettings,
             ...paymentSettings,
@@ -2312,7 +2359,7 @@ const mockApi = {
           const current = db?.state?.paymentSettings || defaultPaymentSettings;
           const currentAccounts = Array.isArray(current?.countryAccounts) ? current.countryAccounts : [];
           const incomingAccounts = Array.isArray(settings?.countryAccounts) ? settings.countryAccounts : currentAccounts;
-          const currentGroups = normalizePaymentGroups(current?.paymentGroups);
+          const currentGroups = normalizePaymentGroups(current?.paymentGroups, { fallbackToDefault: false });
           const incomingGroups = Array.isArray(settings?.paymentGroups) ? settings.paymentGroups : currentGroups;
           const normalizedAccounts = incomingAccounts
             .map((item) => ({
@@ -2324,7 +2371,7 @@ const mockApi = {
               bankAccountName: String(item?.bankAccountName || '').trim(),
             }))
             .filter((item) => item.countryCode);
-          const normalizedGroups = normalizePaymentGroups(incomingGroups);
+          const normalizedGroups = normalizePaymentGroups(incomingGroups, { fallbackToDefault: false });
 
           const next = {
             ...current,

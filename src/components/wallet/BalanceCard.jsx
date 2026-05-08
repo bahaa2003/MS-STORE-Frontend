@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { motion } from 'framer-motion';
-import { Wallet } from 'lucide-react';
+import { ArrowUpRight, CreditCard, Wallet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatWalletAmount } from '../../utils/storefront';
@@ -20,44 +20,54 @@ const BalanceCard = ({ balance, currency, secondaryBalance, secondaryCurrency, o
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="sidebar-wallet-shimmer relative isolate overflow-hidden rounded-[24px] border border-[#b98d3e]/55 bg-[linear-gradient(145deg,rgba(88,61,18,0.34),rgba(176,128,43,0.3)_42%,rgba(234,200,121,0.72)_100%)] p-4 shadow-[0_18px_38px_-24px_rgba(92,62,14,0.72)] before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top_right,rgba(255,243,200,0.28),transparent_45%)] before:opacity-80 sm:p-5"
+      className="sidebar-wallet-shimmer relative isolate overflow-hidden rounded-[18px] border border-[#d8b66e]/70 bg-[linear-gradient(135deg,#56370d_0%,#8f621b_48%,#d8ab55_100%)] p-3 shadow-[0_22px_42px_-28px_rgba(86,55,13,0.82)] before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top_right,rgba(255,247,220,0.34),transparent_46%)] before:opacity-90 dark:border-[#8f7236]/72 dark:bg-[linear-gradient(135deg,#17120a_0%,#3d2b13_48%,#9d762c_100%)] sm:p-3.5"
     >
-      <div className="relative z-10">
-        <div className={`flex items-start justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+      <div className="relative z-10 space-y-3">
+        <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold tracking-[0.18em] text-[#fff1c9]">
+            <p className="text-[10px] font-bold tracking-[0.12em] text-[#ffe8a9]">
               {t('wallet.currentBalance')}
             </p>
-            <p className="mt-0.5 text-xs text-[#fff4d4] sm:text-sm">{t('wallet.balanceAvailable')}</p>
+            <p className="mt-0.5 text-[11px] font-medium text-[#fff7df]">{t('wallet.balanceAvailable')}</p>
           </div>
 
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-[#f1d089]/35 bg-[linear-gradient(180deg,rgba(255,239,194,0.34),rgba(189,133,35,0.3))] text-[#fff1c9] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] sm:h-11 sm:w-11">
-            <Wallet className="h-5 w-5" />
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] border border-[#f7d997]/48 bg-[linear-gradient(180deg,rgba(255,246,219,0.28),rgba(255,218,135,0.18))] text-[#fff2c7] shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]">
+            <Wallet className="h-4 w-4" />
           </span>
         </div>
 
-        <div className={`mt-4 ${isRTL ? 'text-right' : 'text-left'}`}>
-          <div className={`text-[1.7rem] font-black tracking-[-0.04em] sm:text-[2.15rem] ${isNegativeBalance ? 'text-[#ffb4b4]' : 'text-[#fff8e8]'}`}>
+        <div className={`${isRTL ? 'text-right' : 'text-left'}`}>
+          <div className={`truncate text-[1.45rem] font-black leading-none tracking-[-0.02em] sm:text-[1.75rem] ${isNegativeBalance ? 'text-[#ffb4b4]' : 'text-[#fff8e8]'}`}>
             {primaryBalance}
           </div>
           {approxBalance && (
-            <div className={`mt-1.5 inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold sm:px-3 sm:py-1 sm:text-xs ${
+            <div className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
               isNegativeBalance
-                ? 'border border-[#f0aaaa]/30 bg-[linear-gradient(180deg,rgba(255,210,210,0.12),rgba(167,35,35,0.16))] text-[#ffd1d1]'
-                : 'border border-[#f1d089]/30 bg-[linear-gradient(180deg,rgba(255,239,194,0.16),rgba(189,133,35,0.2))] text-[#fff1c9]'
+                ? 'border border-[#f0aaaa]/42 bg-[linear-gradient(180deg,rgba(255,210,210,0.14),rgba(167,35,35,0.18))] text-[#ffd1d1]'
+                : 'border border-[#f7d997]/42 bg-[linear-gradient(180deg,rgba(255,239,194,0.2),rgba(189,133,35,0.22))] text-[#fff0bd]'
             }`}>
               ~ {approxBalance}
             </div>
           )}
         </div>
 
-        <div className={`mt-4 flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+        <div className={`flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+          <div className={`flex flex-wrap items-center gap-1.5 ${isRTL ? 'justify-end' : 'justify-start'}`}>
+            <span className={`inline-flex items-center gap-1 rounded-full border border-[#f0d395]/45 bg-[linear-gradient(180deg,rgba(255,245,213,0.24),rgba(172,121,35,0.2))] px-2 py-0.5 text-[9px] font-semibold text-[#fff2c8] ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <CreditCard className="h-3 w-3" />
+              {isRTL ? 'محفظة نشطة' : 'Active wallet'}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[#f0d395]/38 bg-[linear-gradient(180deg,rgba(255,245,213,0.18),rgba(172,121,35,0.18))] px-2 py-0.5 text-[9px] font-semibold text-[#fff2c8]">
+              {isRTL ? 'تحويل فوري' : 'Instant updates'}
+            </span>
+          </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onAddBalance}
-            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-[14px] border border-[#b88b36]/80 bg-[linear-gradient(180deg,#dcb76f,#bf8f35)] px-4 py-2 text-xs font-bold text-white shadow-[0_12px_24px_-18px_rgba(111,78,20,0.95)] transition-all hover:-translate-y-0.5 hover:brightness-[1.03] sm:min-h-11 sm:text-sm"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[12px] border border-[#ffe4a7]/70 bg-[linear-gradient(180deg,#fff1c8,#d6a64c)] px-3 text-xs font-bold text-[#4a2f08] shadow-[0_12px_22px_-16px_rgba(37,23,4,0.9)] transition-all hover:-translate-y-0.5 hover:brightness-[1.03] sm:min-w-[8.5rem]"
           >
+            <ArrowUpRight className="h-3.5 w-3.5" />
             {t('wallet.addBalance')}
           </motion.button>
         </div>

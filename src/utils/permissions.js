@@ -84,47 +84,47 @@ const LEGACY_PERMISSION_ALIASES = {
 export const SUPERVISOR_PERMISSION_GROUPS = [
   {
     id: 'users',
-    title: 'Users',
+    title: 'المستخدمون',
     options: [
-      { key: PERMISSIONS.ADMIN_USERS, label: 'View Users' },
-      { key: PERMISSIONS.MANAGE_USERS, label: 'Manage Users' },
-      { key: PERMISSIONS.CONFIRM_ACCOUNTS, label: 'Confirm Accounts' },
+      { key: PERMISSIONS.ADMIN_USERS, label: 'عرض المستخدمين' },
+      { key: PERMISSIONS.MANAGE_USERS, label: 'إدارة المستخدمين' },
+      { key: PERMISSIONS.CONFIRM_ACCOUNTS, label: 'تأكيد الحسابات' },
     ],
   },
   {
     id: 'orders',
-    title: 'Orders',
+    title: 'الطلبات',
     options: [
-      { key: PERMISSIONS.ADMIN_ORDERS, label: 'View Orders' },
-      { key: PERMISSIONS.CONFIRM_ORDERS, label: 'Confirm Orders' },
+      { key: PERMISSIONS.ADMIN_ORDERS, label: 'عرض الطلبات' },
+      { key: PERMISSIONS.CONFIRM_ORDERS, label: 'تأكيد الطلبات' },
     ],
   },
   {
     id: 'products',
-    title: 'Products & Groups',
+    title: 'المنتجات والمجموعات',
     options: [
-      { key: PERMISSIONS.ADMIN_GROUPS, label: 'Manage Groups' },
-      { key: PERMISSIONS.ADMIN_PRODUCTS, label: 'Manage Products' },
+      { key: PERMISSIONS.ADMIN_GROUPS, label: 'إدارة المجموعات' },
+      { key: PERMISSIONS.ADMIN_PRODUCTS, label: 'إدارة المنتجات' },
     ],
   },
   {
     id: 'finance',
-    title: 'Finance',
+    title: 'المالية',
     options: [
-      { key: PERMISSIONS.ADMIN_PAYMENTS, label: 'Payments History' },
-      { key: PERMISSIONS.MANAGE_WALLET, label: 'Manage Wallet Balances' },
-      { key: PERMISSIONS.ADMIN_PAYMENT_METHODS, label: 'Payment Methods' },
+      { key: PERMISSIONS.ADMIN_PAYMENTS, label: 'سجل المدفوعات' },
+      { key: PERMISSIONS.MANAGE_WALLET, label: 'إدارة أرصدة المحفظة' },
+      { key: PERMISSIONS.ADMIN_PAYMENT_METHODS, label: 'طرق الدفع' },
     ],
   },
   {
     id: 'others',
-    title: 'Others',
+    title: 'أخرى',
     options: [
-      { key: PERMISSIONS.ADMIN_SUPPLIERS, label: 'Supplier Management' },
-      { key: PERMISSIONS.CUSTOMERS, label: 'Customers' },
+      { key: PERMISSIONS.ADMIN_SUPPLIERS, label: 'إدارة الموردين' },
+      { key: PERMISSIONS.CUSTOMERS, label: 'العملاء' },
       { key: PERMISSIONS.ADMIN_TARGET_REQUESTS, label: 'طلبات التارجت' },
       { key: PERMISSIONS.CONFIRM_TARGET_REQUESTS, label: 'تأكيد طلبات التارجت' },
-      { key: PERMISSIONS.ACTIVITY_LOGS, label: 'Activity Logs' },
+      { key: PERMISSIONS.ACTIVITY_LOGS, label: 'سجلات النشاط' },
     ],
   },
 ];

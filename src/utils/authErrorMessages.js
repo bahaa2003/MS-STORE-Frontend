@@ -75,7 +75,7 @@ const getLanguage = () => {
   const current = String(
     i18n.resolvedLanguage
       || i18n.language
-      || (typeof window !== 'undefined' ? window.localStorage?.getItem('language') : '')
+      || (typeof navigator !== 'undefined' ? navigator.language : '')
       || 'ar'
   ).toLowerCase();
 

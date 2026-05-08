@@ -1,5 +1,7 @@
 import React from 'react';
 import { cn } from '../ui/Button';
+import { resolveImageUrl } from '../../utils/imageUrl';
+import coinsImage from '../../assets/عملات.PNG';
 
 const ProductCard = ({
   product,
@@ -17,7 +19,7 @@ const ProductCard = ({
     <article className="group flex h-full flex-col">
       <div className="relative overflow-hidden rounded-[1rem]">
         <img
-          src={product.image}
+          src={product.image ? resolveImageUrl(product.image) : coinsImage}
           alt={productName}
           className={cn(
             'aspect-square w-full object-cover transition duration-500 group-hover:scale-105',

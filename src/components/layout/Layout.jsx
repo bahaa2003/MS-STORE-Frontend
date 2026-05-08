@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ClipboardList } from 'lucide-react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -15,7 +15,7 @@ import {
   registerVisitedPath,
 } from '../../utils/navigation';
 
-const Layout = () => {
+const Layout = ({ children = null }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const { dir } = useLanguage();
@@ -57,6 +57,11 @@ const Layout = () => {
     '/admin/dashboard',
   ].includes(location.pathname);
   const isCustomerDashboard = location.pathname === '/dashboard';
+  const isBuyTargetPage = location.pathname === '/buy-target';
+  const isWalletTopupPage = (
+    location.pathname === '/wallet/add-balance'
+    || location.pathname.startsWith('/wallet/payment-details/')
+  );
   const shellOffset = !isMobile ? (isSidebarOpen ? '318px' : '112px') : '0';
 
   const handleGoBack = () => {
@@ -117,33 +122,49 @@ const Layout = () => {
         style={{ [dir === 'rtl' ? 'marginRight' : 'marginLeft']: shellOffset }}
       >
         <div
-          className="fixed top-4 z-40 transition-all duration-300"
+          className="fixed z-40 max-w-full transition-all duration-300"
           style={{
-            [dir === 'rtl' ? 'right' : 'left']: isMobile ? '16px' : shellOffset,
-            [dir === 'rtl' ? 'left' : 'right']: '16px',
+            top: isMobile ? 'max(0.75rem, env(safe-area-inset-top))' : '1rem',
+            [dir === 'rtl' ? 'right' : 'left']: isMobile ? '12px' : shellOffset,
+            [dir === 'rtl' ? 'left' : 'right']: isMobile ? '12px' : '16px',
           }}
         >
           <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
         </div>
-        <div className="h-[5.35rem] sm:h-[6.5rem]" aria-hidden="true" />
+        <div className="h-[4.9rem] sm:h-[6.5rem]" aria-hidden="true" />
 
         {!isHomePage && (
           <div className="mx-auto mt-4 max-w-[var(--shell-max-width)] px-4 md:px-6 lg:px-8">
-            <button
-              type="button"
-              onClick={handleGoBack}
-              className="inline-flex items-center gap-2 rounded-full border border-[color:rgb(var(--color-border-rgb)/0.76)] bg-[color:rgb(var(--color-card-rgb)/0.7)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text)] shadow-[var(--shadow-subtle)] backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.28)] hover:text-[var(--color-primary)]"
-              aria-label={dir === 'rtl' ? 'رجوع' : 'Back'}
-            >
-              {dir === 'rtl' ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
-              <span>{dir === 'rtl' ? 'رجوع' : 'Back'}</span>
-            </button>
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleGoBack}
+                className="inline-flex items-center gap-2 rounded-full border border-[color:rgb(var(--color-border-rgb)/0.76)] bg-[color:rgb(var(--color-card-rgb)/0.7)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text)] shadow-[var(--shadow-subtle)] backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.28)] hover:text-[var(--color-primary)]"
+                aria-label={dir === 'rtl' ? 'رجوع' : 'Back'}
+              >
+                {dir === 'rtl' ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
+                <span>{dir === 'rtl' ? 'رجوع' : 'Back'}</span>
+              </button>
+
+              {isBuyTargetPage || isWalletTopupPage ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(isBuyTargetPage ? '/target-orders' : '/wallet/topup-history')}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.26)] bg-[color:rgb(var(--color-primary-rgb)/0.1)] px-3 text-sm font-semibold text-[var(--color-primary)] shadow-[var(--shadow-subtle)] backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.42)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.14)]"
+                  aria-label={dir === 'rtl' ? 'سجل الطلبات' : 'Order history'}
+                  title={dir === 'rtl' ? 'سجل الطلبات' : 'Order history'}
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  <span className="hidden sm:inline">{dir === 'rtl' ? 'سجل الطلبات' : 'Order history'}</span>
+                </button>
+              ) : null}
+            </div>
           </div>
         )}
 
         <main className={`min-w-0 overflow-x-hidden px-3 py-5 sm:px-4 md:px-6 md:py-6 lg:px-8 lg:py-8 ${isHomePage ? 'scrollbar-hide' : ''} ${isCustomerDashboard ? '!pt-0 sm:!pt-0 md:!pt-0 lg:!pt-0' : ''}`}>
           <div className="mx-auto w-full min-w-0 max-w-[var(--shell-max-width)] animate-[page-fade-in_0.35s_ease-out]">
-            <Outlet />
+            {children || <Outlet />}
           </div>
         </main>
       </div>

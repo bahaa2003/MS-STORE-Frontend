@@ -29,7 +29,7 @@ export const getDefaultRouteForRole = (role) => {
   }
 
   if (isSupervisorRole(role)) {
-    return '/admin/dashboard';
+    return '/admin/orders';
   }
 
   return '/dashboard';

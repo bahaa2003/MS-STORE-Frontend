@@ -1,4 +1,6 @@
 const ACCOUNT_SECURITY_STORAGE_KEY = 'ibra-account-security-v1';
+// In-memory store for account security (no localStorage)
+const __accountSecurityStore = Object.create(null);
 
 export const accountSecurityEndpoints = {
   sendCode: '/account/2fa/email/send-code',
@@ -17,15 +19,14 @@ const createApiError = (code, message) => {
 
 const readSecurityStore = () => {
   try {
-    const raw = localStorage.getItem(ACCOUNT_SECURITY_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    return __accountSecurityStore[ACCOUNT_SECURITY_STORAGE_KEY] || {};
   } catch {
     return {};
   }
 };
 
 const writeSecurityStore = (value) => {
-  localStorage.setItem(ACCOUNT_SECURITY_STORAGE_KEY, JSON.stringify(value));
+  __accountSecurityStore[ACCOUNT_SECURITY_STORAGE_KEY] = value;
 };
 
 const getUserSecurityState = (store, userId) => ({

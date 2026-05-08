@@ -474,6 +474,16 @@ const Account = () => {
             />
           </div>
         </Card>
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving || !isDirty}
+            className="inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-[var(--color-button-text)] shadow-[0_10px_24px_-12px_rgb(var(--color-primary-rgb)/0.9)] transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSaving ? (isEnglish ? 'Saving...' : 'جاري الحفظ...') : text.saveLabel}
+          </button>
+        </div>
       </motion.section>
 
       <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>

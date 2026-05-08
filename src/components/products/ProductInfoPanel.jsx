@@ -1,4 +1,6 @@
 import React from 'react';
+import { resolveImageUrl } from '../../utils/imageUrl';
+import coinsImage from '../../assets/عملات.PNG';
 
 const ProductInfoPanel = ({
   product,
@@ -10,7 +12,7 @@ const ProductInfoPanel = ({
   <section className="space-y-4">
     <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/30">
       <img
-        src={product.image}
+        src={product.image ? resolveImageUrl(product.image) : coinsImage}
         alt={title}
         loading="eager"
         fetchPriority="high"

@@ -12,6 +12,10 @@ import {
   Power,
   RefreshCw,
   Search,
+  CreditCard,
+  Target,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import apiClient from '../../services/client';
 import Button from '../../components/ui/Button';
@@ -21,7 +25,13 @@ import Modal from '../../components/ui/Modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
 import { useToast } from '../../components/ui/Toast';
 import useAuthStore from '../../store/useAuthStore';
+import useSystemStore from '../../store/useSystemStore';
 import { formatDateTime, formatNumber } from '../../utils/intl';
+import { useLanguage } from '../../context/LanguageContext';
+import BalanceCard from '../../components/wallet/BalanceCard';
+import StatsCards from '../../components/wallet/StatsCards';
+import { formatWalletAmount } from '../../utils/storefront';
+import { normalizeMoneyAmount } from '../../utils/money';
 
 const defaultForm = {
   supplierName: '',
@@ -154,7 +164,29 @@ const normalizeSupplierProducts = (rawInput = []) => {
       maxQty: Number.isFinite(max) ? max : 0,
       category: String(item?.category || item?.group || item?.section || '').trim(),
     };
+  }).filter((product) => {
+    const id = String(product.externalProductId || product.id || '').trim().toLowerCase();
+    const name = String(product.externalProductName || '').trim().toLowerCase();
+
+    const isDemoProviderProduct = (
+      ['prod-001', 'prod-002', 'prod-003'].includes(id)
+      || name.includes('provider widget')
+      || name.includes('provider gadget')
+      || name.includes('provider item')
+    );
+
+    return !isDemoProviderProduct;
   });
+};
+
+const clearStoredSupplierProductSnapshots = () => {
+  // No-op: remove persistent supplier snapshots (localStorage not used anymore).
+  return;
+};
+
+const stripSupplierProductSnapshot = (supplier = {}) => {
+  const { syncedProductsSnapshot, syncedProductsCount, ...rest } = supplier || {};
+  return rest;
 };
 
 const AdminSuppliers = () => {
@@ -181,6 +213,12 @@ const AdminSuppliers = () => {
   const [debugResult, setDebugResult] = useState(null);
   const [debugLoading, setDebugLoading] = useState(false);
 
+  // ── Wallet stats state ──────────────────────────────────────────────────────
+  const { dir } = useLanguage();
+  const { currencies, loadCurrencies } = useSystemStore();
+  const [walletStats, setWalletStats] = useState(null);
+  const isRTL = dir === 'rtl';
+
   const mergeRuntimeSupplierState = (supplierId, patch) => {
     setRuntimeSupplierState((current) => ({
       ...current,
@@ -190,8 +228,9 @@ const AdminSuppliers = () => {
 
   const load = async () => {
     try {
+      clearStoredSupplierProductSnapshots();
       const rows = await apiClient.suppliers.list();
-      setSuppliers(Array.isArray(rows) ? rows : []);
+      setSuppliers(Array.isArray(rows) ? rows.map(stripSupplierProductSnapshot) : []);
     } catch (error) {
       addToast(error?.message || 'فشل تحميل الموردين', 'error');
     }
@@ -200,6 +239,28 @@ const AdminSuppliers = () => {
   useEffect(() => {
     load();
   }, []);
+
+  // ── Load wallet stats and currencies ────────────────────────────────────────
+  useEffect(() => {
+    if (loadCurrencies) {
+      loadCurrencies().catch(() => null);
+    }
+
+    // Fetch wallet stats from backend
+    const fetchWalletStats = async () => {
+      try {
+        const result = await apiClient.wallet?.getStats?.();
+        if (result) {
+          setWalletStats(result);
+        }
+      } catch (error) {
+        // Silently fail, use defaults
+        setWalletStats(null);
+      }
+    };
+
+    void fetchWalletStats();
+  }, [loadCurrencies]);
 
   const filteredSuppliers = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -227,6 +288,32 @@ const AdminSuppliers = () => {
       syncedProducts: mergedSuppliers.reduce((sum, supplier) => sum + Number(supplier.syncedProductsCount || 0), 0),
     };
   }, [suppliers, runtimeSupplierState]);
+
+  // ── Calculate formatted wallet stats for display ────────────────────────────
+  const userCurrency = String(user?.currency || 'USD').toUpperCase();
+  const balance = normalizeMoneyAmount(user?.coins || 0);
+
+  const currencyRate = useMemo(() => {
+    const match = (currencies || []).find(
+      (c) => String(c.code).toUpperCase() === userCurrency
+    );
+    return Number(match?.rate) || 1;
+  }, [currencies, userCurrency]);
+
+  const usdEquivalent = currencyRate > 0 ? normalizeMoneyAmount(balance / currencyRate) : balance;
+
+  const stats = useMemo(() => {
+    const deposited = normalizeMoneyAmount(walletStats?.totalDeposited || 0);
+    const spent = normalizeMoneyAmount(Math.abs(walletStats?.totalSpent || 0));
+    const netBalance = normalizeMoneyAmount(walletStats?.netBalance ?? balance);
+
+    return {
+      totalDeposits: formatWalletAmount(deposited, userCurrency),
+      totalSpent: formatWalletAmount(spent, userCurrency),
+      netBalance: formatWalletAmount(netBalance, userCurrency),
+      totalTransactions: String(walletStats?.totalTransactions || 0),
+    };
+  }, [balance, walletStats, userCurrency]);
 
   const openCreate = () => {
     setEditing(null);
@@ -311,31 +398,27 @@ const AdminSuppliers = () => {
 
   const openProductsCatalog = async (row, mode = 'live') => {
     const mergedSupplier = { ...row, ...(runtimeSupplierState[row.id] || {}) };
-    const cachedProducts = normalizeSupplierProducts(mergedSupplier.syncedProductsSnapshot || []);
-
-    if (cachedProducts.length && mode === 'live') {
-      setSelectedSupplier(mergedSupplier);
-      setSupplierProducts(cachedProducts);
-      setIsProductsOpen(true);
-    }
-
+    setSelectedSupplier(stripSupplierProductSnapshot(mergedSupplier));
+    setSupplierProducts([]);
+    setIsProductsOpen(true);
     setProductsLoading(true);
+
     try {
       const rawItems = mode === 'sync'
         ? await apiClient.suppliers.syncProducts(row.id, user)
         : await apiClient.suppliers.getLiveProducts(row.id, user);
       const normalizedItems = normalizeSupplierProducts(rawItems);
       const nextMeta = {
-        syncedProductsSnapshot: normalizedItems,
         syncedProductsCount: normalizedItems.length,
       };
 
       if (mode === 'sync') {
+        nextMeta.syncedProductsSnapshot = normalizedItems;
         nextMeta.lastProductSyncAt = new Date().toISOString();
       }
 
       mergeRuntimeSupplierState(row.id, nextMeta);
-      setSelectedSupplier({ ...mergedSupplier, ...nextMeta });
+      setSelectedSupplier(stripSupplierProductSnapshot({ ...mergedSupplier, ...nextMeta }));
       setSupplierProducts(normalizedItems);
       setIsProductsOpen(true);
 
@@ -427,7 +510,110 @@ const AdminSuppliers = () => {
   ) : null;
 
   return (
-    <div className="min-w-0 space-y-4">
+    <div className="min-w-0 space-y-4" dir={dir}>
+      {/* ── Financial Snapshot (Balance & Stats) ────────────────────────────────── */}
+      <section className="space-y-4 px-4 sm:px-5 pt-4 sm:pt-5">
+        <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <BalanceCard
+            balance={balance}
+            currency={userCurrency}
+            secondaryBalance={usdEquivalent}
+            secondaryCurrency="USD"
+            onAddBalance={() => null}
+          />
+        </div>
+
+        <StatsCards stats={stats} />
+      </section>
+
+      {/* ── Notifications Section ──────────────────────────────────────────────── */}
+      <section className="space-y-3 px-4 sm:px-5">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-bold text-gray-950 dark:text-white">الإشعارات</h2>
+          <span className="text-xs text-gray-500 dark:text-gray-400">آخر الأنشطة</span>
+        </div>
+
+        <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          {/* Notification 1: Deposit Request */}
+          <div className="group relative overflow-hidden rounded-[1.1rem] border border-[#d4af37]/40 bg-[linear-gradient(135deg,rgba(242,230,200,0.8),rgba(255,248,220,0.6))] p-3.5 shadow-sm transition-all hover:-translate-y-1 hover:border-[#d4af37]/60 hover:shadow-md dark:border-[#8f7236]/50 dark:bg-[linear-gradient(135deg,rgba(52,39,17,0.7),rgba(42,32,14,0.8))]">
+            <div className="pointer-events-none absolute right-0 top-0 h-16 w-16 rounded-full bg-[radial-gradient(circle,rgba(212,175,55,0.12),transparent)] dark:bg-[radial-gradient(circle,rgba(212,175,55,0.08),transparent)]" />
+            
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#d4af37_0%,#f1d17d_100%)] text-white shadow-sm">
+                    <CreditCard className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-sm font-bold text-[#4a3f28] dark:text-[#f0e8d8]">طلب شحن جديد</h3>
+                </div>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#d4af37] text-xs font-bold text-white">!</span>
+              </div>
+              
+              <p className="text-xs leading-5 text-[#6b5d47] dark:text-[#d0c5b5]">عميل قدم طلب شحن بقيمة 200 جنيه مصري</p>
+              
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-[10px] text-[#8b7d6b] dark:text-[#b5a899]">قبل بضع دقائق</span>
+                <button className="text-xs font-semibold text-[#d4af37] hover:text-[#f1d17d] transition-colors">
+                  عرض التفاصيل →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Notification 2: Deposit Request */}
+          <div className="group relative overflow-hidden rounded-[1.1rem] border border-[#d4af37]/40 bg-[linear-gradient(135deg,rgba(242,230,200,0.8),rgba(255,248,220,0.6))] p-3.5 shadow-sm transition-all hover:-translate-y-1 hover:border-[#d4af37]/60 hover:shadow-md dark:border-[#8f7236]/50 dark:bg-[linear-gradient(135deg,rgba(52,39,17,0.7),rgba(42,32,14,0.8))]">
+            <div className="pointer-events-none absolute right-0 top-0 h-16 w-16 rounded-full bg-[radial-gradient(circle,rgba(212,175,55,0.12),transparent)] dark:bg-[radial-gradient(circle,rgba(212,175,55,0.08),transparent)]" />
+            
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#d4af37_0%,#f1d17d_100%)] text-white shadow-sm">
+                    <CreditCard className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-sm font-bold text-[#4a3f28] dark:text-[#f0e8d8]">طلب شحن جديد</h3>
+                </div>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#d4af37] text-xs font-bold text-white">!</span>
+              </div>
+              
+              <p className="text-xs leading-5 text-[#6b5d47] dark:text-[#d0c5b5]">عميل قدم طلب شحن بقيمة 65.5 جنيه مصري</p>
+              
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-[10px] text-[#8b7d6b] dark:text-[#b5a899]">قبل 5 دقائق</span>
+                <button className="text-xs font-semibold text-[#d4af37] hover:text-[#f1d17d] transition-colors">
+                  عرض التفاصيل →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Notification 3: Target Order */}
+          <div className="group relative overflow-hidden rounded-[1.1rem] border border-[#60a5fa]/40 bg-[linear-gradient(135deg,rgba(219,234,254,0.8),rgba(240,249,255,0.6))] p-3.5 shadow-sm transition-all hover:-translate-y-1 hover:border-[#60a5fa]/60 hover:shadow-md dark:border-[#3b82f6]/40 dark:bg-[linear-gradient(135deg,rgba(30,58,138,0.7),rgba(23,37,84,0.8))]">
+            <div className="pointer-events-none absolute right-0 top-0 h-16 w-16 rounded-full bg-[radial-gradient(circle,rgba(96,165,250,0.12),transparent)] dark:bg-[radial-gradient(circle,rgba(96,165,250,0.08),transparent)]" />
+            
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3 mb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#60a5fa_0%,#93c5fd_100%)] text-white shadow-sm">
+                    <Target className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-sm font-bold text-[#1e3a8a] dark:text-[#dbeafe]">طلب تارجت جديد</h3>
+                </div>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#60a5fa] text-xs font-bold text-white">!</span>
+              </div>
+              
+              <p className="text-xs leading-5 text-[#1e40af] dark:text-[#bfdbfe]">عميل قدم طلب تارجت بقيمة 200 عملة على "بثبث"</p>
+              
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-[10px] text-[#3b82f6] dark:text-[#93c5fd]">قبل دقيقة واحدة</span>
+                <button className="text-xs font-semibold text-[#60a5fa] hover:text-[#93c5fd] transition-colors">
+                  عرض التفاصيل →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="admin-premium-hero overflow-hidden p-4 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl space-y-2">

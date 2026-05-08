@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Card from '../../components/ui/Card';
+import ConfirmDialog from '../../components/account/ConfirmDialog';
 import OrdersFiltersBar from '../../components/orders/OrdersFiltersBar';
 import OrdersMobileCards from '../../components/orders/OrdersMobileCards';
 import EmptyOrdersState from '../../components/orders/EmptyOrdersState';
@@ -112,7 +113,7 @@ const PaginationBar = ({ page, totalPages, totalOrders, limit, onPageChange, onL
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-hover)] disabled:cursor-not-allowed disabled:opacity-30"
-          aria-label="Previous page"
+          aria-label="الصفحة السابقة"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -139,7 +140,7 @@ const PaginationBar = ({ page, totalPages, totalOrders, limit, onPageChange, onL
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-hover)] disabled:cursor-not-allowed disabled:opacity-30"
-          aria-label="Next page"
+          aria-label="الصفحة التالية"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -224,6 +225,7 @@ const AdminOrders = () => {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [actionOrderId, setActionOrderId] = useState('');
   const [syncingOrderId, setSyncingOrderId] = useState('');
+  const [statusConfirm, setStatusConfirm] = useState(null);
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
   // ── Stable ref for store actions so they never appear in dep arrays ─────
@@ -245,9 +247,9 @@ const AdminOrders = () => {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       }),
-      storeActionsRef.current.loadUsers(),
-      storeActionsRef.current.loadProducts(),
-      storeActionsRef.current.loadCurrencies(),
+      storeActionsRef.current.loadUsers({ force: true }),
+      storeActionsRef.current.loadProducts({ force: true }),
+      storeActionsRef.current.loadCurrencies({ force: true }),
     ]);
     setIsLoading(false);
   }, []); // intentionally no deps — storeActionsRef is always current
@@ -387,11 +389,13 @@ const AdminOrders = () => {
       ? `هل تريد تحديث حالة هذا الطلب إلى "${nextStatusLabel}"؟`
       : `Do you want to update this order to "${nextStatusLabel}"?`;
 
-    if (!window.confirm(confirmationMessage)) {
-      return;
-    }
-
-    executeStatusUpdate(order, nextStatus, rejectionReason);
+    setStatusConfirm({
+      order,
+      nextStatus,
+      rejectionReason,
+      title: isArabic ? 'تحديث حالة الطلب' : 'Update order status',
+      description: confirmationMessage,
+    });
   }, [addToast, canConfirmOrders, isArabic]);
 
   const executeStatusUpdate = useCallback(async (order, nextStatus, rejectionReason) => {
@@ -401,7 +405,7 @@ const AdminOrders = () => {
     try {
       await updateOrderStatus(order.id, nextStatus, { ...order, rejectionReason });
       await Promise.allSettled([
-        Promise.resolve(loadUsers()),
+        Promise.resolve(loadUsers({ force: true })),
         Promise.resolve(loadAdminOrders({
           page,
           limit,
@@ -422,6 +426,13 @@ const AdminOrders = () => {
       setActionOrderId('');
     }
   }, [addToast, appliedEndDate, appliedStartDate, isArabic, limit, loadAdminOrders, loadUsers, page, serverSearchTerm, updateOrderStatus]);
+
+  const confirmStatusUpdate = useCallback(() => {
+    if (!statusConfirm?.order) return;
+    const { order, nextStatus, rejectionReason } = statusConfirm;
+    setStatusConfirm(null);
+    executeStatusUpdate(order, nextStatus, rejectionReason);
+  }, [executeStatusUpdate, statusConfirm]);
 
   const handleSync = useCallback(async (order) => {
     setSyncingOrderId(order.id);
@@ -668,6 +679,17 @@ const AdminOrders = () => {
           />
         </Suspense>
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(statusConfirm)}
+        title={statusConfirm?.title || ''}
+        description={statusConfirm?.description || ''}
+        confirmLabel={isArabic ? 'تأكيد' : 'Confirm'}
+        cancelLabel={isArabic ? 'إلغاء' : 'Cancel'}
+        onConfirm={confirmStatusUpdate}
+        onCancel={() => setStatusConfirm(null)}
+        isLoading={Boolean(actionOrderId)}
+      />
 
     </div>
   );

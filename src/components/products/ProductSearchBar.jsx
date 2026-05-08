@@ -1,6 +1,8 @@
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SearchX } from 'lucide-react';
+import { resolveImageUrl } from '../../utils/imageUrl';
+import coinsImage from '../../assets/عملات.PNG';
 import SearchBar from '../ui/SearchBar';
 import { cn } from '../ui/Button';
 import { filterStorefrontProducts, sanitizeStorefrontQuery } from '../../utils/storefront';
@@ -157,7 +159,7 @@ const ProductSearchBar = ({
                 >
                   <div className="h-11 w-11 shrink-0 overflow-hidden rounded-[0.95rem] border border-[color:rgb(var(--color-border-rgb)/0.84)] bg-[color:rgb(var(--color-elevated-rgb)/0.88)]">
                     <img
-                      src={product.image}
+                      src={product.image ? resolveImageUrl(product.image) : coinsImage}
                       alt={product.displayName}
                       loading="lazy"
                       decoding="async"

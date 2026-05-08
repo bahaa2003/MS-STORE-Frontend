@@ -75,6 +75,9 @@ const TargetRequestsReviewSection = ({
               const isPending = isPendingTarget(request.status);
               const isRejected = isRejectedTarget(request.status);
               const isApproving = String(approvingRequestId) === String(request.id);
+              const requesterId = request.userId || request.customerId || '';
+              const requesterName = request.userName || request.customerName || '';
+              const requesterEmail = request.userEmail || request.customerEmail || '';
 
               return (
                 <article
@@ -94,6 +97,27 @@ const TargetRequestsReviewSection = ({
                       <p className="mt-0.5 truncate text-[10px] text-[var(--color-muted)]">
                         {formatDate(request.createdAt)}
                       </p>
+                      {(requesterId || requesterName || requesterEmail) ? (
+                        <div className="mt-2 min-w-0 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.62)] bg-[color:rgb(var(--color-surface-rgb)/0.42)] p-2">
+                          {requesterId ? (
+                            <button
+                              type="button"
+                              onClick={() => copyText(requesterId)}
+                              className="inline-flex max-w-full items-center gap-1 rounded-md border border-[color:rgb(var(--color-primary-rgb)/0.2)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--color-primary)]"
+                              title={isArabic ? 'نسخ ID الحساب' : 'Copy account ID'}
+                            >
+                              <Copy className="h-2.5 w-2.5 shrink-0" />
+                              <span className="truncate">ID: {requesterId}</span>
+                            </button>
+                          ) : null}
+                          {requesterName ? (
+                            <p className="mt-1 truncate text-[11px] font-bold text-[var(--color-text)]">{requesterName}</p>
+                          ) : null}
+                          {requesterEmail ? (
+                            <p className="mt-0.5 truncate text-[10px] text-[var(--color-muted)]">{requesterEmail}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                     <Badge variant={getStatusVariant(request.status)} className="px-2 py-0.5 text-[10px]">
                       {getStatusLabel(request.status, isArabic)}

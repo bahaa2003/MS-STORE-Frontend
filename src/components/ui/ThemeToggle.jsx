@@ -26,7 +26,7 @@ const ThemeToggle = ({ className, compact = false, variant = 'default' }) => {
           compactVariantStyles[variant] || compactVariantStyles.default,
           className
         )}
-        aria-label="Toggle theme"
+        aria-label="تبديل المظهر"
       >
         {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
       </button>
@@ -42,7 +42,7 @@ const ThemeToggle = ({ className, compact = false, variant = 'default' }) => {
         variantStyles[variant] || variantStyles.default,
         className
       )}
-      aria-label="Toggle theme"
+      aria-label="تبديل المظهر"
     >
       <span
         className={cn(

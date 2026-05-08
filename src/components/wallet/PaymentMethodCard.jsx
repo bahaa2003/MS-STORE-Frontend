@@ -59,9 +59,13 @@ const PaymentMethodCard = ({ method, onSelect, index }) => {
                 className="h-11 w-11 shrink-0 rounded-[16px] border border-[#d8bd8b]/75 object-cover shadow-[0_10px_20px_-16px_rgba(125,92,33,0.72)] transition-transform group-hover:scale-110 sm:h-12 sm:w-12"
               />
             ) : (
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-[#d8b36b]/60 bg-[linear-gradient(180deg,rgba(255,246,218,0.95),rgba(242,214,150,0.62))] text-[#8c631f] shadow-[inset_0_1px_0_rgba(255,255,255,0.48)] transition-transform group-hover:scale-110 sm:h-12 sm:w-12">
+              <motion.div
+                animate={{ y: [0, -2, 0], rotate: [0, 4, 0, -4, 0] }}
+                transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut' }}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-[#d8b36b]/60 bg-[linear-gradient(180deg,rgba(255,246,218,0.95),rgba(242,214,150,0.62))] text-[#8c631f] shadow-[inset_0_1px_0_rgba(255,255,255,0.48)] transition-transform group-hover:scale-110 sm:h-12 sm:w-12"
+              >
                 <IconComponent className="h-6 w-6" />
-              </div>
+              </motion.div>
             )}
             <div className="min-w-0">
               {groupLabel ? (

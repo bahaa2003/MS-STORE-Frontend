@@ -91,7 +91,7 @@ const Products = () => {
   const [activeSubcategoryId, setActiveSubcategoryId] = useState(null);
 
   useEffect(() => {
-    loadProducts();
+    loadProducts({ force: true });
   }, [loadProducts]);
 
   useEffect(() => {

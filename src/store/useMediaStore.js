@@ -1,12 +1,11 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { mockProducts, mockCategories } from '../data/mockData';
 import apiClient from '../services/client';
 
 const dataProvider = (import.meta.env.VITE_DATA_PROVIDER || 'mock').toLowerCase();
 const isRealProvider = dataProvider === 'real';
 
-const PRODUCTS_CACHE_TTL = 5 * 60 * 1000;
+const PRODUCTS_CACHE_TTL = 0; // disable caching; always fetch fresh by default
 let productsRequest = null;
 let hasFetchedFromBackendThisSession = false;
 
@@ -283,39 +282,32 @@ const deriveCategoriesFromProducts = (products = []) => {
   return Array.from(unique.values());
 };
 
-const useMediaStore = create(
-  persist(
-    (set, get) => ({
-      products: isRealProvider ? [] : normalizeProducts(mockProducts, mockCategories),
-      categories: isRealProvider ? [] : mockCategories,
-      isLoading: false,
-      error: null,
+const useMediaStore = create((set, get) => ({
+  products: isRealProvider ? [] : normalizeProducts(mockProducts, mockCategories),
+  categories: isRealProvider ? [] : mockCategories,
+  isLoading: false,
+  error: null,
+  lastLoadedAt: 0,
+
+  resetProducts: () => {
+    set({
+      products: normalizeProducts(mockProducts, mockCategories),
+      categories: mockCategories,
       lastLoadedAt: 0,
+    });
+  },
 
-      resetProducts: () => {
-        set({
-          products: normalizeProducts(mockProducts, mockCategories),
-          categories: mockCategories,
-          lastLoadedAt: 0,
-        });
-      },
+  loadProducts: ({ force = true } = {}) => {
+    const state = get();
+    const hasProducts = Array.isArray(state.products);
+    const hasCategories = Array.isArray(state.categories) && state.categories.length > 0;
 
-      loadProducts: ({ force = false } = {}) => {
-        const state = get();
-        const hasProducts = Array.isArray(state.products);
-        const hasCategories = Array.isArray(state.categories) && state.categories.length > 0;
-        const shouldBypassHydratedCache = isRealProvider && !hasFetchedFromBackendThisSession;
-        const isFresh = !shouldBypassHydratedCache
-          && hasProducts
-          && hasCategories
-          && (Date.now() - Number(state.lastLoadedAt || 0) < PRODUCTS_CACHE_TTL);
-
-        if (!force && isFresh) {
-          return Promise.resolve({
-            products: state.products,
-            categories: state.categories,
-          });
-        }
+    if (!force && hasProducts && hasCategories) {
+      return Promise.resolve({
+        products: state.products,
+        categories: state.categories,
+      });
+    }
 
         if (productsRequest) {
           return productsRequest;
@@ -579,37 +571,6 @@ const useMediaStore = create(
       },
 
       fetchProducts: async () => get().loadProducts({ force: true })
-    }),
-    {
-      name: 'products-storage',
-      merge: (persistedState, currentState) => {
-        if (!isRealProvider) {
-          return {
-            ...currentState,
-            ...(persistedState || {}),
-          };
-        }
-
-        return {
-          ...currentState,
-          ...(persistedState || {}),
-          products: currentState.products,
-          categories: currentState.categories,
-          lastLoadedAt: 0,
-        };
-      },
-      migrate: (persistedState) => {
-        if (persistedState && persistedState.products) {
-          const categories = Array.isArray(persistedState.categories) && persistedState.categories.length
-            ? persistedState.categories
-            : mockCategories;
-          persistedState.products = normalizeProducts(persistedState.products, categories);
-          persistedState.categories = categories;
-        }
-        return persistedState;
-      }
-    }
-  )
-);
+}));
 
 export default useMediaStore;

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { mockTopups } from '../data/mockData';
 import apiClient from '../services/client';
 import useNotificationStore from './useNotificationStore';
@@ -11,12 +10,11 @@ const dataProvider = (import.meta.env.VITE_DATA_PROVIDER || 'mock').toLowerCase(
 const isRealProvider = dataProvider === 'real';
 let hasFetchedTopupsFromBackendThisSession = false;
 
-const TOPUPS_CACHE_TTL = 60 * 1000;
+const TOPUPS_CACHE_TTL = 0; // disable caching; always fetch fresh by default
 let topupsRequest = null;
+let filteredTopupsRequestSeq = 0;
 
-const useTopupStore = create(
-  persist(
-    (set, get) => ({
+const useTopupStore = create((set, get) => ({
       // =====================================================================================
       // FINANCIAL SNAPSHOT SYSTEM - CRITICAL BUSINESS LOGIC
       // =====================================================================================
@@ -30,33 +28,25 @@ const useTopupStore = create(
       //
       // This prevents dynamic recalculation when exchange rates change later.
       // =====================================================================================
-      topups: mockTopups,
+      topups: isRealProvider ? [] : mockTopups,
       topupsLastLoadedAt: 0,
 
       topupsPagination: null,
       topupsSummary: null,
 
-      loadTopups: async ({ force = false } = {}) => {
-        const { topups, topupsLastLoadedAt } = get();
+      loadTopups: async ({ force = true } = {}) => {
+        const { topups } = get();
         const hasTopups = Array.isArray(topups) && topups.length > 0;
-        const shouldBypassHydratedCache = isRealProvider && !hasFetchedTopupsFromBackendThisSession;
-        const hasFreshTopups = !shouldBypassHydratedCache
-          && hasTopups
-          && (Date.now() - Number(topupsLastLoadedAt || 0) < TOPUPS_CACHE_TTL);
 
-        if (!force && hasFreshTopups) {
-          return topups;
-        }
+        if (!force && hasTopups) return topups;
 
-        if (topupsRequest) {
-          return topupsRequest;
-        }
+        if (topupsRequest) return topupsRequest;
 
         topupsRequest = apiClient.topups.list()
           .then((result) => {
             // Handle both old (array) and new ({ items, pagination }) response shapes
             const items = Array.isArray(result) ? result : (result?.items || []);
-            const nextTopups = items.length ? items : mockTopups;
+            const nextTopups = items.length ? items : (isRealProvider ? [] : mockTopups);
             set({
               topups: nextTopups,
               topupsLastLoadedAt: Date.now(),
@@ -70,7 +60,7 @@ const useTopupStore = create(
           })
           .catch((_error) => {
             if (!hasTopups) {
-              set({ topups: mockTopups });
+              set({ topups: isRealProvider ? [] : mockTopups });
             }
             return get().topups;
           })
@@ -86,14 +76,42 @@ const useTopupStore = create(
        * Each call hits the server directly, perfect for filter/page changes.
        */
       loadTopupsFiltered: async (params = {}) => {
+        const requestSeq = filteredTopupsRequestSeq + 1;
+        filteredTopupsRequestSeq = requestSeq;
+
+        const normalizedSearch = String(params.search || '').trim().replace(/^#/, '');
+        const shouldTryDirectLookup = Boolean(normalizedSearch)
+          && !normalizedSearch.includes('@')
+          && !/\s/.test(normalizedSearch)
+          && Number(params.page || 1) === 1;
+
+        if (shouldTryDirectLookup) {
+          try {
+            const directMatch = await apiClient.topups.getById(normalizedSearch);
+            if (directMatch && requestSeq === filteredTopupsRequestSeq) {
+              set({
+                topups: [directMatch],
+                topupsLastLoadedAt: Date.now(),
+                topupsPagination: { page: 1, limit: params.limit || 20, total: 1, pages: 1 },
+                topupsSummary: null,
+              });
+              return [directMatch];
+            }
+          } catch (_error) {
+            // Not an exact request id; continue with the normal server-side list search.
+          }
+        }
+
         const result = await apiClient.topups.list(params);
         const items = Array.isArray(result) ? result : (result?.items || []);
-        set({
-          topups: items,
-          topupsLastLoadedAt: Date.now(),
-          topupsPagination: result?.pagination || null,
-          topupsSummary: result?.summary || null,
-        });
+        if (requestSeq === filteredTopupsRequestSeq) {
+          set({
+            topups: items,
+            topupsLastLoadedAt: Date.now(),
+            topupsPagination: result?.pagination || null,
+            topupsSummary: result?.summary || null,
+          });
+        }
         return items;
       },
 
@@ -223,6 +241,9 @@ const useTopupStore = create(
       updateTopupStatus: async (id, status, review = {}) => {
         const target = (get().topups || []).find((t) => t.id === id);
         if (!target) return;
+        const currentActor = useAuthStore.getState().user || null;
+        const actorRole = String(currentActor?.role || '').trim().toLowerCase();
+        const isAdminActor = ['admin', 'supervisor', 'manager', 'moderator'].includes(actorRole);
 
         // Get current exchange rates for financial snapshot
         const currencies = await apiClient.system.currencies().catch(() => []);
@@ -259,6 +280,12 @@ const useTopupStore = create(
           updatedTopup.actualPaidAmount = actualPaidAmount;
           updatedTopup.creditedCoins = convertedAmount;
           updatedTopup.adminNote = review.adminNote || '';
+          if (isAdminActor) {
+            updatedTopup.reviewedBy = currentActor?.id || currentActor?._id || updatedTopup.reviewedBy || null;
+            updatedTopup.reviewerName = currentActor?.name || updatedTopup.reviewerName || '';
+            updatedTopup.approvedBy = updatedTopup.reviewedBy || updatedTopup.approvedBy || null;
+            updatedTopup.reviewedAt = new Date().toISOString();
+          }
         }
 
         const updated = await apiClient.topups.updateStatus(id, status, updatedTopup);
@@ -268,6 +295,19 @@ const useTopupStore = create(
           topups: state.topups.map(t => t.id === id ? finalUpdate : t),
           topupsLastLoadedAt: Date.now(),
         }));
+
+        if (isAdminActor) {
+          useAdminStore.getState().appendAdminActivity?.({
+            action: `topup_${status}`,
+            title: status === 'approved' || status === 'completed' ? 'قبول طلب شحن' : 'رفض طلب شحن',
+            description: `${currentActor?.name || actorRole || 'مشرف'} ${status === 'approved' || status === 'completed' ? 'قبل' : 'رفض'} طلب الشحن ${target?.id || id}`,
+            actor: currentActor,
+            entityType: 'topup',
+            entityId: target?.id || id,
+            status,
+            source: 'topup_review',
+          });
+        }
 
         // Refresh wallet/user snapshots so dashboard metrics reflect the approval immediately.
         if ((status === 'approved' || status === 'completed') && useAdminStore.getState().loadUsers) {
@@ -303,11 +343,27 @@ const useTopupStore = create(
       },
 
       updateTopupRequest: async (id, payload = {}) => {
+        const currentActor = useAuthStore.getState().user || null;
+        const actorRole = String(currentActor?.role || '').trim().toLowerCase();
+        const isAdminActor = ['admin', 'supervisor', 'manager', 'moderator'].includes(actorRole);
         const updated = await apiClient.topups.updateRequest(id, payload);
         set((state) => ({
           topups: state.topups.map((item) => (item.id === id ? { ...item, ...updated } : item)),
           topupsLastLoadedAt: Date.now(),
         }));
+
+        if (isAdminActor) {
+          useAdminStore.getState().appendAdminActivity?.({
+            action: 'topup_updated',
+            title: 'تعديل طلب شحن',
+            description: `${currentActor?.name || actorRole || 'مشرف'} عدل طلب الشحن ${id}`,
+            actor: currentActor,
+            entityType: 'topup',
+            entityId: id,
+            status: 'updated',
+            source: 'topup_review',
+          });
+        }
 
         const requestedAmount = Number(updated?.requestedAmount ?? updated?.requestedCoins ?? updated?.amount ?? 0);
         useNotificationStore.getState().addNotification({
@@ -320,11 +376,6 @@ const useTopupStore = create(
           targetUrl: '/admin/payments',
         });
       }
-    }),
-    {
-      name: 'topups-storage',
-    }
-  )
-);
+}));
 
 export default useTopupStore;

@@ -67,8 +67,8 @@ const Orders = () => {
       setIsLoading(true);
 
       await Promise.allSettled([
-        Promise.resolve(loadOrders(user?.id)),
-        Promise.resolve(loadProducts()),
+        Promise.resolve(loadOrders(user?.id, { force: true })),
+        Promise.resolve(loadProducts({ force: true })),
         Promise.resolve(loadCurrencies()),
       ]);
 

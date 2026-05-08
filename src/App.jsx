@@ -8,13 +8,14 @@ import SessionBootstrap from './components/app/SessionBootstrap';
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/ui/Toast';
-import { ADMIN_ROLES, SUPERVISOR_ROLES } from './utils/authRoles';
+import { ADMIN_ROLES, SUPERVISOR_ROLES, isSupervisorRole } from './utils/authRoles';
 import { PERMISSIONS } from './utils/permissions';
 import {
   ACCOUNT_PENDING_ROUTE,
   ACCOUNT_REJECTED_ROUTE,
   ACCOUNT_VERIFICATION_ROUTE,
 } from './utils/accountStatus';
+import useAuthStore from './store/useAuthStore';
 
 const Layout = lazy(() => import('./components/layout/Layout'));
 const Auth = lazy(() => import('./pages/Auth'));
@@ -49,7 +50,9 @@ const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
 const AdminUserTransactions = lazy(() => import('./pages/admin/AdminUserTransactions'));
 const AdminTargetRequests = lazy(() => import('./pages/admin/AdminTargetRequests'));
 const BuyTarget = lazy(() => import('./pages/BuyTarget'));
+const TargetOrders = lazy(() => import('./pages/TargetOrders'));
 const AddBalance = lazy(() => import('./pages/AddBalance'));
+const WalletTopupHistory = lazy(() => import('./pages/WalletTopupHistory'));
 const PaymentDetails = lazy(() => import('./pages/PaymentDetails'));
 
 const ADMIN_PANEL_ROLES = [...ADMIN_ROLES, ...SUPERVISOR_ROLES];
@@ -61,6 +64,41 @@ const renderSuspended = (element) => (
     {element}
   </Suspense>
 );
+
+const CreatedByRoute = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return renderSuspended(<CreatedByPage />);
+  }
+
+  return (
+    <ProtectedRoute>
+      {renderSuspended(
+        <Layout>
+          <CreatedByPage embedded />
+        </Layout>
+      )}
+    </ProtectedRoute>
+  );
+};
+
+const AdminPanelDefaultRoute = () => {
+  const user = useAuthStore((state) => state.user);
+  const fallbackPath = isSupervisorRole(user?.role) ? '/admin/orders' : '/admin/dashboard';
+
+  return <Navigate to={fallbackPath} replace />;
+};
+
+const AdminDashboardRoute = () => {
+  const user = useAuthStore((state) => state.user);
+
+  if (isSupervisorRole(user?.role)) {
+    return <Navigate to="/admin/orders" replace />;
+  }
+
+  return renderSuspended(<AdminDashboard />);
+};
 
 const AnimatedAppRoutes = () => {
   const location = useLocation();
@@ -86,7 +124,7 @@ const AnimatedAppRoutes = () => {
           <Route path="/about-us" element={renderSuspended(<AboutUsPage />)} />
           <Route path="/auth" element={renderSuspended(<Auth />)} />
           <Route path="/login" element={renderSuspended(<Auth />)} />
-          <Route path="/created-by" element={renderSuspended(<CreatedByPage />)} />
+          <Route path="/created-by" element={<CreatedByRoute />} />
           <Route path="/email-verified" element={renderSuspended(<EmailVerified />)} />
           <Route path={ACCOUNT_PENDING_ROUTE} element={renderSuspended(<AccountPending />)} />
           <Route path={ACCOUNT_REJECTED_ROUTE} element={renderSuspended(<AccountRejected />)} />
@@ -152,10 +190,26 @@ const AnimatedAppRoutes = () => {
               )}
             />
             <Route
+              path="/target-orders"
+              element={(
+                <ProtectedRoute roles={['customer']}>
+                  {renderSuspended(<TargetOrders />)}
+                </ProtectedRoute>
+              )}
+            />
+            <Route
               path="/wallet/add-balance"
               element={(
                 <ProtectedRoute roles={['customer']}>
                   {renderSuspended(<AddBalance />)}
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/wallet/topup-history"
+              element={(
+                <ProtectedRoute roles={['customer']}>
+                  {renderSuspended(<WalletTopupHistory />)}
                 </ProtectedRoute>
               )}
             />
@@ -195,7 +249,7 @@ const AnimatedAppRoutes = () => {
               path="/manager/dashboard"
               element={(
                 <ProtectedRoute roles={ADMIN_PANEL_ROLES}>
-                  <Navigate to="/admin/dashboard" replace />
+                  <AdminPanelDefaultRoute />
                 </ProtectedRoute>
               )}
             />
@@ -203,7 +257,7 @@ const AnimatedAppRoutes = () => {
               path="/supervisor/dashboard"
               element={(
                 <ProtectedRoute roles={ADMIN_PANEL_ROLES}>
-                  <Navigate to="/admin/dashboard" replace />
+                  <AdminPanelDefaultRoute />
                 </ProtectedRoute>
               )}
             />
@@ -211,7 +265,7 @@ const AnimatedAppRoutes = () => {
               path="/admin"
               element={(
                 <ProtectedRoute roles={ADMIN_PANEL_ROLES}>
-                  <Navigate to="/admin/dashboard" replace />
+                  <AdminPanelDefaultRoute />
                 </ProtectedRoute>
               )}
             />
@@ -219,7 +273,7 @@ const AnimatedAppRoutes = () => {
               path="/admin/dashboard"
               element={(
                 <ProtectedRoute roles={ADMIN_PANEL_ROLES}>
-                  {renderSuspended(<AdminDashboard />)}
+                  <AdminDashboardRoute />
                 </ProtectedRoute>
               )}
             />
