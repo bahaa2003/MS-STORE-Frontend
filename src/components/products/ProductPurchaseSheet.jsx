@@ -362,6 +362,19 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     };
   }, [currencies, isOpen, loadCurrencies]);
 
+  // Auto-close the sheet after a successful order so the user sees the success card briefly.
+  useEffect(() => {
+    if (!successfulOrderId) return undefined;
+
+    const timer = setTimeout(() => {
+      setSuccessfulOrderId(null);
+      setSuccessMeta({ amount: '', identifier: '', orderNumber: '' });
+      onClose();
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, [successfulOrderId, onClose]);
+
   const userCurrencyCode = String(user?.currency || 'USD').toUpperCase();
   const pricingGroup = user?.groupId || user?.group || 'Normal';
   const pricingGroupPercentage = user?.groupPercentage ?? null;
@@ -574,9 +587,13 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setStatusCard({ tone: 'info', title: copy.preparingTitle, message: copy.preparingMessage });
 
     try {
-      const freshCatalog = await loadProducts({ force: true }).catch(() => null);
+      // Refresh the catalog — loadProducts updates the Zustand store in place,
+      // its promise does NOT resolve to the products array.
+      await loadProducts({ force: true }).catch(() => null);
+      const freshCatalog = useMediaStore.getState().products;
+      const catalogArray = Array.isArray(freshCatalog) ? freshCatalog : [];
       const selectedProductId = resolveProductId(product);
-      const freshProduct = (freshCatalog?.products || []).find((item) => resolveProductId(item) === selectedProductId) || null;
+      const freshProduct = catalogArray.find((p) => String(p._id || p.id).trim() === selectedProductId) || null;
 
       if (!freshProduct) {
         const message = language === 'en'
@@ -681,15 +698,21 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
         || createdOrder?.id
         || createdOrderId
       ).trim();
-      setSuccessfulOrderId(createdOrderId || `ord-${Date.now()}`);
+      const storedOrderId = createdOrderId || `ord-${Date.now()}`;
+      setSuccessfulOrderId(storedOrderId);
       setSuccessMeta({
         amount: formattedTotalPrice,
         identifier: userIdentifier,
         orderNumber: createdOrderNumber,
       });
       setStatusCard({ tone: 'success', title: copy.successTitle, message: copy.successMessage });
-      addToast(copy.successMessage, 'success');
+      addToast(
+        language === 'en' ? 'Order placed successfully!' : 'تم إرسال الطلب بنجاح!',
+        'success'
+      );
     } catch (error) {
+      console.error('Order submission false-negative details:', error, error?.response?.data);
+
       if (String(error?.code || '').toUpperCase() === 'PROVIDER_PRICE_INCREASED') {
         const priceMsg = language === 'en'
           ? 'The price for this service has been updated by the provider. Please refresh and review the new price.'
@@ -697,7 +720,8 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
         setStatusCard({ tone: 'warning', title: language === 'en' ? 'Price Updated' : 'تم تحديث السعر', message: priceMsg });
         addToast(priceMsg, 'warning');
       } else {
-        const message = '\u062a\u0639\u0630\u0631 \u062a\u0646\u0641\u064a\u0630 \u0627\u0644\u0637\u0644\u0628 \u0627\u062a\u0635\u0644 \u0628\u0627\u0644\u0645\u0633\u0624\u0648\u0644';
+        const backendMessage = error?.response?.data?.message || error?.message || '';
+        const message = backendMessage || (language === 'en' ? 'Unable to complete order. Please contact support.' : 'تعذر تنفيذ الطلب اتصل بالمسؤول');
         if (String(error?.code || '').toUpperCase() !== 'INVALID_ORDER_AMOUNT') {
           devLogger.warnUnlessBenign('Order submit error:', error);
         }

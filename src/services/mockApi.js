@@ -689,16 +689,13 @@ const mockApi = {
 
     generateTwoFactor: async () => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
-      return {
-        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent('otpauth://totp/MS STORE:mock?secret=MSSTOREMOCK&issuer=MS STORE')}`,
-        secret: 'MSSTOREMOCK',
-      };
+      return { message: 'Verification code sent to email' };
     },
 
-    enableTwoFactor: async ({ token }) => {
+    enableTwoFactor: async ({ code } = {}) => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
-      if (String(token || '').replace(/\D/g, '') !== '123456') {
-        throw new Error('Invalid 2FA code');
+      if (String(code || '').replace(/\D/g, '') !== '123456') {
+        throw new Error('Invalid 2FA setup code');
       }
       return { twoFactorEnabled: true };
     },

@@ -1942,33 +1942,43 @@ const AdminProducts = () => {
                                     {(productForm.dynamicFields || []).map((item, index) => (
                                         <div
                                             key={`${item?.name || 'dynamic'}-${index}`}
-                                            className="grid grid-cols-1 gap-2 rounded-lg border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-900/40 md:grid-cols-12"
+                                            className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900/40 sm:grid-cols-2 md:grid-cols-12 md:items-end"
                                         >
-                                            <Input
-                                                label="العنوان"
-                                                value={item.label || ''}
-                                                onChange={(e) => setProductForm((prev) => ({
-                                                    ...prev,
-                                                    dynamicFields: (prev.dynamicFields || []).map((row, rowIndex) => (
-                                                        rowIndex === index ? { ...row, label: e.target.value } : row
-                                                    )),
-                                                }))}
-                                                className="md:col-span-3"
-                                            />
+                                            {/* العنوان (Label) */}
+                                            <div className="sm:col-span-1 md:col-span-3">
+                                                <Input
+                                                    label="العنوان"
+                                                    placeholder="مثال: رقم اللاعب"
+                                                    value={item.label || ''}
+                                                    onChange={(e) => setProductForm((prev) => ({
+                                                        ...prev,
+                                                        dynamicFields: (prev.dynamicFields || []).map((row, rowIndex) => (
+                                                            rowIndex === index ? { ...row, label: e.target.value } : row
+                                                        )),
+                                                    }))}
+                                                />
+                                            </div>
 
-                                            <Input
-                                                label="الاسم البرمجي"
-                                                value={item.name || ''}
-                                                onChange={(e) => setProductForm((prev) => ({
-                                                    ...prev,
-                                                    dynamicFields: (prev.dynamicFields || []).map((row, rowIndex) => (
-                                                        rowIndex === index ? { ...row, name: e.target.value } : row
-                                                    )),
-                                                }))}
-                                                className="md:col-span-3"
-                                            />
+                                            {/* الاسم البرمجي (Name / Key) */}
+                                            <div className="sm:col-span-1 md:col-span-3">
+                                                <Input
+                                                    label="الاسم البرمجي"
+                                                    placeholder="مثال: player_id"
+                                                    value={item.name || ''}
+                                                    onChange={(e) => {
+                                                        const sanitized = e.target.value.replace(/\s/g, '_');
+                                                        setProductForm((prev) => ({
+                                                            ...prev,
+                                                            dynamicFields: (prev.dynamicFields || []).map((row, rowIndex) => (
+                                                                rowIndex === index ? { ...row, name: sanitized } : row
+                                                            )),
+                                                        }));
+                                                    }}
+                                                />
+                                            </div>
 
-                                            <div className="md:col-span-3">
+                                            {/* النوع (Type) */}
+                                            <div className="sm:col-span-1 md:col-span-3">
                                                 <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)] sm:text-sm">
                                                     النوع
                                                 </label>
@@ -1980,7 +1990,7 @@ const AdminProducts = () => {
                                                             rowIndex === index ? { ...row, type: e.target.value } : row
                                                         )),
                                                     }))}
-                                                    className={`${selectClassName} h-10`}
+                                                    className={selectClassName}
                                                 >
                                                     <option value="text">Text</option>
                                                     <option value="number">Number</option>
@@ -1988,7 +1998,8 @@ const AdminProducts = () => {
                                                 </select>
                                             </div>
 
-                                            <label className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 md:col-span-2 md:self-end md:pb-2">
+                                            {/* مطلوب (Required) */}
+                                            <label className="inline-flex cursor-pointer items-center gap-2 self-end pb-2.5 text-xs font-medium text-gray-600 dark:text-gray-300 sm:col-span-1 md:col-span-2">
                                                 <input
                                                     type="checkbox"
                                                     checked={Boolean(item.required)}
@@ -1998,11 +2009,13 @@ const AdminProducts = () => {
                                                             rowIndex === index ? { ...row, required: e.target.checked } : row
                                                         )),
                                                     }))}
+                                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800"
                                                 />
                                                 مطلوب
                                             </label>
 
-                                            <div className="flex items-end md:col-span-1">
+                                            {/* حذف (Delete) */}
+                                            <div className="flex items-end pb-0.5 md:col-span-1">
                                                 <Button
                                                     type="button"
                                                     variant="ghost"

@@ -1442,6 +1442,7 @@ const realApi = {
           requires2FA: true,
           tempToken,
           twoFactorToken: tempToken,
+          email: data.email || null,
           user: data.user ? normaliseUser(data.user) : null,
         };
       }
@@ -1468,15 +1469,11 @@ const realApi = {
 
     generateTwoFactor: async () => {
       const res = await http.post('/auth/2fa/generate');
-      const data = unwrap(res);
-      return {
-        qrCodeUrl: data?.qrCodeUrl || data?.qrCode || data?.url || '',
-        secret: data?.secret || '',
-      };
+      return unwrap(res);
     },
 
-    enableTwoFactor: async ({ token }) => {
-      const res = await http.post('/auth/2fa/enable', { token });
+    enableTwoFactor: async ({ code } = {}) => {
+      const res = await http.post('/auth/2fa/enable', { code });
       return unwrap(res);
     },
 
@@ -1532,15 +1529,18 @@ const realApi = {
     },
 
     register: async (userData) => {
-      const res = await http.post('/auth/register', {
+      const payload = {
         name: userData.name || userData.username || '',
         email: userData.email,
         password: userData.password,
-        username: userData.username || '',
         currency: userData.currency || 'USD',
         country: userData.country || '',
         phone: userData.phone || '',
-      });
+      };
+
+      if (userData.username) payload.username = userData.username;
+
+      const res = await http.post('/auth/register', payload);
       const data = unwrap(res);
       const user = normaliseUser(data.user);
       const token = data.token || data.accessToken || null;
@@ -2709,9 +2709,25 @@ const realApi = {
       for (const endpoint of endpoints) {
         try {
           const res = await http.post(endpoint, body, requestConfig);
-          const data = unwrap(res);
-          return { order: normaliseOrder(data?.order || data) };
+          // If we reach here, the HTTP call returned a 2xx — the order was created.
+          // Parse defensively so a normalisation hiccup never masks a successful creation.
+          try {
+            const data = unwrap(res);
+            return { order: normaliseOrder(data?.order || data), updatedBalance: (data?.updatedBalance ?? data?.order?.updatedBalance ?? res.data?.updatedBalance) };
+          } catch (_parseError) {
+            // Normalisation failed, but the order WAS created. Return raw data.
+            const raw = res.data?.data?.order || res.data?.data || res.data?.order || res.data || {};
+            return {
+              order: {
+                id: raw._id || raw.id || `ord-${Date.now()}`,
+                status: (raw.status || 'pending').toLowerCase(),
+                ...raw,
+              },
+              updatedBalance: raw.updatedBalance,
+            };
+          }
         } catch (error) {
+          // HTTP-level error (4xx/5xx) — try the next endpoint.
           lastError = error;
         }
       }

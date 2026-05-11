@@ -10,7 +10,6 @@ import {
   Globe,
   Lock,
   Mail,
-  RotateCcw,
   User,
 } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
@@ -28,7 +27,6 @@ import {
   validateEmail,
   validateFullName,
   validatePassword,
-  validateUsername,
 } from '../utils/validation';
 import { COUNTRY_CATALOG } from '../data/countryCatalog';
 import { getDefaultRouteForRole } from '../utils/authRoles';
@@ -65,12 +63,6 @@ const StepTwo = ({ children }) => (
   </motion.div>
 );
 
-const VerificationStep = ({ children }) => (
-  <motion.div key="verification-step" {...stepMotion} className={styles.verificationStep}>
-    {children}
-  </motion.div>
-);
-
 const Auth = () => {
   const fallbackCountries = useMemo(() => COUNTRY_CATALOG, []);
   const navigate = useNavigate();
@@ -100,7 +92,6 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
   const [country, setCountry] = useState('US');
   const [currency, setCurrency] = useState('USD');
   const [countries] = useState(COUNTRY_CATALOG);
@@ -255,10 +246,8 @@ const countryOptions = useMemo(() => {
 
     if (!isLogin) {
       const nameError = validateFullName(name);
-      const usernameError = validateUsername(username);
 
       if (nameError) nextErrors.name = nameError;
-      if (usernameError) nextErrors.username = usernameError;
 
       if (!confirmPassword) {
         nextErrors.confirmPassword = t('auth.passwordConfirmRequired');
@@ -309,7 +298,6 @@ const countryOptions = useMemo(() => {
 
   const validateRegisterStepTwo = () => {
     const nextErrors = {
-      username: validateUsername(username) || null,
       country: country ? null : t('auth.country'),
       currency: currency ? null : t('auth.noCurrenciesConfigured'),
     };
@@ -323,7 +311,7 @@ const countryOptions = useMemo(() => {
     && Boolean(email.trim())
     && Boolean(password)
     && Boolean(confirmPassword);
-  const isStepTwoReady = Boolean(username.trim()) && Boolean(country) && Boolean(currency);
+  const isStepTwoReady = Boolean(country) && Boolean(currency);
 
   const goToRegisterStepTwo = () => {
     if (!validateRegisterStepOne()) return;
@@ -413,7 +401,6 @@ const countryOptions = useMemo(() => {
       ? await login(email, password)
       : await signup({
           name,
-          username,
           email,
           password,
           country,
@@ -424,17 +411,11 @@ const countryOptions = useMemo(() => {
     if (isLogin && result?.requires2FA) {
       setTwoFactorChallenge(result);
       setTwoFactorCode('');
-      addToast('أدخل رمز المصادقة الثنائية المكوّن من 6 أرقام لإكمال تسجيل الدخول.', 'warning');
+      addToast('أدخل كود التحقق المرسل إلى بريدك الإلكتروني لإكمال تسجيل الدخول.', 'warning');
       return;
     }
 
     if (!isLogin) {
-      if (result?.ok && result?.status === 'verification_required') {
-        addToast('تم إنشاء الحساب بنجاح. تم إرسال رابط تأكيد إلى بريدك الإلكتروني.', 'success');
-        setRegisterStep(3);
-        return;
-      }
-
       consumeAuthResult(result, { source: 'email', mode: 'signup' });
       return;
     }
@@ -445,7 +426,7 @@ const countryOptions = useMemo(() => {
   const handleTwoFactorSubmit = async () => {
     const tempToken = twoFactorChallenge?.tempToken || twoFactorChallenge?.twoFactorToken;
     if (!tempToken || twoFactorCode.length !== 6) {
-      addToast('رمز المصادقة غير مكتمل: أدخل 6 أرقام من تطبيق أو رسالة التحقق.', 'error');
+      addToast('كود التحقق غير مكتمل: أدخل الكود المرسل إلى بريدك الإلكتروني.', 'error');
       return;
     }
 
@@ -457,22 +438,7 @@ const countryOptions = useMemo(() => {
     if (result?.canAccessApp) {
       setTwoFactorChallenge(null);
       setTwoFactorCode('');
-    }
-
-    consumeAuthResult(result, { source: 'email', mode: 'login' });
-  };
-
-  const handleVerificationLogin = async () => {
-    const result = await login(email, password);
-
-    if (result?.canAccessApp) {
-      consumeAuthResult(result, { source: 'email', mode: 'login' });
-      return;
-    }
-
-    if (result?.status === 'verification_required') {
-      addToast('البريد ما زال غير مؤكد: افتح رابط التفعيل في بريدك ثم اضغط تم التفعيل.', 'warning');
-      return;
+      addToast('تم تأكيد كود البريد الإلكتروني وتسجيل الدخول بنجاح.', 'success');
     }
 
     consumeAuthResult(result, { source: 'email', mode: 'login' });
@@ -613,7 +579,6 @@ const countryOptions = useMemo(() => {
                   {[
                     { index: 1, label: 'البيانات الأساسية' },
                     { index: 2, label: 'إعداد الحساب' },
-                    { index: 3, label: 'تأكيد البريد' },
                   ].map((step) => (
                     <div
                       key={step.index}
@@ -634,11 +599,11 @@ const countryOptions = useMemo(() => {
                 {isLogin && twoFactorChallenge ? (
                   <motion.div key="login-2fa" {...stepMotion} className={styles.verificationStep}>
                     <div className={styles.successBadge}>
-                      <Lock className="h-5 w-5" />
+                      <Mail className="h-5 w-5" />
                     </div>
                     <div>
                       <h2>المصادقة الثنائية</h2>
-                      <p>أدخل كود التحقق المكون من 6 أرقام لإكمال تسجيل الدخول.</p>
+                      <p>أدخل كود التحقق المرسل إلى بريدك الإلكتروني لإكمال تسجيل الدخول.</p>
                     </div>
                     <OtpInput value={twoFactorCode} onChange={setTwoFactorCode} disabled={isLoading} />
                   </motion.div>
@@ -741,17 +706,6 @@ const countryOptions = useMemo(() => {
                   </StepOne>
                 ) : registerStep === 2 ? (
                   <StepTwo>
-                    <Input
-                      label={t('auth.username')}
-                      type="text"
-                      placeholder="johndoe"
-                      value={username}
-                      onChange={(event) => setUsername(event.target.value)}
-                      icon={<User className="h-4 w-4" />}
-                      error={errors.username}
-                      className={styles.authInput}
-                    />
-
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-[var(--color-text-secondary)]">
                         {t('auth.country')}
@@ -795,25 +749,7 @@ const countryOptions = useMemo(() => {
                       {errors.currency && <p className="mt-1.5 text-xs text-[var(--color-error)]">{errors.currency}</p>}
                     </div>
                   </StepTwo>
-                ) : (
-                  <VerificationStep>
-                    <div className={styles.successBadge}>
-                      <Mail className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2>تم إنشاء الحساب بنجاح</h2>
-                      <p>تم إرسال كود تأكيد إلى بريدك الإلكتروني</p>
-                    </div>
-                    <div className={styles.otpGrid} aria-hidden="true">
-                      {[0, 1, 2, 3, 4, 5].map((item) => (
-                        <span key={item} />
-                      ))}
-                    </div>
-                    <p className={styles.verificationHint}>
-                      افتح رسالة التفعيل في بريدك الإلكتروني، وبعد الانتهاء اضغط تم التفعيل لتسجيل الدخول تلقائيًا.
-                    </p>
-                  </VerificationStep>
-                )}
+                ) : null}
               </AnimatePresence>
 
               <AnimatePresence initial={false}>
@@ -884,7 +820,7 @@ const countryOptions = useMemo(() => {
                   التالي
                   <ArrowRight className={`h-4 w-4 ${dir === 'rtl' ? 'mr-1 rotate-180' : 'ml-1'}`} />
                 </Button>
-              ) : registerStep === 2 ? (
+              ) : (
                 <div className={styles.stepActions}>
                   <Button
                     type="button"
@@ -904,30 +840,9 @@ const countryOptions = useMemo(() => {
                     {!isLoading && <ArrowRight className={`h-4 w-4 ${dir === 'rtl' ? 'mr-1 rotate-180' : 'ml-1'}`} />}
                   </Button>
                 </div>
-              ) : (
-                <div className={styles.stepActions}>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className={styles.secondaryStepButton}
-                    onClick={() => setRegisterStep(2)}
-                    disabled={isLoading}
-                  >
-                    تعديل البيانات
-                  </Button>
-                  <Button
-                    type="button"
-                    className={styles.primaryButton}
-                    onClick={handleVerificationLogin}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? t('common.loading') : 'تم التفعيل'}
-                    {!isLoading && <RotateCcw className="h-4 w-4" />}
-                  </Button>
-                </div>
               )}
 
-              {registerStep !== 3 && !twoFactorChallenge && (
+              {!twoFactorChallenge && (
               <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[rgba(212,175,55,0.3)] to-transparent" />

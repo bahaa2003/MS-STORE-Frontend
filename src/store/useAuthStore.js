@@ -432,20 +432,20 @@ const useAuthStore = create((set, get) => ({
       },
 
       updateUserSession: (updates) => {
-        const { user } = get();
-          writeStoredAuthState({
-            user: response.user,
-            token: response.token || null,
-            isAuthenticated: true,
-            blockedStatus: outcome.canAccessApp ? null : outcome.status,
-            blockedUser: outcome.canAccessApp ? null : response.user,
-            profileLastLoadedAt: Date.now(),
-          });
+        const { user, token } = get();
         if (user) {
           const nextUser = { ...user, ...updates };
           const nextStatus = normalizeAccountStatus(nextUser?.status);
           set({
             user: nextUser,
+            blockedStatus: isApprovedAccountStatus(nextStatus) ? null : nextStatus,
+            blockedUser: isApprovedAccountStatus(nextStatus) ? null : nextUser,
+            profileLastLoadedAt: Date.now(),
+          });
+          writeStoredAuthState({
+            user: nextUser,
+            token: token || null,
+            isAuthenticated: true,
             blockedStatus: isApprovedAccountStatus(nextStatus) ? null : nextStatus,
             blockedUser: isApprovedAccountStatus(nextStatus) ? null : nextUser,
             profileLastLoadedAt: Date.now(),

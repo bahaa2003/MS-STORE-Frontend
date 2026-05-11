@@ -316,13 +316,10 @@ const SupervisorMonitoring = () => {
       .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
   }, [adminOrders, auditLogs, search, sourceFilter, topups, users, usersById]);
 
-  const supervisorCount = useMemo(
-    () => (users || []).filter((user) => SUPERVISOR_ROLES.has(String(user.role || '').toLowerCase())).length,
-    [users]
-  );
+
 
   return (
-    <div className="min-w-0 space-y-4 pb-4">
+    <div className="min-w-0 space-y-6 pb-4">
       <section className="admin-premium-hero relative overflow-hidden p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
@@ -343,20 +340,6 @@ const SupervisorMonitoring = () => {
           </Button>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <Card className="admin-premium-stat p-3">
-            <p className="text-xs text-[var(--color-text-secondary)]">عدد المشرفين</p>
-            <p className="mt-1 text-2xl font-black text-[var(--color-text)]">{supervisorCount}</p>
-          </Card>
-          <Card className="admin-premium-stat p-3">
-            <p className="text-xs text-[var(--color-text-secondary)]">العمليات المعروضة</p>
-            <p className="mt-1 text-2xl font-black text-[var(--color-text)]">{rows.length}</p>
-          </Card>
-          <Card className="admin-premium-stat p-3">
-            <p className="text-xs text-[var(--color-text-secondary)]">مصدر البيانات</p>
-            <p className="mt-1 text-sm font-bold text-[var(--color-text)]">{auditLogs.length ? 'Audit API' : 'Fallback Timeline'}</p>
-          </Card>
-        </div>
       </section>
 
       <Card className="admin-premium-panel p-3">

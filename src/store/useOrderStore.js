@@ -212,17 +212,25 @@ const useOrderStore = create((set, get) => ({
             ordersLastLoadedScope: state.ordersLastLoadedScope || `user:${nextOrder.userId}`,
           }));
 
-          useNotificationStore.getState().addNotification({
-            title: 'طلب جديد',
-            message: `تم إنشاء طلب جديد بواسطة ${nextOrder?.userName || nextOrder?.userId || 'عميل'}`,
-            type: 'info',
-            targetType: 'order',
-            targetId: nextOrder?.id,
-            orderId: nextOrder?.id,
-            targetUrl: nextOrder?.id ? `/admin/orders?orderId=${encodeURIComponent(nextOrder.id)}` : '/admin/orders',
-          });
+          // Fire-and-forget: don't let a notification failure mask a successful order.
+          try {
+            useNotificationStore.getState().addNotification({
+              title: 'طلب جديد',
+              message: `تم إنشاء طلب جديد بواسطة ${nextOrder?.userName || nextOrder?.userId || 'عميل'}`,
+              type: 'info',
+              targetType: 'order',
+              targetId: nextOrder?.id,
+              orderId: nextOrder?.id,
+              targetUrl: nextOrder?.id ? `/admin/orders?orderId=${encodeURIComponent(nextOrder.id)}` : '/admin/orders',
+            });
+          } catch (_notifError) {
+            // Swallow — order was already created successfully.
+          }
 
-          return created || { order: nextOrder };
+          return {
+            order: nextOrder,
+            updatedBalance: created?.updatedBalance,
+          };
         } catch (err) {
           // Refetch products so the UI picks up the latest prices after a provider price jump.
           if (err?.code === 'PROVIDER_PRICE_INCREASED') {
@@ -230,6 +238,7 @@ const useOrderStore = create((set, get) => ({
             throw err;
           }
 
+          console.error('Order submission error details:', err, err?.response?.data);
           throw err;
         }
       },

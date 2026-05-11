@@ -69,6 +69,14 @@ const COPY = {
     ar: 'كلمة المرور مطلوبة: اكتب كلمة مرور الحساب.',
     en: 'Password is required. Enter your account password.',
   },
+  twoFactorInvalid: {
+    ar: 'كود التحقق المرسل إلى بريدك الإلكتروني غير صحيح. تأكد من آخر رسالة وحاول مرة أخرى.',
+    en: 'The email verification code is incorrect. Check the latest email and try again.',
+  },
+  twoFactorExpired: {
+    ar: 'انتهت صلاحية كود البريد الإلكتروني. سجّل الدخول مرة أخرى لإرسال كود جديد.',
+    en: 'The email verification code has expired. Sign in again to send a new code.',
+  },
 };
 
 const getLanguage = () => {
@@ -143,6 +151,18 @@ export const formatAuthErrorMessage = (error, { action = 'login' } = {}) => {
     || includesAny(message, ['username already exists', 'username already taken', 'username is taken'])
   ) {
     return pick('usernameExists');
+  }
+
+  if (
+    includesAny(message, ['2fa verification has expired', '2fa setup verification has expired', 'two-factor verification has expired', 'temporary token'])
+  ) {
+    return pick('twoFactorExpired');
+  }
+
+  if (
+    includesAny(message, ['invalid 2fa code', 'invalid 2fa setup code', 'invalid two-factor code', 'invalid verification code'])
+  ) {
+    return pick('twoFactorInvalid');
   }
 
   if (

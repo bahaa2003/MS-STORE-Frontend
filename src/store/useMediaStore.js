@@ -81,6 +81,7 @@ const mergeSavedProductSnapshot = (baseProduct = {}, apiProduct = {}) => ({
     apiProduct.originalPriceCoins ?? apiProduct.originalPrice ?? apiProduct.costPrice,
     baseProduct.originalPriceCoins ?? baseProduct.originalPrice ?? baseProduct.costPrice ?? ''
   ),
+  dynamicFields: pickDefinedProductValue(apiProduct.dynamicFields, baseProduct.dynamicFields || []),
 });
 
 const splitProductStatusUpdate = (currentProduct = {}, updates = {}) => {
@@ -180,6 +181,7 @@ const normalizeProductRecord = (product = {}, categories = mockCategories) => {
     manualPriceAdjustment,
     syncedProviderBasePrice: product.syncedProviderBasePrice ?? null,
     originalPriceCoins: product.originalPriceCoins ?? product.originalPrice ?? product.costPrice ?? '',
+    dynamicFields: Array.isArray(product.dynamicFields) ? product.dynamicFields : [],
     searchIndex: product.searchIndex || buildProductSearchIndex(product),
   };
 
