@@ -14,15 +14,41 @@ import { findPaymentMethodById } from '../utils/paymentSettings';
 import { devLogger } from '../utils/devLogger';
 import { resolveImageUrl } from '../utils/imageUrl';
 
+const normalizeMethodType = (type) => String(type || '').trim().toLowerCase();
+
+const getSenderDetailRequirement = (method) => {
+  const type = normalizeMethodType(method?.type);
+  if (type === 'mobile_wallet' || type === 'e_wallet' || type === 'ewallet') {
+    return {
+      field: 'senderWalletNumber',
+      label: 'رقم المحفظة المحول منها',
+      placeholder: 'أدخل رقم المحفظة التي تم التحويل منها',
+      validationMessage: 'يرجى إدخال رقم المحفظة المحول منها',
+    };
+  }
+
+  if (type === 'usdt' || type === 'crypto') {
+    return {
+      field: 'senderWalletAddress',
+      label: 'عنوان المحفظة المحول منها',
+      placeholder: 'أدخل عنوان محفظة USDT التي تم التحويل منها',
+      validationMessage: 'يرجى إدخال عنوان المحفظة المحول منها',
+    };
+  }
+
+  return null;
+};
+
 const getMethodPresentation = (method) => {
   const token = `${method?.id || ''} ${method?.name || ''}`.toLowerCase();
+  const type = normalizeMethodType(method?.type);
 
   if (token.includes('vodafone')) return { icon: 'VC', color: 'from-red-500 to-pink-500' };
   if (token.includes('etisalat')) return { icon: 'EC', color: 'from-green-500 to-teal-500' };
   if (token.includes('orange')) return { icon: 'OC', color: 'from-orange-500 to-red-500' };
-  if (String(method?.type || '') === 'bank_transfer') return { icon: 'BT', color: 'from-blue-500 to-purple-500' };
-  if (String(method?.type || '') === 'paypal') return { icon: 'PP', color: 'from-cyan-500 to-blue-600' };
-  if (String(method?.type || '') === 'credit_card') return { icon: 'CC', color: 'from-amber-500 to-orange-600' };
+  if (type === 'bank_transfer') return { icon: 'BT', color: 'from-blue-500 to-purple-500' };
+  if (type === 'usdt' || type === 'crypto') return { icon: 'USDT', color: 'from-emerald-500 to-cyan-600' };
+  if (type === 'credit_card') return { icon: 'CC', color: 'from-amber-500 to-orange-600' };
 
   return { icon: 'PM', color: 'from-emerald-500 to-teal-600' };
 };
@@ -59,6 +85,9 @@ const PaymentDetails = () => {
     cardNumber: '',
     expiryDate: '',
     cvv: '',
+    senderWalletNumber: '',
+    senderWalletAddress: '',
+    notes: '',
   });
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -84,8 +113,12 @@ const PaymentDetails = () => {
   );
 
   const methodFields = method?.fields || ['amount'];
+  const senderDetailRequirement = useMemo(
+    () => getSenderDetailRequirement(method),
+    [method]
+  );
   const visibleMethodFields = useMemo(
-    () => methodFields.filter((field) => field !== 'senderNumber'),
+    () => methodFields.filter((field) => !['senderNumber', 'senderWalletNumber', 'senderWalletAddress'].includes(field)),
     [methodFields]
   );
   const rawMethodInstructions = method?.instructions || paymentSettings?.instructions || t('payments.chooseMethod');
@@ -180,6 +213,9 @@ const PaymentDetails = () => {
   const validate = () => {
     const amountValue = Number(formData.amount);
     if (!Number.isFinite(amountValue) || amountValue <= 0) return t('payments.validationAmount');
+    if (senderDetailRequirement && !String(formData[senderDetailRequirement.field] || '').trim()) {
+      return senderDetailRequirement.validationMessage;
+    }
     if (requiresReceipt && !uploadedFile) return t('payments.validationReceipt');
     return '';
   };
@@ -215,6 +251,23 @@ const PaymentDetails = () => {
         : 0;
       const freshFeeAmount = Number(((baseAmount * freshFeePercent) / 100).toFixed(2));
       const freshPayableAmount = Number((baseAmount + freshFeeAmount).toFixed(2));
+      const freshSenderRequirement = getSenderDetailRequirement(freshMethod);
+      const senderValue = freshSenderRequirement
+        ? String(formData[freshSenderRequirement.field] || '').trim()
+        : '';
+
+      if (freshSenderRequirement && !senderValue) {
+        addToast(freshSenderRequirement.validationMessage, 'error');
+        setFormError(freshSenderRequirement.validationMessage);
+        return;
+      }
+
+      const senderDetails = freshSenderRequirement ? {
+        methodType: normalizeMethodType(freshMethod?.type),
+        field: freshSenderRequirement.field,
+        label: freshSenderRequirement.label,
+        value: senderValue,
+      } : null;
       const { requestTopup } = useTopupStore.getState();
 
       await requestTopup({
@@ -224,13 +277,17 @@ const PaymentDetails = () => {
         paymentFeePercent: freshFeePercent,
         paymentFeeAmount: freshFeeAmount,
         amountWithFee: freshPayableAmount,
-        senderWalletNumber: '',
-        transferredFromNumber: '',
+        senderDetails,
+        senderWalletNumber: freshSenderRequirement?.field === 'senderWalletNumber' ? senderValue : '',
+        senderWalletAddress: freshSenderRequirement?.field === 'senderWalletAddress' ? senderValue : '',
+        transferredFromNumber: senderValue,
         proofImage: uploadedFile || null,
         paymentChannel: freshMethod?.name || methodId || '',
+        paymentMethodType: normalizeMethodType(freshMethod?.type),
         currencyCode: freshGroup?.currency || freshMethod?.currency || user?.currency || 'USD',
         userId: user?.id || '',
         userName: user?.name || '',
+        notes: formData.notes || '',
         type: 'regular',
       });
 
@@ -457,6 +514,24 @@ const PaymentDetails = () => {
               </div>
             );
           })}
+
+          {senderDetailRequirement && (
+            <div className="mb-4">
+              <label className={`mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                {senderDetailRequirement.label}
+                <span className="text-rose-500"> *</span>
+              </label>
+              <input
+                type="text"
+                value={formData[senderDetailRequirement.field] || ''}
+                onChange={(e) => handleInputChange(senderDetailRequirement.field, e.target.value)}
+                placeholder={senderDetailRequirement.placeholder}
+                className={`${inputBaseClassName} ${isRTL ? 'text-right' : 'text-left'}`}
+                disabled={isSubmitting}
+                required
+              />
+            </div>
+          )}
 
           <div className="mb-6">
             <label className={`mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300 ${isRTL ? 'text-right' : 'text-left'}`}>

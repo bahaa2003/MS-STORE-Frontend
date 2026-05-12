@@ -146,6 +146,36 @@ const serializePaymentGroupsForApi = (groups) => normalizePaymentGroups(groups, 
   })),
 }));
 
+const normaliseSenderDetails = (source = {}) => {
+  const rawDetails = source?.senderDetails && typeof source.senderDetails === 'object'
+    ? source.senderDetails
+    : safeParseJson(source?.senderDetails, null);
+  const details = rawDetails && typeof rawDetails === 'object' ? rawDetails : {};
+  const value = String(
+    details.value
+    || source.senderWalletAddress
+    || source.senderWalletNumber
+    || source.transferredFromNumber
+    || ''
+  ).trim();
+
+  if (!value) return null;
+
+  const methodType = String(details.methodType || details.type || source.paymentMethodType || '').trim().toLowerCase();
+  const field = String(
+    details.field
+    || (source.senderWalletAddress ? 'senderWalletAddress' : 'senderWalletNumber')
+  ).trim();
+  const label = String(
+    details.label
+    || (field === 'senderWalletAddress' || methodType === 'usdt'
+      ? 'عنوان المحفظة المحول منها'
+      : 'رقم المحفظة المحول منها')
+  ).trim();
+
+  return { methodType, field, label, value };
+};
+
 const writeAuthState = (nextState) => {
   const root = getAuthPersistedRoot() || {};
   root.state = { ...(root.state || {}), ...(nextState || {}) };
@@ -869,6 +899,7 @@ const normaliseDeposit = (d) => {
   const amountUsd = d.amountUsd ?? d.amountApproved ?? d.actualPaidAmount ?? null;
   const currency = d.currency || 'USD';
   const exchangeRate = d.exchangeRate ?? 1;
+  const senderDetails = normaliseSenderDetails(d);
 
   // Resolve proof image URL — handle both new receiptImage and legacy transferImageUrl
   const rawProof = d.receiptImage || d.transferImageUrl || d.proofImage || '';
@@ -905,7 +936,14 @@ const normaliseDeposit = (d) => {
     adminNotes: d.adminNotes || '',
     // Transfer proof
     proofImage,
-    senderWalletNumber: d.transferredFromNumber || d.senderWalletNumber || '',
+    senderDetails,
+    senderWalletNumber: senderDetails?.field === 'senderWalletNumber'
+      ? senderDetails.value
+      : (d.transferredFromNumber || d.senderWalletNumber || ''),
+    senderWalletAddress: senderDetails?.field === 'senderWalletAddress'
+      ? senderDetails.value
+      : (d.senderWalletAddress || ''),
+    transferredFromNumber: senderDetails?.value || d.transferredFromNumber || d.senderWalletNumber || d.senderWalletAddress || '',
     // Timestamps
     createdAt: d.createdAt || d.date,
     reviewedAt: d.reviewedAt || null,
@@ -2860,6 +2898,19 @@ const realApi = {
       const notes = String(topupData.notes || '').trim();
       if (notes) formData.append('notes', notes);
 
+      const senderDetails = normaliseSenderDetails(topupData);
+      if (senderDetails) {
+        formData.append('senderDetails', JSON.stringify(senderDetails));
+        formData.append('senderDetailValue', senderDetails.value);
+        formData.append('senderDetailField', senderDetails.field);
+        if (senderDetails.field === 'senderWalletAddress') {
+          formData.append('senderWalletAddress', senderDetails.value);
+        } else {
+          formData.append('senderWalletNumber', senderDetails.value);
+        }
+        formData.append('transferredFromNumber', senderDetails.value);
+      }
+
       // ── File — must be a File/Blob for Multer to parse it into req.file
       const file = topupData.receipt || topupData.proofImage || null;
       if (file) formData.append('receipt', file);
@@ -3119,11 +3170,10 @@ const realApi = {
     },
 
     /**
-     * "Delete" a currency by deactivating it.
-     * BE has no hard-delete endpoint — use PATCH with { isActive: false }.
+     * DELETE /admin/currencies/:code → remove an unused currency.
      */
     deleteCurrency: async (code, _actorContext) => {
-      const res = await http.patch(`/admin/currencies/${code}`, { isActive: false });
+      const res = await http.delete(`/admin/currencies/${code}`);
       return normaliseCurrency(unwrap(res)?.currency || unwrap(res));
     },
 

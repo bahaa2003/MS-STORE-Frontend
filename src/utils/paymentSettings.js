@@ -2,7 +2,7 @@ const PAYMENT_METHOD_FIELDS = {
   mobile_wallet: ['amount'],
   bank_transfer: ['amount'],
   credit_card: ['amount', 'cardNumber', 'expiryDate', 'cvv'],
-  paypal: ['amount'],
+  usdt: ['amount'],
 };
 
 const ALLOWED_METHOD_TYPES = Object.keys(PAYMENT_METHOD_FIELDS);
@@ -27,8 +27,14 @@ const normalizeFeePercent = (value) => {
   return Number(clamped.toFixed(2));
 };
 
+export const normalizePaymentMethodType = (type = 'mobile_wallet') => {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (normalized === 'paypal' || normalized === 'crypto' || normalized === 'usdt') return 'usdt';
+  return ALLOWED_METHOD_TYPES.includes(normalized) ? normalized : 'mobile_wallet';
+};
+
 export const getPaymentFieldsForType = (type = 'mobile_wallet') =>
-  PAYMENT_METHOD_FIELDS[type] || PAYMENT_METHOD_FIELDS.mobile_wallet;
+  PAYMENT_METHOD_FIELDS[normalizePaymentMethodType(type)] || PAYMENT_METHOD_FIELDS.mobile_wallet;
 
 export const createDefaultPaymentGroups = () => [];
 
@@ -53,7 +59,7 @@ const getPaymentMethodTokenVariants = (value) => {
 };
 
 export const normalizePaymentMethod = (method = {}, index = 0) => {
-  const type = ALLOWED_METHOD_TYPES.includes(method?.type) ? method.type : 'mobile_wallet';
+  const type = normalizePaymentMethodType(method?.type);
   const name = String(method?.name || '').trim() || `Payment Method ${index + 1}`;
   const id = String(method?.id || '').trim() || createPaymentEntityId('method', name);
   const fields = Array.isArray(method?.fields) && method.fields.length

@@ -161,12 +161,16 @@ const useTopupStore = create((set, get) => ({
           paymentChannel: isPayloadObject ? amountOrPayload.paymentChannel : method,
           currencyCode: isPayloadObject ? amountOrPayload.currencyCode : 'USD',
           proofImage: isPayloadObject ? amountOrPayload.proofImage : '',
+          senderDetails: isPayloadObject ? (amountOrPayload.senderDetails || null) : null,
           senderWalletNumber: isPayloadObject ? amountOrPayload.senderWalletNumber : '',
+          senderWalletAddress: isPayloadObject ? amountOrPayload.senderWalletAddress : '',
+          transferredFromNumber: isPayloadObject ? amountOrPayload.transferredFromNumber : '',
           type: topupType,
           gameDetails: gameDetails,
           // ── Fields required by realApi.topups.create (POST /me/deposits) ──
           paymentMethodId: isPayloadObject ? (amountOrPayload.paymentMethodId || '') : '',
           currency: isPayloadObject ? (amountOrPayload.currencyCode || amountOrPayload.currency || 'USD') : 'USD',
+          paymentMethodType: isPayloadObject ? (amountOrPayload.paymentMethodType || '') : '',
           receipt: isPayloadObject ? (amountOrPayload.receipt || amountOrPayload.proofImage || null) : null,
           notes: isPayloadObject ? (amountOrPayload.notes || '') : '',
         };

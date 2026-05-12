@@ -53,9 +53,10 @@ const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
 
 const getMethodBadge = (method) => {
   if (method?.image) return null;
-  if (String(method?.type || '') === 'bank_transfer') return 'BANK';
-  if (String(method?.type || '') === 'credit_card') return 'CARD';
-  if (String(method?.type || '') === 'paypal') return 'PP';
+  const type = String(method?.type || '').toLowerCase();
+  if (type === 'bank_transfer') return 'BANK';
+  if (type === 'credit_card') return 'CARD';
+  if (type === 'usdt' || type === 'crypto') return 'USDT';
   return 'PAY';
 };
 
@@ -104,7 +105,7 @@ const AdminPaymentMethods = () => {
       { value: 'mobile_wallet', label: tx('محفظة إلكترونية', 'Mobile Wallet') },
       { value: 'bank_transfer', label: tx('تحويل بنكي', 'Bank Transfer') },
       { value: 'credit_card', label: tx('بطاقة ائتمان', 'Credit Card') },
-      { value: 'paypal', label: 'PayPal' },
+      { value: 'usdt', label: 'USDT' },
     ]),
     [isEnglish]
   );

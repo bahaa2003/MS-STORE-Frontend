@@ -85,7 +85,7 @@ const CreatedByRoute = () => {
 
 const AdminPanelDefaultRoute = () => {
   const user = useAuthStore((state) => state.user);
-  const fallbackPath = isSupervisorRole(user?.role) ? '/admin/orders' : '/admin/dashboard';
+  const fallbackPath = isSupervisorRole(user?.role) ? '/dashboard' : '/admin/dashboard';
 
   return <Navigate to={fallbackPath} replace />;
 };
@@ -94,7 +94,7 @@ const AdminDashboardRoute = () => {
   const user = useAuthStore((state) => state.user);
 
   if (isSupervisorRole(user?.role)) {
-    return <Navigate to="/admin/orders" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return renderSuspended(<AdminDashboard />);
@@ -136,7 +136,7 @@ const AnimatedAppRoutes = () => {
             <Route
               path="/dashboard"
               element={(
-                <ProtectedRoute roles={['customer', 'admin']}>
+                <ProtectedRoute roles={['customer', 'admin', ...SUPERVISOR_ROLES]}>
                   {renderSuspended(<Dashboard />)}
                 </ProtectedRoute>
               )}

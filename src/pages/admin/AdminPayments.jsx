@@ -50,6 +50,29 @@ const getPaymentChannelLabel = (request) => {
   return request?.paymentChannelName || request?.method || 'محفظة كاش';
 };
 
+const getSenderDetails = (request) => {
+  const details = request?.senderDetails && typeof request.senderDetails === 'object'
+    ? request.senderDetails
+    : {};
+  const value = String(
+    details.value
+    || request?.senderWalletAddress
+    || request?.senderWalletNumber
+    || request?.transferredFromNumber
+    || ''
+  ).trim();
+  const methodType = String(details.methodType || details.type || request?.paymentMethodType || '').trim().toLowerCase();
+  const field = String(details.field || (request?.senderWalletAddress ? 'senderWalletAddress' : 'senderWalletNumber')).trim();
+  const label = String(
+    details.label
+    || (field === 'senderWalletAddress' || methodType === 'usdt'
+      ? 'عنوان المحفظة المحول منها'
+      : 'رقم المحفظة المحول منها')
+  ).trim();
+
+  return { label, value: value || '-' };
+};
+
 const PAGE_SIZE = 20;
 
 const SummaryCard = ({ icon: Icon, label, value }) => (
@@ -284,6 +307,10 @@ const AdminPayments = () => {
   const rejectedCount = summarySource?.rejectedCount
     ?? summarySource?.deniedCount
     ?? requests.filter((request) => ['rejected', 'denied'].includes(normalizeStatus(request.status))).length;
+  const selectedSenderDetails = useMemo(
+    () => getSenderDetails(selectedRequest),
+    [selectedRequest]
+  );
 
   return (
     <div className="min-w-0 space-y-4 pb-4 sm:space-y-5">
@@ -346,6 +373,7 @@ const AdminPayments = () => {
             const currencyCode = request.currencyCode || findUserCurrency(request.userId);
             const requestedAmount = formatRequestAmount(request.requestedAmount ?? request.requestedCoins ?? request.amount ?? 0);
             const actualAmount = request.actualPaidAmount ? formatRequestAmount(request.actualPaidAmount) : '-';
+            const senderDetails = getSenderDetails(request);
 
             return (
             <article
@@ -377,6 +405,10 @@ const AdminPayments = () => {
                 <div className="rounded-lg bg-[color:rgb(var(--color-surface-rgb)/0.62)] px-2 py-1.5">
                   <p className="text-[var(--color-text-secondary)]">قناة الدفع</p>
                   <p className="mt-0.5 font-semibold text-[var(--color-text)]">{getPaymentChannelLabel(request)}</p>
+                </div>
+                <div className="rounded-lg bg-[color:rgb(var(--color-surface-rgb)/0.62)] px-2 py-1.5">
+                  <p className="text-[var(--color-text-secondary)]">{senderDetails.label}</p>
+                  <p className="mt-0.5 break-all font-semibold text-[var(--color-text)]">{senderDetails.value}</p>
                 </div>
                 <div className="rounded-lg bg-[color:rgb(var(--color-surface-rgb)/0.62)] px-2 py-1.5">
                   <p className="text-[var(--color-text-secondary)]">المبلغ الفعلي</p>
@@ -437,6 +469,7 @@ const AdminPayments = () => {
                 <TableHead className="text-center">العملة</TableHead>
                 <TableHead className="text-center">المبلغ المطلوب</TableHead>
                 <TableHead className="text-center">المبلغ الفعلي</TableHead>
+                <TableHead className="text-center">بيانات المرسل</TableHead>
                 <TableHead className="text-center">الإيصال</TableHead>
                 <TableHead className="text-center">الحالة</TableHead>
                 <TableHead className="text-end">الإجراءات</TableHead>
@@ -446,6 +479,7 @@ const AdminPayments = () => {
               {requests.map((request) => {
                 const requestId = getRequestId(request);
                 const currencyCode = request.currencyCode || findUserCurrency(request.userId);
+                const senderDetails = getSenderDetails(request);
 
                 return (
                 <TableRow key={request.id}>
@@ -467,6 +501,12 @@ const AdminPayments = () => {
                   <TableCell className="text-center font-semibold">{currencyCode}</TableCell>
                   <TableCell className="text-center">{formatRequestAmount(request.requestedAmount ?? request.requestedCoins ?? request.amount ?? 0)}</TableCell>
                   <TableCell className="text-center">{request.actualPaidAmount ? formatRequestAmount(request.actualPaidAmount) : '-'}</TableCell>
+                  <TableCell className="max-w-[220px] text-center">
+                    <div className="break-all text-sm font-semibold text-[var(--color-text)]">{senderDetails.value}</div>
+                    {senderDetails.value !== '-' ? (
+                      <div className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">{senderDetails.label}</div>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="text-center">
                     {request.proofImage ? (
                       <button
@@ -594,6 +634,11 @@ const AdminPayments = () => {
           <p className="text-sm text-gray-600 dark:text-gray-300">
             اسم العميل: <strong>{selectedRequest?.userName}</strong>
           </p>
+
+          <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+            <p className="mb-1 text-sm font-medium text-gray-800 dark:text-gray-100">{selectedSenderDetails.label}</p>
+            <p className="break-all text-sm text-gray-600 dark:text-gray-300">{selectedSenderDetails.value}</p>
+          </div>
 
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
             <p className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">الإيصال المرفوع</p>

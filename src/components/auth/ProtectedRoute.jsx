@@ -9,6 +9,19 @@ import {
 } from '../../utils/accountStatus';
 import { hasPermission } from '../../utils/permissions';
 
+const SAFE_FALLBACK_PATH = '/dashboard';
+
+const AccessDeniedFallback = () => (
+  <div className="flex min-h-[50vh] items-center justify-center px-4">
+    <div className="max-w-md rounded-2xl border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)] p-6 text-center shadow-[var(--shadow-subtle)]">
+      <h2 className="text-lg font-semibold text-[var(--color-text)]">لا تملك صلاحية الوصول</h2>
+      <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+        لا يمكن فتح هذه الصفحة بحسابك الحالي. يمكنك الرجوع إلى الصفحة الرئيسية ومتابعة التصفح من هناك.
+      </p>
+    </div>
+  </div>
+);
+
 const ProtectedRoute = ({ children, roles = [], permission = null }) => {
   const { user, isAuthenticated, blockedStatus } = useAuthStore();
   const location = useLocation();
@@ -28,13 +41,22 @@ const ProtectedRoute = ({ children, roles = [], permission = null }) => {
   }
 
   const fallbackPath = getDefaultRouteForRole(user?.role);
+  const redirectOnDenied = () => {
+    const redirectPath = fallbackPath === location.pathname ? SAFE_FALLBACK_PATH : fallbackPath;
+
+    if (redirectPath && redirectPath !== location.pathname) {
+      return <Navigate to={redirectPath} state={{ from: location, denied: true }} replace />;
+    }
+
+    return <AccessDeniedFallback />;
+  };
 
   if (roles.length > 0 && !hasRequiredRole(user?.role, roles)) {
-    return <Navigate to={fallbackPath} replace />;
+    return redirectOnDenied();
   }
 
   if (!hasPermission(user, permission)) {
-    return <Navigate to={fallbackPath} replace />;
+    return redirectOnDenied();
   }
 
   return children;
