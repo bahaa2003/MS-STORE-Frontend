@@ -55,8 +55,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// No localStorage usage: skip old persistent cleanup.
-// Keep call to cleanupVolatileAppStorage for compatibility (it is a no-op when storage removed).
+// Auth state persists in localStorage; keep this compatibility cleanup as a no-op.
 cleanupVolatileAppStorage && typeof cleanupVolatileAppStorage === 'function' && cleanupVolatileAppStorage();
 
 const hideBootLoader = () => {

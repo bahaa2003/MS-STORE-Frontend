@@ -1,2 +1,2 @@
-// No persistent storage maintenance in this build: localStorage/sessionStorage are not used.
+// Auth state intentionally persists in localStorage; no volatile cleanup is needed here.
 export const cleanupVolatileAppStorage = ({ force = false } = {}) => 0;

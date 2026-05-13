@@ -8,9 +8,9 @@ const AUTH_STORAGE_KEY = 'auth-storage';
 const hasArabicText = (value) => /[\u0600-\u06FF]/.test(String(value || ''));
 
 const readStoredRole = () => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return '';
+  if (typeof window === 'undefined' || !window.localStorage) return '';
   try {
-    const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return String(parsed?.state?.user?.role || '').trim().toLowerCase();
   } catch {

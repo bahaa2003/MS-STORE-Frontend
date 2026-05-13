@@ -153,10 +153,10 @@ const countryOptions = useMemo(() => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const reason = sessionStorage.getItem('auth:logout-reason');
+    const reason = localStorage.getItem('auth:logout-reason');
     if (!reason) return;
 
-    sessionStorage.removeItem('auth:logout-reason');
+    localStorage.removeItem('auth:logout-reason');
     if (reason === 'expired') {
       addToast(
         dir === 'rtl'

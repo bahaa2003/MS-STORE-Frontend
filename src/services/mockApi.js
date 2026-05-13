@@ -24,31 +24,31 @@ const DELAY = 800; // Simulated network latency in ms
 const ACCOUNT_SECURITY_STORAGE_KEY = 'ibra-account-security-v1';
 const AUTH_STORAGE_KEY = 'auth-storage';
 
-// In-memory simulated "Database" (no localStorage). Keeps runtime-only state.
+// In-memory simulated "Database"; auth uses localStorage to match real persistence.
 const __inMemoryDB = Object.create(null);
-const readAuthSessionStorage = () => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return null;
+const readAuthLocalStorage = () => {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
   try {
-    const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 };
 
-const writeAuthSessionStorage = (value) => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
+const writeAuthLocalStorage = (value) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
   try {
-    window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(value));
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(value));
   } catch {
     // Ignore storage failures.
   }
 };
 
-const clearAuthSessionStorage = () => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
+const clearAuthLocalStorage = () => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
   try {
-    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
   } catch {
     // Ignore storage failures.
   }
@@ -57,7 +57,7 @@ const clearAuthSessionStorage = () => {
 const getDB = (key, defaultData) => {
   try {
     if (key === AUTH_STORAGE_KEY) {
-      return readAuthSessionStorage() || defaultData;
+      return readAuthLocalStorage() || defaultData;
     }
     return __inMemoryDB[key] ? __inMemoryDB[key] : defaultData;
   } catch (error) {
@@ -69,7 +69,7 @@ const getDB = (key, defaultData) => {
 const saveDB = (key, data) => {
   try {
     if (key === AUTH_STORAGE_KEY) {
-      writeAuthSessionStorage(data);
+      writeAuthLocalStorage(data);
       return;
     }
     __inMemoryDB[key] = data;
@@ -811,9 +811,7 @@ const mockApi = {
 
     logout: async () => {
       await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 250)));
-      // No persistent storage in mock mode; clear in-memory auth if present.
-      try { delete __inMemoryDB['auth-storage']; } catch {}
-      clearAuthSessionStorage();
+      clearAuthLocalStorage();
       return { success: true };
     },
 

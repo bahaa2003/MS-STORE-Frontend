@@ -10,6 +10,7 @@ const PAYMENT_SETTINGS_BROADCAST_CHANNEL = 'payment-settings-updates';
 
 let currenciesRequest = null;
 let paymentSettingsRequest = null;
+let paymentSettingsRequestId = 0;
 let paymentSettingsPollId = null;
 
 const createInitialPaymentSettings = () => ({
@@ -114,15 +115,18 @@ const useSystemStore = create((set, get) => ({
       return get().paymentSettings;
     }
 
-    if (paymentSettingsRequest) return paymentSettingsRequest;
+    if (!force && paymentSettingsRequest) return paymentSettingsRequest;
 
-    paymentSettingsRequest = apiClient.system.paymentSettings()
+    const requestId = ++paymentSettingsRequestId;
+    const request = apiClient.system.paymentSettings()
       .then((settings) => {
         const nextPaymentSettings = normalizeStorePaymentSettings(settings);
 
-        set({
-          paymentSettings: nextPaymentSettings,
-        });
+        if (requestId === paymentSettingsRequestId) {
+          set({
+            paymentSettings: nextPaymentSettings,
+          });
+        }
 
         return nextPaymentSettings;
       })
@@ -130,13 +134,19 @@ const useSystemStore = create((set, get) => ({
         // On error, keep current state but return a safe default
         if (!isRealProvider) return get().paymentSettings;
         const emptyPaymentSettings = createInitialPaymentSettings();
-        set({ paymentSettings: emptyPaymentSettings });
-        return emptyPaymentSettings;
+        if (requestId === paymentSettingsRequestId) {
+          set({ paymentSettings: emptyPaymentSettings });
+          return emptyPaymentSettings;
+        }
+        return get().paymentSettings;
       })
       .finally(() => {
-        paymentSettingsRequest = null;
+        if (paymentSettingsRequest === request) {
+          paymentSettingsRequest = null;
+        }
       });
 
+    paymentSettingsRequest = request;
     return paymentSettingsRequest;
   },
 
@@ -149,6 +159,8 @@ const useSystemStore = create((set, get) => ({
     };
     const saved = await apiClient.system.updatePaymentSettings(normalizedPayload, actor);
     const nextPaymentSettings = normalizeStorePaymentSettings(saved);
+    paymentSettingsRequestId += 1;
+    paymentSettingsRequest = null;
     set({
       paymentSettings: nextPaymentSettings,
     });

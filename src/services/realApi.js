@@ -44,10 +44,6 @@ const REFRESH_ENDPOINT = '/auth/refresh';
 
 const AUTH_FORCE_LOGOUT_EVENT = 'auth:force-logout';
 
-// Session-backed auth root so the signed-in state survives refreshes without localStorage.
-let __authPersistRoot = {};
-
-
 const safeParseJson = (raw, fallback = null) => {
   try {
     return JSON.parse(raw);
@@ -57,21 +53,15 @@ const safeParseJson = (raw, fallback = null) => {
 };
 
 const getAuthPersistedRoot = () => {
-  if (typeof window !== 'undefined' && window.sessionStorage) {
-    try {
-      const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          __authPersistRoot = parsed;
-        }
-      }
-    } catch {
-      // Fall back to the in-memory copy below.
-    }
-  }
+  if (typeof window === 'undefined' || !window.localStorage) return {};
 
-  return __authPersistRoot || {};
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
 };
 const getStoredAuthState = () => getAuthPersistedRoot()?.state || {};
 const getStoredRole = () => String(getStoredAuthState()?.user?.role || '').trim().toUpperCase();
@@ -178,15 +168,17 @@ const normaliseSenderDetails = (source = {}) => {
 
 const writeAuthState = (nextState) => {
   const root = getAuthPersistedRoot() || {};
-  root.state = { ...(root.state || {}), ...(nextState || {}) };
-  __authPersistRoot = root;
+  const nextRoot = {
+    ...root,
+    state: { ...(root.state || {}), ...(nextState || {}) },
+  };
 
-  if (typeof window !== 'undefined' && window.sessionStorage) {
-    try {
-      window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(root));
-    } catch {
-      // Best effort.
-    }
+  if (typeof window === 'undefined' || !window.localStorage) return;
+
+  try {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextRoot));
+  } catch {
+    // Best effort.
   }
 };
 
@@ -204,28 +196,22 @@ const setStoredAuthTokens = (token, refreshToken) => {
 };
 
 const clearStoredSession = () => {
-  writeAuthState({
-    user: null,
-    token: null,
-    refreshToken: null,
-    isAuthenticated: false,
-    blockedStatus: null,
-    blockedUser: null,
-    profileLastLoadedAt: 0,
-  });
+  if (typeof window === 'undefined' || !window.localStorage) return;
 
-  if (typeof window !== 'undefined' && window.sessionStorage) {
-    try {
-      window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
-    } catch {
-      // Ignore storage failures.
-    }
+  try {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures.
   }
 };
 
 const setSessionLogoutReason = (reason = SESSION_EXPIRED_REASON) => {
   if (typeof window === 'undefined') return;
-  sessionStorage.setItem(SESSION_LOGOUT_REASON_KEY, reason);
+  try {
+    window.localStorage.setItem(SESSION_LOGOUT_REASON_KEY, reason);
+  } catch {
+    // Ignore storage failures.
+  }
 };
 
 const dispatchForceLogoutEvent = (reason) => {
@@ -337,7 +323,10 @@ const flushRefreshQueue = (error, token) => {
 http.interceptors.request.use((config) => {
   const token = getStoredToken();
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers = {
+      ...(config.headers || {}),
+      Authorization: `Bearer ${token}`,
+    };
   }
   return config;
 });
@@ -1458,7 +1447,6 @@ const runProductMutationPlan = async (plan, fallbackMessage = 'Unable to save pr
 
 const isAdmin = () => {
   try {
-    // Use in-memory auth state instead of localStorage
     return getStoredAuthState()?.user?.role?.toLowerCase() === 'admin';
   } catch { return false; }
 };

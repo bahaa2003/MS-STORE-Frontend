@@ -16,10 +16,10 @@ const PROFILE_CACHE_TTL = 0; // disable short-lived profile caching; always fetc
 let profileRefreshRequest = null;
 
 const readStoredAuthState = () => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return {};
+  if (typeof window === 'undefined' || !window.localStorage) return {};
 
   try {
-    const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return parsed?.state || {};
   } catch {
@@ -28,23 +28,23 @@ const readStoredAuthState = () => {
 };
 
 const writeStoredAuthState = (nextState = {}) => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  if (typeof window === 'undefined' || !window.localStorage) return;
 
   try {
-    const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     const currentState = parsed?.state || {};
-    window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ state: { ...currentState, ...nextState } }));
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ state: { ...currentState, ...nextState } }));
   } catch {
     // Best-effort only.
   }
 };
 
 const clearStoredAuthState = () => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  if (typeof window === 'undefined' || !window.localStorage) return;
 
   try {
-    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
   } catch {
     // Ignore storage failures.
   }
@@ -296,6 +296,14 @@ const useAuthStore = create((set, get) => ({
             blockedUser: outcome.canAccessApp ? null : response.user,
             profileLastLoadedAt: Date.now(),
           });
+          writeStoredAuthState({
+            user: response.user,
+            token: response.token || null,
+            isAuthenticated: true,
+            blockedStatus: outcome.canAccessApp ? null : outcome.status,
+            blockedUser: outcome.canAccessApp ? null : response.user,
+            profileLastLoadedAt: Date.now(),
+          });
           await useAdminStore.getState().loadUsers({ force: true });
           return outcome;
         } catch (err) {
@@ -474,14 +482,24 @@ const useAuthStore = create((set, get) => ({
 
           profileRefreshRequest = apiClient.auth.getProfile(currentUserId)
             .then((profile) => {
+              const current = get();
+              const nextUser = { ...current.user, ...profile };
               const nextStatus = normalizeAccountStatus(profile?.status);
 
-              set((state) => ({
-                user: { ...state.user, ...profile },
+              set({
+                user: nextUser,
                 blockedStatus: isApprovedAccountStatus(nextStatus) ? null : nextStatus,
-                blockedUser: isApprovedAccountStatus(nextStatus) ? null : { ...state.user, ...profile },
+                blockedUser: isApprovedAccountStatus(nextStatus) ? null : nextUser,
                 profileLastLoadedAt: Date.now(),
-              }));
+              });
+              writeStoredAuthState({
+                user: nextUser,
+                token: current.token || null,
+                isAuthenticated: Boolean(current.token),
+                blockedStatus: isApprovedAccountStatus(nextStatus) ? null : nextStatus,
+                blockedUser: isApprovedAccountStatus(nextStatus) ? null : nextUser,
+                profileLastLoadedAt: Date.now(),
+              });
               return profile;
             })
             .catch((err) => {
