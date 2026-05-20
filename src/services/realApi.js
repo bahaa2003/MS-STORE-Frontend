@@ -1415,32 +1415,11 @@ const normaliseProductMutationResponse = (response) => normaliseProduct(
   || unwrap(response)
 );
 
-const runProductMutationPlan = async (plan, fallbackMessage = 'Unable to save product.') => {
-  let lastError = null;
-
-  for (const [method, endpoint, payload] of plan) {
-    try {
-      const response = method === 'patch'
-        ? await http.patch(endpoint, payload)
-        : await http.post(endpoint, payload);
-      return normaliseProductMutationResponse(response);
-    } catch (error) {
-      lastError = error;
-
-      // Definitive client errors — do NOT retry the next endpoint.
-      // 400 = validation failed (e.g. bad basePrice, missing field)
-      // 409 = conflict (e.g. duplicate product name)
-      // 422 = unprocessable entity
-      const status = error?.response?.status;
-      if (status === 400 || status === 409 || status === 422) {
-        throw error;
-      }
-      // For 404 (endpoint doesn't exist) or 5xx (server error),
-      // fall through to the next endpoint in the plan.
-    }
-  }
-
-  throw lastError || new Error(fallbackMessage);
+const runProductMutation = async (method, endpoint, payload) => {
+  const response = method === 'patch'
+    ? await http.patch(endpoint, payload)
+    : await http.post(endpoint, payload);
+  return normaliseProductMutationResponse(response);
 };
 
 // ─── Determine if current user is admin ──────────────────────────────────────
@@ -1769,21 +1748,7 @@ const realApi = {
      */
     create: async (productData) => {
       const body = productToBE(productData);
-      const hasProvider = Boolean(body.providerProductId);
-      const requestPlan = hasProvider
-        ? [
-          ['post', '/admin/products/from-provider', body],
-          ['post', '/providers/products/publish', body],
-          ['post', '/products/publish', body],
-          ['post', '/admin/products', body],
-          ['post', '/products', body],
-        ]
-        : [
-          ['post', '/admin/products', body],
-          ['post', '/products', body],
-        ];
-
-      return runProductMutationPlan(requestPlan, 'Unable to create product.');
+      return runProductMutation('post', '/admin/products', body);
     },
 
     /**
@@ -1793,27 +1758,14 @@ const realApi = {
      */
     update: async (id, updates) => {
       const body = productToBE(updates);
-      const requestPlan = [
-        ['patch', `/admin/products/${id}`, body],
-        ['patch', `/products/${id}`, body],
-      ];
-
-      if (String(body.providerProductId || body.externalProductId || '').trim()) {
-        requestPlan.splice(1, 0, ['patch', `/providers/products/${id}`, body]);
-      }
-
-      return runProductMutationPlan(requestPlan, 'Unable to update product.');
+      return runProductMutation('patch', `/admin/products/${id}`, body);
     },
 
     /**
      * PATCH /products/:id/toggle-status — activate or deactivate product.
      */
     toggleStatus: async (id) => {
-      return runProductMutationPlan([
-        ['patch', `/products/${id}/toggle-status`],
-        ['patch', `/admin/products/${id}/toggle`],
-        ['patch', `/products/${id}/toggle`],
-      ], 'Unable to toggle product status.');
+      return runProductMutation('patch', `/admin/products/${id}/toggle`);
     },
 
     /**
@@ -2245,25 +2197,12 @@ const realApi = {
 
       const normalizedBalance = toFiniteNumber(balance, 0);
 
-      // Try the dedicated set-balance endpoint first
-      const requestPlan = [
-        { method: 'put', url: `/admin/wallets/${normalizedUserId}/set`, payload: { targetBalance: normalizedBalance, description: 'Admin set balance' } },
-        { method: 'patch', url: `/admin/wallets/${normalizedUserId}`, payload: { walletBalance: normalizedBalance } },
-        { method: 'patch', url: `/admin/users/${normalizedUserId}`, payload: { walletBalance: normalizedBalance } },
-      ];
-
-      let lastError = null;
-      for (const { method, url, payload } of requestPlan) {
-        try {
-          const res = await http[method](url, payload);
-          const data = unwrap(res);
-          return data?.user ? normaliseUser(data.user) : normaliseUser(data);
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError || new Error('Unable to set wallet balance.');
+      const res = await http.put(`/admin/wallets/${normalizedUserId}/set`, {
+        targetBalance: normalizedBalance,
+        description: 'Admin set balance',
+      });
+      const data = unwrap(res);
+      return data?.user ? normaliseUser(data.user) : normaliseUser(data);
     },
 
     /**
@@ -2304,23 +2243,9 @@ const realApi = {
           : [],
       };
 
-      const endpointPlan = [
-        { method: 'patch', url: `/admin/users/${normalizedUserId}/permissions`, payload },
-        { method: 'patch', url: `/admin/users/${normalizedUserId}`, payload },
-      ];
-
-      let lastError = null;
-      for (const request of endpointPlan) {
-        try {
-          const res = await http[request.method](request.url, request.payload);
-          const data = unwrap(res);
-          return normaliseUser(data?.user || data);
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError || new Error('Unable to update permissions.');
+      const res = await http.patch(`/admin/users/${normalizedUserId}/permissions`, payload);
+      const data = unwrap(res);
+      return normaliseUser(data?.user || data);
     },
 
     delete: async (userId, _actorContext) => {
@@ -2329,26 +2254,8 @@ const realApi = {
     },
 
     restore: async (userId, _actorContext) => {
-      const endpointCandidates = [
-        [`/admin/users/${userId}/restore`, {}],
-        [`/admin/users/${userId}/approve`, null],
-        [`/admin/users/${userId}`, { status: 'ACTIVE', deletedAt: null }],
-      ];
-
-      let lastError = null;
-
-      for (const [endpoint, payload] of endpointCandidates) {
-        try {
-          const res = payload === null
-            ? await http.patch(endpoint)
-            : await http.patch(endpoint, payload);
-          return normaliseUser(unwrap(res)?.user || unwrap(res));
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError || new Error('Unable to restore deleted user.');
+      const res = await http.patch(`/admin/users/${userId}/restore`, {});
+      return normaliseUser(unwrap(res)?.user || unwrap(res));
     },
 
     /**
@@ -2726,39 +2633,28 @@ const realApi = {
         body.orderFieldsValues = customInputsPayload;
       }
 
-      const endpoints = isAdmin() ? ['/orders', '/me/orders'] : ['/me/orders', '/orders'];
       const requestConfig = orderData?.idempotencyKey
         ? { headers: { 'Idempotency-Key': String(orderData.idempotencyKey) } }
         : undefined;
-      let lastError = null;
 
-      for (const endpoint of endpoints) {
-        try {
-          const res = await http.post(endpoint, body, requestConfig);
-          // If we reach here, the HTTP call returned a 2xx — the order was created.
-          // Parse defensively so a normalisation hiccup never masks a successful creation.
-          try {
-            const data = unwrap(res);
-            return { order: normaliseOrder(data?.order || data), updatedBalance: (data?.updatedBalance ?? data?.order?.updatedBalance ?? res.data?.updatedBalance) };
-          } catch (_parseError) {
-            // Normalisation failed, but the order WAS created. Return raw data.
-            const raw = res.data?.data?.order || res.data?.data || res.data?.order || res.data || {};
-            return {
-              order: {
-                id: raw._id || raw.id || `ord-${Date.now()}`,
-                status: (raw.status || 'pending').toLowerCase(),
-                ...raw,
-              },
-              updatedBalance: raw.updatedBalance,
-            };
-          }
-        } catch (error) {
-          // HTTP-level error (4xx/5xx) — try the next endpoint.
-          lastError = error;
-        }
+      const res = await http.post('/me/orders', body, requestConfig);
+      // If we reach here, the HTTP call returned a 2xx - the order was created.
+      // Parse defensively so a normalisation hiccup never masks a successful creation.
+      try {
+        const data = unwrap(res);
+        return { order: normaliseOrder(data?.order || data), updatedBalance: (data?.updatedBalance ?? data?.order?.updatedBalance ?? res.data?.updatedBalance) };
+      } catch (_parseError) {
+        // Normalisation failed, but the order WAS created. Return raw data.
+        const raw = res.data?.data?.order || res.data?.data || res.data?.order || res.data || {};
+        return {
+          order: {
+            id: raw._id || raw.id || `ord-${Date.now()}`,
+            status: (raw.status || 'pending').toLowerCase(),
+            ...raw,
+          },
+          updatedBalance: raw.updatedBalance,
+        };
       }
-
-      throw lastError || new Error('Unable to create order.');
     },
 
     /**
@@ -3052,40 +2948,21 @@ const realApi = {
 
     updateStatus: async (id, status, payload = {}) => {
       const normalizedStatus = String(status || '').trim().toLowerCase();
-      const endpoint = normalizedStatus === 'approved' || normalizedStatus === 'done'
-        ? `/admin/targets/${id}/approve`
-        : normalizedStatus === 'rejected'
-          ? `/admin/targets/${id}/reject`
-          : null;
+      let endpoint = '';
+      let body = {};
 
-      if (!endpoint && normalizedStatus !== 'pending') {
+      if (normalizedStatus === 'approved' || normalizedStatus === 'done') {
+        endpoint = `/admin/targets/${id}/approve`;
+      } else if (normalizedStatus === 'rejected') {
+        endpoint = `/admin/targets/${id}/reject`;
+        body.adminNotes = payload.adminNotes ?? payload.rejectionReason ?? payload.reason ?? '';
+      } else {
         throw new Error(`Unsupported target order status: ${status}`);
       }
 
-      const body = normalizedStatus === 'rejected'
-        ? { adminNotes: payload.adminNotes ?? payload.rejectionReason ?? payload.reason ?? '' }
-        : {};
-      const pendingBody = { status: 'PENDING' };
-
-      const requests = endpoint
-        ? [{ url: endpoint, body }]
-        : [
-            { url: `/admin/targets/${id}/status`, body: pendingBody },
-            { url: `/admin/targets/${id}`, body: pendingBody },
-          ];
-
-      let lastError = null;
-      for (const request of requests) {
-        try {
-          const res = await http.patch(request.url, request.body);
-          const data = unwrap(res);
-          return normaliseTargetOrder(data?.order || data?.request || data);
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError || new Error(`Unsupported target order status: ${status}`);
+      const res = await http.patch(endpoint, body);
+      const data = unwrap(res);
+      return normaliseTargetOrder(data?.order || data?.request || data);
     },
   },
 

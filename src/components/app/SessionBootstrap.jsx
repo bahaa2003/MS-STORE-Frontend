@@ -1,27 +1,42 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import useAuthStore from '../../store/useAuthStore';
-import useMediaStore from '../../store/useMediaStore';
-import useGroupStore from '../../store/useGroupStore';
-import useAdminStore from '../../store/useAdminStore';
-import useSystemStore from '../../store/useSystemStore';
 import apiClient from '../../services/client';
 
 const AUTH_FORCE_LOGOUT_EVENT = 'auth:force-logout';
-const PAYMENT_SETTINGS_BROADCAST_CHANNEL = 'payment-settings-updates';
+const SESSION_RECHECK_INTERVAL = 5 * 60 * 1000;
 
 const SessionBootstrap = () => {
+  const sessionRefreshRequestRef = useRef(null);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const token = useAuthStore((state) => state.token);
   const userId = useAuthStore((state) => state.user?.id);
-  const userRole = useAuthStore((state) => String(state.user?.role || '').toLowerCase());
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
   const logout = useAuthStore((state) => state.logout);
-  const loadProducts = useMediaStore((state) => state.loadProducts);
-  const loadGroups = useGroupStore((state) => state.loadGroups);
-  const loadUsers = useAdminStore((state) => state.loadUsers);
-  const loadPaymentSettings = useSystemStore((state) => state.loadPaymentSettings);
-  const startPaymentSettingsPolling = useSystemStore((state) => state.startPaymentSettingsPolling);
-  const stopPaymentSettingsPolling = useSystemStore((state) => state.stopPaymentSettingsPolling);
+
+  const refreshSessionProfile = useCallback(({ forceProfile = false } = {}) => {
+    if (sessionRefreshRequestRef.current) {
+      return sessionRefreshRequestRef.current;
+    }
+
+    const request = (async () => {
+      try {
+        await apiClient.auth.refreshSession?.();
+        return await refreshProfile({ force: forceProfile });
+      } catch {
+        // Non-blocking session check. Auth interceptors/force-logout events handle hard failures.
+        return null;
+      }
+    })();
+
+    sessionRefreshRequestRef.current = request;
+    request.finally(() => {
+      if (sessionRefreshRequestRef.current === request) {
+        sessionRefreshRequestRef.current = null;
+      }
+    });
+
+    return request;
+  }, [refreshProfile]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -38,105 +53,52 @@ const SessionBootstrap = () => {
   useEffect(() => {
     if (!isAuthenticated || !token || !userId) return undefined;
 
-    let cancelled = false;
+    void refreshSessionProfile({ forceProfile: true });
 
-    const syncSession = async () => {
-      try {
-        await apiClient.auth.refreshSession?.();
-
-        if (cancelled) return;
-
-        await refreshProfile({ force: true });
-
-        if (cancelled) return;
-
-        await Promise.allSettled([
-          loadProducts({ force: true }),
-          loadPaymentSettings({ force: true }),
-          userRole !== 'customer' ? loadGroups({ force: true }) : Promise.resolve(),
-          userRole === 'admin' ? loadUsers({ force: true }) : Promise.resolve(),
-        ]);
-      } catch {
-        // Non-blocking bootstrap.
-      }
-    };
-
-    syncSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, token, userId, userRole, refreshProfile, loadProducts, loadPaymentSettings, loadGroups, loadUsers]);
+    return undefined;
+  }, [isAuthenticated, token, userId, refreshSessionProfile]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !isAuthenticated || !token || !userId) return undefined;
 
-    let lastSyncAt = 0;
-    let syncInFlight = false;
+    let lastSyncAt = Date.now();
+    let cancelled = false;
 
-    const syncFreshData = async () => {
-      if (document.visibilityState === 'hidden' || syncInFlight) return;
+    const syncSessionIfNeeded = async ({ bypassThrottle = false } = {}) => {
+      if (cancelled || document.visibilityState === 'hidden') return;
 
       const now = Date.now();
-      if (now - lastSyncAt < 30 * 1000) return;
+      if (!bypassThrottle && now - lastSyncAt < SESSION_RECHECK_INTERVAL) return;
 
       lastSyncAt = now;
-      syncInFlight = true;
+      await refreshSessionProfile({ forceProfile: true });
+    };
 
-      try {
-        await Promise.allSettled([
-          refreshProfile({ force: true }),
-          loadProducts({ force: true }),
-          loadPaymentSettings({ force: true }),
-          userRole !== 'customer' ? loadGroups({ force: true }) : Promise.resolve(),
-          userRole === 'admin' ? loadUsers({ force: true }) : Promise.resolve(),
-        ]);
-      } finally {
-        syncInFlight = false;
-      }
+    const handleFocus = () => {
+      void syncSessionIfNeeded();
+    };
+
+    const handleOnline = () => {
+      void syncSessionIfNeeded({ bypassThrottle: true });
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        void syncFreshData();
+        void syncSessionIfNeeded();
       }
     };
 
-    window.addEventListener('focus', syncFreshData);
-    window.addEventListener('online', syncFreshData);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    const intervalId = window.setInterval(syncFreshData, 30 * 1000);
 
     return () => {
-      window.removeEventListener('focus', syncFreshData);
-      window.removeEventListener('online', syncFreshData);
+      cancelled = true;
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.clearInterval(intervalId);
     };
-  }, [isAuthenticated, token, userId, userRole, refreshProfile, loadProducts, loadPaymentSettings, loadGroups, loadUsers]);
-
-  useEffect(() => {
-    if (!isAuthenticated || !token) {
-      stopPaymentSettingsPolling();
-      return undefined;
-    }
-
-    startPaymentSettingsPolling();
-    return () => stopPaymentSettingsPolling();
-  }, [isAuthenticated, token, startPaymentSettingsPolling, stopPaymentSettingsPolling]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.BroadcastChannel || !isAuthenticated || !token) return undefined;
-
-    const channel = new BroadcastChannel(PAYMENT_SETTINGS_BROADCAST_CHANNEL);
-    channel.onmessage = (event) => {
-      if (event?.data?.type === 'payment-settings:changed') {
-        void loadPaymentSettings({ force: true });
-      }
-    };
-
-    return () => channel.close();
-  }, [isAuthenticated, token, loadPaymentSettings]);
+  }, [isAuthenticated, token, userId, refreshSessionProfile]);
 
   return null;
 };

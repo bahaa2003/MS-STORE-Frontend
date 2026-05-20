@@ -301,7 +301,6 @@ const AdminProducts = () => {
         toggleProductStatus,
         deleteProduct,
         loadProducts,
-        resetProducts,
     } = useMediaStore();
     const { user } = useAuthStore();
     const { addToast } = useToast();
@@ -316,7 +315,6 @@ const AdminProducts = () => {
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState(null);
     const [isSavingCategory, setIsSavingCategory] = useState(false);
-    const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
     const [categoryToDelete, setCategoryToDelete] = useState(null);
     const [categoryForm, setCategoryForm] = useState({
         name: '',
@@ -660,18 +658,6 @@ const AdminProducts = () => {
         }
 
         return rawMessage || fallback;
-    };
-
-    const handleResetData = () => {
-        setResetConfirmOpen(true);
-    };
-
-    const confirmResetData = () => {
-        resetProducts();
-        addToast('تمت إعادة ضبط البيانات بنجاح، وسيتم عرض الحقول بشكل صحيح', 'success');
-        setResetConfirmOpen(false);
-        // No persistent storage to clear: runtime-only state now.
-        window.location.reload();
     };
 
     const handleImageUpload = async (e, setForm, uploadCategory = 'products') => {
@@ -1108,13 +1094,6 @@ const AdminProducts = () => {
             <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('productsManager')}</h1>
-                    <button
-                        onClick={handleResetData}
-                        className="flex items-center gap-1 text-sm text-gray-400 hover:text-red-500"
-                        title="Reset to defaults"
-                    >
-                        <RefreshCw className="h-3 w-3" /> Reset
-                    </button>
                 </div>
             </div>
             </section>
@@ -2071,16 +2050,6 @@ const AdminProducts = () => {
                     </div>
                 </form>
             </Modal>
-
-            <ConfirmDialog
-                open={resetConfirmOpen}
-                title={isEnglish ? 'Restore default data?' : 'إعادة ضبط البيانات'}
-                description={isEnglish ? 'This will restore default products and categories.' : 'سيتم إعادة المنتجات والأقسام الافتراضية وتحديث الصفحة.'}
-                confirmLabel={isEnglish ? 'Restore' : 'إعادة ضبط'}
-                cancelLabel={isEnglish ? 'Cancel' : 'إلغاء'}
-                onConfirm={confirmResetData}
-                onCancel={() => setResetConfirmOpen(false)}
-            />
 
             <ConfirmDialog
                 open={Boolean(categoryToDelete)}
