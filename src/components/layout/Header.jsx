@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Bell, Menu, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ const Header = ({ toggleSidebar }) => {
   const { user } = useAuthStore();
   const { notifications, unreadCount, isLoading, loadNotifications, loadUnreadCount, markAsRead, markAllAsRead } = useNotificationStore();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationsRef = useRef(null);
   const { dir } = useLanguage();
 
   const language = String(i18n.resolvedLanguage || i18n.language || 'ar').toLowerCase().startsWith('ar') ? 'ar' : 'en';
@@ -37,17 +38,49 @@ const Header = ({ toggleSidebar }) => {
     return () => clearInterval(timer);
   }, [loadUnreadCount, user?.id]);
 
-  const resolveNotificationTarget = (notification) => {
-    if (notification?.targetUrl) return notification.targetUrl;
+  useEffect(() => {
+    if (!isNotificationsOpen) return undefined;
 
+    const handlePointerDown = (event) => {
+      if (notificationsRef.current?.contains(event.target)) return;
+      setIsNotificationsOpen(false);
+      markAllAsRead();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [isNotificationsOpen, markAllAsRead]);
+
+  const buildPathWithQuery = (path, key, value) => {
+    const normalizedValue = String(value || '').trim();
+    if (!path || !normalizedValue) return path;
+
+    const [pathAndSearch, hash = ''] = String(path).split('#');
+    const [pathname, search = ''] = pathAndSearch.split('?');
+    const params = new URLSearchParams(search);
+    params.set(key, normalizedValue);
+
+    const query = params.toString();
+    return `${pathname}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`;
+  };
+
+  const resolveNotificationTarget = (notification) => {
     const source = String(notification?.source || notification?.context || notification?.category || '').toLowerCase();
     const targetType = String(notification?.targetType || '').toLowerCase();
-    const orderId = notification?.orderId || (targetType === 'order' ? notification?.targetId : '');
-    const topupId = notification?.topupId || (targetType === 'topup' || targetType === 'wallet' ? notification?.targetId : '');
+    const targetId = notification?.targetId || '';
+    const orderId = notification?.orderId || (targetType === 'order' ? targetId : '');
+    const topupId = notification?.topupId || (targetType === 'topup' || targetType === 'deposit' || targetType === 'wallet' ? targetId : '');
+    const targetRequestId = notification?.targetRequestId || (
+      targetType.includes('target') || source.includes('target') ? targetId : ''
+    );
     const userId = notification?.userId || (targetType === 'user' ? notification?.targetId : '');
     const text = `${notification?.title || ''} ${notification?.message || ''} ${source} ${targetType}`;
+
     if (source.includes('target') || targetType.includes('target') || /target/i.test(text)) {
-      return isBackoffice ? '/admin/target-requests' : '/buy-target';
+      const basePath = isBackoffice ? '/admin/target-requests' : '/target-orders';
+      return targetRequestId ? buildPathWithQuery(basePath, 'targetRequestId', targetRequestId) : basePath;
     }
 
     if (
@@ -59,7 +92,8 @@ const Header = ({ toggleSidebar }) => {
       || targetType === 'wallet'
       || /wallet|topup|payment|deposit/i.test(text)
     ) {
-      return isBackoffice ? '/admin/payments' : '/wallet';
+      const basePath = isBackoffice ? '/admin/payments' : '/wallet/topup-history';
+      return topupId ? buildPathWithQuery(basePath, 'topupId', topupId) : basePath;
     }
     const inferredId = text.match(/(?:الطلب|طلب|order|#)\s*([A-Za-z0-9_-]{4,})/i)?.[1] || '';
 
@@ -70,12 +104,15 @@ const Header = ({ toggleSidebar }) => {
     }
 
     if (topupId || targetType === 'topup' || targetType === 'wallet' || /شحن|رصيد|محفظة|wallet|topup|payment/i.test(text)) {
-      return isBackoffice ? '/admin/payments' : '/wallet';
+      const basePath = isBackoffice ? '/admin/payments' : '/wallet/topup-history';
+      return topupId ? buildPathWithQuery(basePath, 'topupId', topupId) : basePath;
     }
 
     if (userId || targetType === 'user' || /حساب|account|user/i.test(text)) {
       return isBackoffice ? '/admin/users' : '/account';
     }
+
+    if (notification?.targetUrl) return notification.targetUrl;
 
     return getDefaultRouteForRole(user?.role);
   };
@@ -89,16 +126,24 @@ const Header = ({ toggleSidebar }) => {
   };
 
   const handleNotificationsToggle = () => {
-    setIsNotificationsOpen((previous) => !previous);
-    if (!isNotificationsOpen) {
-      void loadNotifications().catch(() => {});
-    }
+    setIsNotificationsOpen((previous) => {
+      const nextIsOpen = !previous;
+
+      if (nextIsOpen) {
+        void loadNotifications().catch(() => {});
+      } else {
+        markAllAsRead();
+      }
+
+      return nextIsOpen;
+    });
   };
 
   const handleNotificationClick = (notification) => {
     if (notification?.id && !notification?.read) {
       void markAsRead(notification.id);
     }
+    markAllAsRead();
     navigate(resolveNotificationTarget(notification));
     setIsNotificationsOpen(false);
   };
@@ -189,7 +234,7 @@ const Header = ({ toggleSidebar }) => {
               </>
             )}
 
-            <div className="relative">
+            <div className="relative" ref={notificationsRef}>
               <button
                 type="button"
                 onClick={handleNotificationsToggle}
@@ -223,7 +268,14 @@ const Header = ({ toggleSidebar }) => {
                         <span className="flex items-start gap-2">
                           <span className={`mt-1 h-2 w-2 rounded-full ${notification.read ? 'bg-[color:rgb(var(--color-border-rgb)/0.9)]' : 'bg-[var(--color-primary)]'}`} />
                           <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold text-[var(--color-text)]">{notification.title}</span>
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="block truncate text-sm font-semibold text-[var(--color-text)]">{notification.title}</span>
+                              {!notification.read ? (
+                                <span className="shrink-0 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.28)] bg-[color:rgb(var(--color-primary-rgb)/0.12)] px-1.5 py-0.5 text-[9px] font-black text-[var(--color-primary)]">
+                                  جديد
+                                </span>
+                              ) : null}
+                            </span>
                             {notification.message ? (
                               <span className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--color-text-secondary)]">{notification.message}</span>
                             ) : null}

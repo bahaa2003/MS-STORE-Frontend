@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowUpLeft, Boxes, CheckCircle2, ClipboardList, Target } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import AdminOrdersTable from '../../components/target/AdminOrdersTable';
 import AdminProducts from '../../components/target/AdminProducts';
 import RejectionReasonModal from '../../components/target/RejectionReasonModal';
@@ -15,6 +16,7 @@ import { PERMISSIONS, hasPermission } from '../../utils/permissions';
 import { getActivePaymentMethods } from '../../utils/paymentSettings';
 
 const AdminTargetRequests = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     products,
     requests,
@@ -33,12 +35,21 @@ const AdminTargetRequests = () => {
   const [isRequestsPanelOpen, setIsRequestsPanelOpen] = useState(false);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const canConfirmTargetRequests = hasPermission(actor, PERMISSIONS.CONFIRM_TARGET_REQUESTS);
+  const targetRequestIdParam = String(searchParams.get('targetRequestId') || '').trim();
 
   useEffect(() => {
     void loadApps({ includeInactive: true });
     void loadRequests({ page: 1, limit: 100 });
     void loadPaymentSettings({ force: true });
   }, [loadApps, loadRequests, loadPaymentSettings]);
+
+  useEffect(() => {
+    if (!targetRequestIdParam) return;
+    const request = requests.find((item) => String(item?.id || '').trim() === targetRequestIdParam);
+    if (!request) return;
+    setSelectedRequest(request);
+    setIsRequestsPanelOpen(true);
+  }, [requests, targetRequestIdParam]);
 
   const paymentMethods = getActivePaymentMethods(paymentSettings, { fallbackToDefault: false });
 
@@ -89,6 +100,20 @@ const AdminTargetRequests = () => {
     } finally {
       setIsStatusUpdating(false);
     }
+  };
+
+  const openRequestDetails = (request) => {
+    setSelectedRequest(request);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('targetRequestId', request.id);
+    setSearchParams(nextParams);
+  };
+
+  const closeRequestDetails = () => {
+    setSelectedRequest(null);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('targetRequestId');
+    setSearchParams(nextParams, { replace: true });
   };
 
   const pendingCount = requests.filter((request) => String(request.status).toUpperCase() === 'PENDING').length;
@@ -194,7 +219,7 @@ const AdminTargetRequests = () => {
             <AdminOrdersTable
               requests={requests}
               onStatusChange={handleStatusChange}
-              onViewDetails={(request) => setSelectedRequest(request)}
+              onViewDetails={openRequestDetails}
               canConfirm={canConfirmTargetRequests}
               showHeader={false}
             />
@@ -210,7 +235,7 @@ const AdminTargetRequests = () => {
 
       <TargetOrderDetailsModal
         isOpen={Boolean(selectedRequest)}
-        onClose={() => setSelectedRequest(null)}
+        onClose={closeRequestDetails}
         order={selectedRequest}
         canManage={canConfirmTargetRequests}
         isUpdating={isStatusUpdating}

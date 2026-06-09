@@ -174,6 +174,7 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
     { icon: ShieldCheck, label: t('sidebar.paymentsManager'), path: '/admin/payments', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_PAYMENTS },
     { icon: CreditCard, label: t('sidebar.paymentMethods'), path: '/admin/payment-methods', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_PAYMENT_METHODS },
     { icon: Coins, label: t('sidebar.currencies'), path: '/admin/currencies', roles: ADMIN_NAV_ROLES, permission: PERMISSIONS.ADMIN_CURRENCIES },
+    { icon: MessageCircle, label: 'واتساب', path: '/admin/whatsapp', roles: ['admin'] },
     {
       icon: Sparkles,
       label: t('sidebar.createdBy', { defaultValue: 'تم الإنشاء بواسطة' }),
@@ -195,6 +196,27 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
   ));
   const showWalletCard = String(user?.role || '').toLowerCase() === 'customer' && isExpanded;
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';
+  const getNavSection = (item) => {
+    const path = String(item?.path || '');
+    if (path === '/dashboard') return 'account';
+    if (path.startsWith('/admin') || path.startsWith('/manager') || path.startsWith('/supervisor')) return 'admin';
+    if (['/account', '/account-security', '/settings', '/contact-us', '/created-by'].includes(path)) return 'account';
+    return 'main';
+  };
+  const sectionLabels = {
+    main: dir === 'rtl' ? 'المساحة' : 'Space',
+    admin: dir === 'rtl' ? 'الإدارة' : 'Admin',
+    account: dir === 'rtl' ? 'الحساب' : 'Account',
+  };
+  const navSections = filteredNavItems.reduce((sections, item) => {
+    const sectionId = getNavSection(item);
+    const existing = sections.find((section) => section.id === sectionId);
+    if (existing) {
+      existing.items.push(item);
+      return sections;
+    }
+    return [...sections, { id: sectionId, items: [item] }];
+  }, []);
 
   return (
     <>
@@ -223,26 +245,34 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
           }
         }}
         className={cn(
-          'fixed top-4 z-[90] h-[calc(100vh-4rem)] overflow-hidden',
+          'fixed top-4 z-[90] h-[calc(100vh-2rem)] overflow-hidden',
           dir === 'rtl' ? 'right-4' : 'left-4',
           isMobile && !isOpen && 'hidden'
         )}
       >
         <div className={cn(
-          'app-shell-sidebar-panel relative flex h-full flex-col rounded-[32px] border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.76),rgb(var(--color-elevated-rgb)/0.56))] shadow-[var(--shadow-medium)] backdrop-blur-[24px]',
+          'app-shell-sidebar-panel relative flex h-full flex-col overflow-hidden rounded-[30px] border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.82),rgb(var(--color-elevated-rgb)/0.62))] shadow-[0_28px_80px_-52px_rgb(0_0_0/0.68)] backdrop-blur-[24px]',
           isAdmin && 'border-[color:rgb(var(--color-primary-rgb)/0.22)] bg-[linear-gradient(180deg,rgb(255_255_255/0.86),rgb(245_241_231/0.72))] shadow-[0_34px_90px_-58px_rgb(80_64_24/0.36)] dark:bg-[linear-gradient(180deg,rgb(26_26_26/0.84),rgb(10_10_10/0.72))] dark:shadow-[0_34px_90px_-54px_rgb(0_0_0/0.94)]'
         )}>
-          <div className="border-b border-[color:rgb(var(--color-border-rgb)/0.56)] px-4 pb-4 pt-5">
+          <div className="border-b border-[color:rgb(var(--color-border-rgb)/0.56)] px-3 pb-3 pt-3.5">
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => navigate(getDefaultRouteForRole(user?.role))}
                 className={cn(
-                  'flex items-center rounded-[24px] transition-all hover:-translate-y-0.5',
-                  isExpanded ? 'bg-transparent' : 'mx-auto'
+                  'flex min-w-0 items-center rounded-[22px] transition-all hover:-translate-y-0.5',
+                  isExpanded
+                    ? 'min-h-[4.7rem] flex-1 justify-start border border-[color:rgb(var(--color-border-rgb)/0.58)] bg-[linear-gradient(135deg,rgb(var(--color-surface-rgb)/0.68),rgb(var(--color-primary-rgb)/0.06))] px-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]'
+                    : 'mx-auto'
                 )}
               >
-                <BrandMark compact={!isExpanded} size={isExpanded ? 'sm' : 'md'} showCaption={false} />
+                <BrandMark
+                  compact={!isExpanded}
+                  size={isExpanded ? 'sm' : 'md'}
+                  stacked={isExpanded}
+                  centerStackedText={isExpanded}
+                  showCaption={false}
+                />
               </button>
 
               {!isMobile && (
@@ -261,54 +291,13 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
             </div>
 
             {isExpanded && (
-              <>
-                <div className="mt-4">
-                  <LanguageSwitcher variant="sidebar" className="w-full justify-center bg-[color:rgb(var(--color-surface-rgb)/0.5)]" />
-                </div>
-
-                <div className="mt-4 flex items-end gap-3">
-                  <div className="flex shrink-0 flex-col items-center gap-1">
-                    {userId ? (
-                      <button
-                        type="button"
-                        onClick={handleCopyUserId}
-                        className="group inline-flex max-w-[4.9rem] items-center gap-1 rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] px-1.5 py-0.5 text-[9px] font-bold leading-none text-[var(--color-primary)] shadow-[0_10px_18px_-16px_rgb(var(--color-primary-rgb)/0.55)] transition-all hover:-translate-y-0.5 hover:border-[color:rgb(var(--color-primary-rgb)/0.34)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.13)]"
-                        title={copiedUserId ? 'تم نسخ ID المستخدم' : 'اضغط لنسخ ID المستخدم'}
-                        aria-label={copiedUserId ? 'تم نسخ ID المستخدم' : 'نسخ ID المستخدم'}
-                      >
-                        {copiedUserId ? <Check className="h-2.5 w-2.5 shrink-0" /> : <Copy className="h-2.5 w-2.5 shrink-0 opacity-75" />}
-                        <span className="truncate">{copiedUserId ? 'تم النسخ' : `ID ${userId}`}</span>
-                      </button>
-                    ) : null}
-                    <img
-                      src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || 'User')}&background=random`}
-                      alt={user?.name || 'User'}
-                      className="h-10 w-10 rounded-full object-cover"
-                      onClick={handleOpenMyAccount}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </div>
-
-                  <div className="min-w-0 pb-1.5">
-                    <div className="truncate text-sm font-medium text-[var(--color-text)]">{user?.name || user?.email || 'حسابي'}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleLogoutClick}
-                    className={cn(
-                      dir === 'rtl' ? 'mr-auto' : 'ml-auto',
-                      'inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:rgb(var(--color-error-rgb)/0.42)] bg-[color:rgb(var(--color-error-rgb)/0.14)] text-[var(--color-error)] shadow-sm transition-all hover:bg-[color:rgb(var(--color-error-rgb)/0.22)] hover:border-[color:rgb(var(--color-error-rgb)/0.58)]'
-                    )}
-                    aria-label={dir === 'rtl' ? 'تسجيل الخروج' : 'Logout'}
-                  >
-                    <LogOut className="h-4.5 w-4.5" />
-                  </button>
-                </div>
-              </>
+              <div className="mt-3">
+                <LanguageSwitcher variant="sidebar" className="w-full justify-center rounded-[18px] bg-[color:rgb(var(--color-surface-rgb)/0.5)]" />
+              </div>
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide">
+          <div className="flex-1 overflow-y-auto px-3 py-3 scrollbar-hide">
             {showWalletCard && (
               <WalletSidebarCard
                 className="mb-4"
@@ -317,34 +306,43 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
               />
             )}
 
-            <div className="space-y-2">
-              {filteredNavItems.map((item) => (
-                item.isExternal ? (
+            <div className="space-y-4">
+              {navSections.map((section) => (
+                <div key={section.id} className="space-y-1.5">
+                  {isExpanded && (
+                    <div className="px-3 pb-1 text-[0.64rem] font-black uppercase tracking-[0.24em] text-[color:rgb(var(--color-text-secondary)/0.58)]">
+                      {sectionLabels[section.id]}
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    {section.items.map((item) => (
+                      item.isExternal ? (
                   <button
                     key={item.path}
                     type="button"
                     onClick={item.onClick}
                     className={cn(
-                      'group relative flex w-full items-center gap-3 overflow-hidden rounded-[22px] border border-transparent px-3 py-3 text-[var(--color-text-secondary)] transition-all hover:border-[color:rgb(var(--color-primary-rgb)/0.16)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)] hover:text-[var(--color-text)]',
-                      !isExpanded && 'justify-center'
+                      'group relative flex min-h-[3.2rem] w-full items-center gap-3 overflow-hidden rounded-[18px] border border-transparent px-2.5 py-2.5 text-[var(--color-text-secondary)] transition-all duration-200 hover:border-[color:rgb(var(--color-primary-rgb)/0.16)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)] hover:text-[var(--color-text)]',
+                      !isExpanded && 'justify-center px-2'
                     )}
                   >
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:rgb(var(--color-primary-rgb)/0.08)] text-[var(--color-primary)]">
+                    <span className="inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-[15px] bg-[color:rgb(var(--color-primary-rgb)/0.08)] text-[var(--color-primary)]">
                       <item.icon className="h-4.5 w-4.5" />
                     </span>
-                    {isExpanded && <span className="truncate text-sm font-medium">{item.label}</span>}
+                    {isExpanded && <span className="truncate text-[13px] font-semibold">{item.label}</span>}
                   </button>
-                ) : (
+                      ) : (
                   <NavLink
                     key={item.path}
                     to={item.path}
                     onClick={closeSidebarOnMobile}
                     className={({ isActive }) =>
                       cn(
-                        'group relative flex items-center gap-3 overflow-hidden rounded-[22px] border px-3 py-3 transition-all',
-                        !isExpanded && 'justify-center',
+                        'group relative flex min-h-[3.2rem] items-center gap-3 overflow-hidden rounded-[18px] border px-2.5 py-2.5 transition-all duration-200',
+                        !isExpanded && 'justify-center px-2',
                         isActive
-                          ? 'border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[linear-gradient(90deg,rgb(var(--color-primary-rgb)/0.14),transparent)] text-[var(--color-text)] shadow-[0_18px_34px_-28px_rgb(var(--color-primary-rgb)/0.24)]'
+                          ? 'border-[color:rgb(var(--color-primary-rgb)/0.24)] bg-[linear-gradient(135deg,rgb(var(--color-primary-rgb)/0.16),rgb(var(--color-primary-rgb)/0.05))] text-[var(--color-text)] shadow-[0_18px_38px_-30px_rgb(var(--color-primary-rgb)/0.5),inset_0_1px_0_rgb(255_255_255/0.08)]'
                           : 'border-transparent text-[var(--color-text-secondary)] hover:border-[color:rgb(var(--color-primary-rgb)/0.14)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.07)] hover:text-[var(--color-text)]'
                       )
                     }
@@ -352,22 +350,81 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
                     {({ isActive }) => (
                       <>
                         {isActive && (
-                          <span className={cn('absolute inset-y-3 w-[3px] rounded-full bg-[linear-gradient(180deg,var(--color-primary),var(--color-primary-hover))]', dir === 'rtl' ? 'right-0' : 'left-0')} />
+                          <span className={cn('absolute inset-y-2.5 w-[3px] rounded-full bg-[linear-gradient(180deg,var(--color-primary),var(--color-primary-hover))]', dir === 'rtl' ? 'right-0' : 'left-0')} />
                         )}
                         <span className={cn(
-                          'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors',
-                          isActive ? 'bg-[color:rgb(var(--color-primary-rgb)/0.14)] text-[var(--color-primary)]' : 'bg-[color:rgb(var(--color-surface-rgb)/0.42)] text-[var(--color-text-secondary)] group-hover:text-[var(--color-primary)]'
+                          'inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-[15px] transition-colors',
+                          isActive ? 'bg-[color:rgb(var(--color-primary-rgb)/0.15)] text-[var(--color-primary)] shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]' : 'bg-[color:rgb(var(--color-surface-rgb)/0.42)] text-[var(--color-text-secondary)] group-hover:text-[var(--color-primary)]'
                         )}
                         >
                           <item.icon className="h-4.5 w-4.5" />
                         </span>
-                        {isExpanded && <span className="truncate text-sm font-medium">{item.label}</span>}
+                        {isExpanded && <span className="truncate text-[13px] font-semibold">{item.label}</span>}
+                        {isExpanded && isActive && (
+                          <span className={cn('ms-auto h-1.5 w-1.5 rounded-full bg-[var(--color-primary)] shadow-[0_0_10px_rgb(var(--color-primary-rgb)/0.65)]', dir === 'rtl' && 'ms-0 me-auto')} />
+                        )}
                       </>
                     )}
                   </NavLink>
-                )
+                      )
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
+          </div>
+
+          <div className="border-t border-[color:rgb(var(--color-border-rgb)/0.56)] p-3">
+            {isExpanded ? (
+              <div className="rounded-[22px] border border-[color:rgb(var(--color-border-rgb)/0.62)] bg-[linear-gradient(135deg,rgb(var(--color-surface-rgb)/0.72),rgb(var(--color-card-rgb)/0.58))] p-2.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || 'User')}&background=random`}
+                    alt={user?.name || 'User'}
+                    className="h-10 w-10 rounded-[16px] border border-[color:rgb(var(--color-border-rgb)/0.62)] object-cover"
+                    onClick={handleOpenMyAccount}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <button type="button" onClick={handleOpenMyAccount} className="min-w-0 flex-1 text-start">
+                    <span className="block truncate text-[13px] font-black text-[var(--color-text)]">{user?.name || 'حسابي'}</span>
+                    <span className="block truncate text-[11px] text-[var(--color-text-secondary)]">{user?.email || user?.role || ''}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogoutClick}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] border border-[color:rgb(var(--color-error-rgb)/0.36)] bg-[color:rgb(var(--color-error-rgb)/0.1)] text-[var(--color-error)] transition-all hover:border-[color:rgb(var(--color-error-rgb)/0.58)] hover:bg-[color:rgb(var(--color-error-rgb)/0.18)]"
+                    aria-label={dir === 'rtl' ? 'تسجيل الخروج' : 'Logout'}
+                  >
+                    <LogOut className="h-4.5 w-4.5" />
+                  </button>
+                </div>
+                {userId ? (
+                  <button
+                    type="button"
+                    onClick={handleCopyUserId}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-[14px] border border-[color:rgb(var(--color-primary-rgb)/0.16)] bg-[color:rgb(var(--color-primary-rgb)/0.07)] px-2 py-1.5 text-[10px] font-bold leading-none text-[var(--color-primary)] transition-all hover:border-[color:rgb(var(--color-primary-rgb)/0.34)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.12)]"
+                    title={copiedUserId ? 'تم نسخ ID المستخدم' : 'اضغط لنسخ ID المستخدم'}
+                    aria-label={copiedUserId ? 'تم نسخ ID المستخدم' : 'نسخ ID المستخدم'}
+                  >
+                    {copiedUserId ? <Check className="h-3 w-3 shrink-0" /> : <Copy className="h-3 w-3 shrink-0 opacity-75" />}
+                    <span className="truncate">{copiedUserId ? 'تم النسخ' : `ID ${userId}`}</span>
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenMyAccount}
+                className="mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-[17px] border border-[color:rgb(var(--color-border-rgb)/0.62)] bg-[color:rgb(var(--color-surface-rgb)/0.58)]"
+                aria-label={dir === 'rtl' ? 'حسابي' : 'My account'}
+              >
+                <img
+                  src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || 'User')}&background=random`}
+                  alt={user?.name || 'User'}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            )}
           </div>
         </div>
       </motion.aside>

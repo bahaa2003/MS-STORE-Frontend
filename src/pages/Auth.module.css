@@ -37,9 +37,8 @@
   background:
     radial-gradient(circle at 75% 18%, rgb(212 175 55 / 0.22), transparent 22%),
     radial-gradient(circle at 90% 74%, rgb(243 222 155 / 0.12), transparent 28%);
-  filter: blur(72px);
-  opacity: 0.85;
-  animation: authAmbientDrift 18s ease-in-out infinite;
+  filter: blur(48px);
+  opacity: 0.62;
 }
 
 .topControls {
@@ -59,7 +58,7 @@
   background: rgb(10 10 10 / 0.66);
   padding: 0.35rem;
   box-shadow: 0 20px 46px -34px rgb(0 0 0 / 0.82);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(10px);
 }
 
 .backButton {
@@ -79,7 +78,7 @@
   font-size: 0.78rem;
   font-weight: 800;
   box-shadow: 0 20px 46px -34px rgb(0 0 0 / 0.82);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(10px);
   transition:
     transform 180ms ease,
     border-color 180ms ease,
@@ -137,7 +136,6 @@
   position: absolute;
   inset: -45%;
   background: radial-gradient(circle, rgb(243 222 155 / 0.28), transparent 58%);
-  animation: authGlowPulse 6s ease-in-out infinite;
 }
 
 .brandIcon img {
@@ -182,7 +180,7 @@
   border-radius: 1.15rem;
   background: rgb(255 255 255 / 0.035);
   padding: 0.3rem;
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(10px);
 }
 
 .modeToggleActive {
@@ -204,7 +202,7 @@
   box-shadow:
     0 34px 86px -54px rgb(0 0 0 / 0.96),
     inset 0 1px 0 rgb(255 255 255 / 0.05);
-  backdrop-filter: blur(24px);
+  backdrop-filter: blur(12px);
 }
 
 .formIntro {
@@ -455,16 +453,14 @@
     linear-gradient(110deg, transparent 0%, rgb(212 175 55 / 0.1) 32%, transparent 33%),
     linear-gradient(110deg, transparent 0%, rgb(243 222 155 / 0.08) 58%, transparent 59%);
   background-size: 220% 100%;
-  animation: authGoldLines 16s linear infinite;
 }
 
 .visualGlowOne,
 .visualGlowTwo {
   position: absolute;
   border-radius: 999px;
-  filter: blur(72px);
-  opacity: 0.42;
-  animation: authGlowFloat 14s ease-in-out infinite;
+  filter: blur(52px);
+  opacity: 0.3;
 }
 
 .visualGlowOne {
@@ -481,7 +477,6 @@
   width: 15rem;
   height: 15rem;
   background: rgb(243 222 155 / 0.16);
-  animation-delay: -6s;
 }
 
 .goldLines {
@@ -508,7 +503,7 @@
   border-radius: 2rem;
   background: rgb(255 255 255 / 0.04);
   box-shadow: 0 32px 80px -42px rgb(212 175 55 / 0.5);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(10px);
 }
 
 .visualLogo img {
@@ -548,7 +543,7 @@
   text-align: center;
   font-size: 0.75rem;
   line-height: 1.7;
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(10px);
 }
 
 :global(:root:not(.dark)) .authPage {
@@ -656,47 +651,6 @@
   color: rgb(45 33 0 / 0.66);
 }
 
-@keyframes authAmbientDrift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(-2rem, 1rem, 0) scale(1.04);
-  }
-}
-
-@keyframes authGlowFloat {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(0.8rem, -0.9rem, 0) scale(1.05);
-  }
-}
-
-@keyframes authGlowPulse {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: scale(0.96);
-  }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.04);
-  }
-}
-
-@keyframes authGoldLines {
-  from {
-    background-position: 0% 0;
-  }
-  to {
-    background-position: 220% 0;
-  }
-}
-
 @media (max-width: 1023px) {
   .authShell {
     display: flex;
@@ -743,15 +697,5 @@
 
   .privacyStrip > div {
     border-radius: 1.25rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .authPage::after,
-  .brandIcon::before,
-  .visualPane::before,
-  .visualGlowOne,
-  .visualGlowTwo {
-    animation: none;
   }
 }

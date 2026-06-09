@@ -1667,6 +1667,22 @@ const realApi = {
     },
   },
 
+  whatsapp: {
+    getStatus: async () => {
+      const res = await http.get('/admin/whatsapp/status');
+      return unwrap(res);
+    },
+
+    reconnect: async () => {
+      const res = await http.post('/admin/whatsapp/reconnect');
+      return unwrap(res);
+    },
+
+    reset: async () => {
+      const res = await http.post('/admin/whatsapp/reset');
+      return unwrap(res);
+    },
+  },
   // ── Products ─────────────────────────────────────────────────────────────
   products: {
     /**

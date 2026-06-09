@@ -871,6 +871,50 @@ const mockApi = {
     },
   },
 
+  whatsapp: {
+    getStatus: async () => {
+      await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 250)));
+      return {
+        isReady: false,
+        isInitializing: false,
+        qrDataUrl: null,
+        lastError: null,
+        lastConnectedAt: null,
+        lastDisconnectedAt: null,
+        adminNumberConfigured: true,
+        dependencyAvailable: true,
+      };
+    },
+
+    reconnect: async () => {
+      await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 250)));
+      return {
+        isReady: false,
+        isInitializing: true,
+        qrDataUrl: null,
+        lastError: null,
+        lastConnectedAt: null,
+        lastDisconnectedAt: null,
+        adminNumberConfigured: true,
+        dependencyAvailable: true,
+      };
+    },
+
+    reset: async () => {
+      await new Promise(resolve => setTimeout(resolve, Math.min(DELAY, 250)));
+      return {
+        isReady: false,
+        isInitializing: true,
+        qrDataUrl: null,
+        lastError: null,
+        lastConnectedAt: null,
+        lastDisconnectedAt: new Date().toISOString(),
+        adminNumberConfigured: true,
+        dependencyAvailable: true,
+      };
+    },
+  },
+
   // --- Products ---
   products: {
     list: async () => {

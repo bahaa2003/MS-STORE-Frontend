@@ -41,7 +41,7 @@
   box-shadow:
     0 32px 84px -56px rgb(80 64 24 / 0.32),
     0 24px 62px -54px rgb(var(--color-primary-rgb) / 0.34);
-  backdrop-filter: blur(22px);
+  backdrop-filter: blur(10px);
 }
 
 .admin-dashboard-info-tile {
@@ -72,7 +72,6 @@
   min-height: 9.25rem;
   border-radius: 1.15rem;
   background: var(--admin-stat-bg);
-  transform: translateZ(0);
 }
 
 .admin-stat-card::before {
@@ -99,33 +98,7 @@
 }
 
 .admin-stat-card-shimmer {
-  position: absolute;
-  inset: -36% auto -36% -48%;
-  z-index: 0;
-  width: 38%;
-  border-radius: inherit;
-  background: linear-gradient(
-    105deg,
-    transparent 0%,
-    rgb(255 255 255 / 0.02) 18%,
-    rgb(255 255 255 / 0.28) 42%,
-    rgb(var(--color-primary-rgb) / 0.2) 54%,
-    rgb(255 255 255 / 0.04) 74%,
-    transparent 100%
-  );
-  opacity: 0;
-  pointer-events: none;
-  transform: skewX(-22deg);
-  mix-blend-mode: screen;
-  animation: admin-stat-card-shimmer 6.2s ease-in-out infinite;
-}
-
-.admin-stat-card:nth-child(2n) .admin-stat-card-shimmer {
-  animation-delay: -1.4s;
-}
-
-.admin-stat-card:nth-child(3n) .admin-stat-card-shimmer {
-  animation-delay: -2.6s;
+  display: none;
 }
 
 .admin-stat-card:hover {
@@ -211,27 +184,6 @@
     inset 0 1px 0 rgb(255 255 255 / 0.05);
 }
 
-@keyframes admin-stat-card-shimmer {
-  0% {
-    left: -48%;
-    opacity: 0;
-  }
-  18% {
-    opacity: 0.08;
-  }
-  38% {
-    opacity: 0.5;
-  }
-  58% {
-    left: 112%;
-    opacity: 0;
-  }
-  100% {
-    left: 112%;
-    opacity: 0;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .admin-stat-card,
   .admin-dashboard-shell article,
@@ -240,7 +192,6 @@
   }
 
   .admin-stat-card-shimmer {
-    animation: none;
-    opacity: 0;
+    display: none;
   }
 }

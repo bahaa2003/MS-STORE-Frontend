@@ -27,7 +27,7 @@ import {
   getCurrencyMeta,
   resolveProductUnitPrice,
 } from '../../utils/pricing';
-import coinsImage from '../../assets/عملات.PNG';
+import coinsImage from '../../assets/ms-coins.webp';
 import { normalizeMoneyAmount } from '../../utils/money';
 import { getProductStatus } from '../../utils/productStatus';
 import {

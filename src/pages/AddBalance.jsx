@@ -76,8 +76,6 @@ const CompactPaymentMethodTile = ({ method, presentation, onSelect, index, isRTL
                 />
             ) : (
                 <motion.div
-                    animate={{ y: [0, -2, 0], rotate: [0, 4, 0, -4, 0] }}
-                    transition={{ duration: 4.6, repeat: Infinity, ease: 'easeInOut' }}
                     className={`flex h-11 w-11 items-center justify-center rounded-[14px] bg-gradient-to-br ${presentation.color} text-white shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 sm:h-12 sm:w-12 sm:rounded-[15px] ${presentation.glow}`}
                 >
                     <IconComponent className="h-5 w-5" />
@@ -171,8 +169,6 @@ const AddBalance = () => {
                                 </p>
                             </div>
                             <motion.span
-                                animate={{ rotate: [0, 6, 0, -6, 0], scale: [1, 1.04, 1] }}
-                                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                                 className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] border border-[#f1d089]/35 bg-[linear-gradient(180deg,rgba(255,239,194,0.34),rgba(189,133,35,0.3))] text-[#fff1c9] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
                             >
                                 <Wallet className="h-[1.15rem] w-[1.15rem]" />
@@ -222,8 +218,6 @@ const AddBalance = () => {
                                                                 />
                                                             ) : (
                                                                 <motion.div
-                                                                    animate={{ y: [0, -2, 0], rotate: [0, 4, 0, -4, 0] }}
-                                                                    transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
                                                                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#b9892f] via-[#d1a64e] to-[#f1d17d] text-white shadow-[0_12px_24px_-18px_rgba(184,126,25,0.8)] sm:h-12 sm:w-12 sm:rounded-[16px]"
                                                                 >
                                                                     <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />

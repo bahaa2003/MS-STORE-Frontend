@@ -1,5 +1,6 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Check, CheckCircle2, Clock3, Eye, Pencil, Search, Wallet, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import useTopupStore from '../../store/useTopupStore';
 import useAuthStore from '../../store/useAuthStore';
 import useAdminStore from '../../store/useAdminStore';
@@ -90,6 +91,7 @@ const SummaryCard = ({ icon: Icon, label, value }) => (
 );
 
 const AdminPayments = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { topups, topupsPagination, topupsSummary, loadTopups, loadTopupsFiltered, getTopupById, updateTopupStatus, updateTopupRequest } = useTopupStore();
   const { user: actor } = useAuthStore();
   const { users, loadUsers } = useAdminStore();
@@ -124,6 +126,9 @@ const AdminPayments = () => {
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [rejectingRequest, setRejectingRequest] = useState(null);
+  const [detailsRequest, setDetailsRequest] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const topupIdParam = String(searchParams.get('topupId') || '').trim();
 
   // ── Fetch deposits with filters ─────────────────────────────────────────
   const fetchDeposits = useCallback(async () => {
@@ -147,6 +152,36 @@ const AdminPayments = () => {
     loadUsers({ force: true });
     loadCurrencies();
   }, [fetchDeposits, loadUsers, loadCurrencies]);
+
+  useEffect(() => {
+    if (!topupIdParam) return undefined;
+    let isActive = true;
+
+    const openTopupFromQuery = async () => {
+      const cached = (topups || []).find((request) => String(request?.id || request?._id || '').trim() === topupIdParam);
+      if (cached) {
+        setDetailsRequest(cached);
+        setIsDetailsModalOpen(true);
+        return;
+      }
+
+      try {
+        const fetched = await getTopupById(topupIdParam);
+        if (isActive && fetched) {
+          setDetailsRequest(fetched);
+          setIsDetailsModalOpen(true);
+        }
+      } catch (_error) {
+        // Keep the page usable if the referenced notification target no longer exists.
+      }
+    };
+
+    void openTopupFromQuery();
+
+    return () => {
+      isActive = false;
+    };
+  }, [getTopupById, topupIdParam, topups]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -206,6 +241,30 @@ const AdminPayments = () => {
       adminNote: nextRequest?.adminNote || '',
     });
     setIsEditModalOpen(true);
+  };
+
+  const openDetailsModal = async (request) => {
+    let nextRequest = request;
+
+    try {
+      nextRequest = await getTopupById(request.id) || request;
+    } catch (_error) {
+      nextRequest = request;
+    }
+
+    setDetailsRequest(nextRequest);
+    setIsDetailsModalOpen(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('topupId', nextRequest.id);
+    setSearchParams(nextParams);
+  };
+
+  const closeDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setDetailsRequest(null);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('topupId');
+    setSearchParams(nextParams, { replace: true });
   };
 
   const handleApprove = async () => {
@@ -310,6 +369,10 @@ const AdminPayments = () => {
   const selectedSenderDetails = useMemo(
     () => getSenderDetails(selectedRequest),
     [selectedRequest]
+  );
+  const detailsSenderDetails = useMemo(
+    () => getSenderDetails(detailsRequest),
+    [detailsRequest]
   );
 
   return (
@@ -435,6 +498,10 @@ const AdminPayments = () => {
                   <span className="text-xs text-[var(--color-text-secondary)]">لا يوجد إيصال</span>
                 )}
                 <div className="flex flex-wrap gap-1.5">
+                <Button size="sm" variant="outline" onClick={() => openDetailsModal(request)}>
+                  <Eye className="w-4 h-4" />
+                  تفاصيل
+                </Button>
                 {isPendingLike(request.status) && canConfirmPayments ? (
                   <>
                     <Button size="sm" variant="outline" onClick={() => openEditModal(request)}>
@@ -524,8 +591,12 @@ const AdminPayments = () => {
                     <Badge variant={statusVariant(request.status)}>{statusLabel(request.status)}</Badge>
                   </TableCell>
                   <TableCell className="text-end">
-                    {isPendingLike(request.status) && canConfirmPayments ? (
-                      <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => openDetailsModal(request)}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      {isPendingLike(request.status) && canConfirmPayments ? (
+                        <>
                         <Button size="sm" variant="outline" onClick={() => openEditModal(request)}>
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -535,10 +606,11 @@ const AdminPayments = () => {
                         <Button size="sm" variant="danger" onClick={() => handleReject(request)}>
                           <X className="w-4 h-4" />
                         </Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">تمت المراجعة</span>
-                    )}
+                        </>
+                      ) : (
+                        <span className="self-center text-xs text-gray-400">تمت المراجعة</span>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
                 );
@@ -695,6 +767,82 @@ const AdminPayments = () => {
             />
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={isDetailsModalOpen}
+        onClose={closeDetailsModal}
+        title="تفاصيل طلب الشحن"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={closeDetailsModal}>إغلاق</Button>
+            {detailsRequest?.proofImage ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  setReceiptPreviewUrl(detailsRequest.proofImage);
+                  setIsReceiptModalOpen(true);
+                }}
+              >
+                عرض الإيصال
+              </Button>
+            ) : null}
+          </div>
+        }
+      >
+        {detailsRequest ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] p-3">
+              <div>
+                <p className="text-xs text-[var(--color-text-secondary)]">رقم الطلب</p>
+                <p className="mt-1 font-black text-[var(--color-text)]">#{getRequestId(detailsRequest) || detailsRequest.id}</p>
+              </div>
+              <Badge variant={statusVariant(detailsRequest.status)}>{statusLabel(detailsRequest.status)}</Badge>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                <p className="text-xs text-[var(--color-text-secondary)]">العميل</p>
+                <p className="mt-1 font-semibold text-[var(--color-text)]">{detailsRequest.userName || detailsRequest.userId || '-'}</p>
+                <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">{detailsRequest.userEmail || '-'}</p>
+              </div>
+              <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                <p className="text-xs text-[var(--color-text-secondary)]">التاريخ</p>
+                <p className="mt-1 font-semibold text-[var(--color-text)]">{formatRequestDate(detailsRequest.createdAt || Date.now())}</p>
+              </div>
+              <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                <p className="text-xs text-[var(--color-text-secondary)]">المبلغ المطلوب</p>
+                <p className="mt-1 font-black text-[var(--color-primary)]">
+                  {formatRequestAmount(detailsRequest.requestedAmount ?? detailsRequest.requestedCoins ?? detailsRequest.amount ?? 0)} {detailsRequest.currencyCode || findUserCurrency(detailsRequest.userId)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                <p className="text-xs text-[var(--color-text-secondary)]">المبلغ الفعلي</p>
+                <p className="mt-1 font-semibold text-[var(--color-text)]">
+                  {detailsRequest.actualPaidAmount ? formatRequestAmount(detailsRequest.actualPaidAmount) : '-'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                <p className="text-xs text-[var(--color-text-secondary)]">قناة الدفع</p>
+                <p className="mt-1 font-semibold text-[var(--color-text)]">{getPaymentChannelLabel(detailsRequest)}</p>
+              </div>
+              <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                <p className="text-xs text-[var(--color-text-secondary)]">{detailsSenderDetails.label}</p>
+                <p className="mt-1 break-all font-semibold text-[var(--color-text)]">{detailsSenderDetails.value}</p>
+              </div>
+            </div>
+
+            {detailsRequest.adminNote ? (
+              <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[color:rgb(var(--color-surface-rgb)/0.46)] p-3">
+                <p className="text-xs text-[var(--color-text-secondary)]">ملاحظة</p>
+                <p className="mt-1 text-sm leading-6 text-[var(--color-text)]">{detailsRequest.adminNote}</p>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--color-text-secondary)]">تعذر تحميل تفاصيل الطلب.</p>
+        )}
       </Modal>
 
       <Modal

@@ -383,6 +383,45 @@ const Products = () => {
   const displayProducts = isViewingLeafCategory
     ? catalogProducts
     : (currentParentId ? currentProducts : []);
+  const mixedCatalogItems = useMemo(() => {
+    const items = [
+      ...currentCategories.map((category) => {
+        const order = Number(category?.sortOrder ?? category?.displayOrder ?? 0);
+
+        return {
+          type: 'category',
+          key: `category-${category.id}`,
+          category,
+          order: Number.isFinite(order) ? order : 0,
+          label: category?.title || category?.name || '',
+        };
+      }),
+      ...displayProducts.map((product) => {
+        const order = Number(product?.displayOrder ?? product?.sortOrder ?? 0);
+
+        return {
+          type: 'product',
+          key: `product-${product.id}`,
+          product,
+          order: Number.isFinite(order) ? order : 0,
+          label: product?.displayName || product?.name || product?.nameAr || '',
+        };
+      }),
+    ];
+
+    return items.sort((left, right) => {
+      const orderDelta = left.order - right.order;
+      if (orderDelta !== 0) return orderDelta;
+
+      return String(left.label || '').localeCompare(
+        String(right.label || ''),
+        language === 'ar' ? 'ar' : 'en'
+      );
+    });
+  }, [currentCategories, displayProducts, language]);
+  const showMixedCategoryItems = currentParentId !== null
+    && !activeSubcategoryId
+    && mixedCatalogItems.length > 0;
 
   return (
     <div className="space-y-6 pb-4">
@@ -446,17 +485,28 @@ const Products = () => {
             </section>
           )}
 
-          {/* Sub-categories — tight square cards (drilled into a parent) */}
-          {currentCategories.length > 0 && currentParentId !== null && !activeSubcategoryId && (
-            <section className="grid grid-cols-2 gap-3 p-1 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
-              {currentCategories.map((catalog, index) => (
-                <CategoryCard
-                  key={catalog.id}
-                  category={catalog}
-                  active={false}
-                  index={index}
-                  onSelect={openCatalog}
-                />
+          {/* Sub-categories and products share the same grid inside a parent catalog. */}
+          {showMixedCategoryItems && (
+            <section className="grid grid-cols-3 gap-3 p-1 sm:gap-4">
+              {mixedCatalogItems.map((item, index) => (
+                item.type === 'category' ? (
+                  <CategoryCard
+                    key={item.key}
+                    category={item.category}
+                    active={false}
+                    index={index}
+                    onSelect={openCatalog}
+                    variant="product"
+                  />
+                ) : (
+                  <ProductCardSimple
+                    key={item.key}
+                    product={item.product}
+                    onOpen={openProduct}
+                    buyLabel={copy.buyNow}
+                    unavailableLabel={language === 'ar' ? 'غير متاح' : 'Unavailable'}
+                  />
+                )
               ))}
             </section>
           )}
@@ -489,7 +539,7 @@ const Products = () => {
           })()}
 
           {/* Products — from leaf category or parent drill-down */}
-          {displayProducts.length > 0 && (
+          {!showMixedCategoryItems && displayProducts.length > 0 && (
             <section className="grid grid-cols-3 gap-3 p-1 sm:gap-4">
               {displayProducts.map((product) => (
                 <ProductCardSimple

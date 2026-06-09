@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ClipboardList, Eye, RefreshCw, Target } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Badge from '../components/ui/Badge';
 import Button, { cn } from '../components/ui/Button';
 import TargetOrderDetailsModal from '../components/target/TargetOrderDetailsModal';
@@ -23,10 +23,12 @@ const statusFilters = [
 
 const TargetOrders = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthStore();
   const { myRequests, loadMyRequests, isLoading } = useTargetStore();
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const targetRequestIdParam = String(searchParams.get('targetRequestId') || '').trim();
 
   const loadOrders = () => (
     loadMyRequests({ page: 1, limit: 100, userId: user?.id }).catch(() => [])
@@ -35,6 +37,12 @@ const TargetOrders = () => {
   useEffect(() => {
     void loadOrders();
   }, [loadMyRequests, user?.id]);
+
+  useEffect(() => {
+    if (!targetRequestIdParam) return;
+    const request = myRequests.find((item) => String(item?.id || '').trim() === targetRequestIdParam);
+    if (request) setSelectedOrder(request);
+  }, [myRequests, targetRequestIdParam]);
 
   const stats = useMemo(() => {
     const base = { all: myRequests.length, pending: 0, approved: 0, rejected: 0 };
@@ -50,6 +58,20 @@ const TargetOrders = () => {
       ? myRequests
       : myRequests.filter((request) => normalizeTargetOrderStatus(request.status) === selectedStatus)
   ), [myRequests, selectedStatus]);
+
+  const openOrderDetails = (request) => {
+    setSelectedOrder(request);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('targetRequestId', request.id);
+    setSearchParams(nextParams);
+  };
+
+  const closeOrderDetails = () => {
+    setSelectedOrder(null);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('targetRequestId');
+    setSearchParams(nextParams, { replace: true });
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 text-[var(--color-text)]">
@@ -135,7 +157,7 @@ const TargetOrders = () => {
                       ID الحساب: <span className="font-semibold text-[var(--color-text)]">{request.senderId || request.transferFromId || '-'}</span>
                     </p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" className="shrink-0 rounded-xl" onClick={() => setSelectedOrder(request)}>
+                  <Button type="button" variant="outline" size="sm" className="shrink-0 rounded-xl" onClick={() => openOrderDetails(request)}>
                     <Eye className="h-4 w-4" />
                     تفاصيل
                   </Button>
@@ -177,7 +199,7 @@ const TargetOrders = () => {
 
       <TargetOrderDetailsModal
         isOpen={Boolean(selectedOrder)}
-        onClose={() => setSelectedOrder(null)}
+        onClose={closeOrderDetails}
         order={selectedOrder}
       />
     </div>

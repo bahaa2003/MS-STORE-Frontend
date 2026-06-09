@@ -97,8 +97,6 @@ const UploadReceiptBox = ({ onFileUpload }) => {
 
             <div className="flex flex-col items-center gap-4">
               <motion.div
-                animate={{ y: [0, -2, 0] }}
-                transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
                 className={`flex h-14 w-14 items-center justify-center rounded-[1rem] border border-white/70 bg-gradient-to-br from-[var(--color-primary)] via-sky-500 to-emerald-500 shadow-[0_16px_28px_-20px_rgba(14,165,233,0.75)] transition-transform ${
                   isDragOver ? 'scale-110' : ''
                 }`}
@@ -117,8 +115,6 @@ const UploadReceiptBox = ({ onFileUpload }) => {
 
             <motion.div
               aria-hidden="true"
-              animate={{ opacity: [0.35, 0.9, 0.35] }}
-              transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
               className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/70 to-transparent dark:via-sky-500/35"
             />
           </div>

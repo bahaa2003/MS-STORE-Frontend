@@ -32,7 +32,7 @@ import { COUNTRY_CATALOG } from '../data/countryCatalog';
 import { getDefaultRouteForRole } from '../utils/authRoles';
 import { getAccountAccessRoute, normalizeAccountStatus } from '../utils/accountStatus';
 import brandIconImage from '../assets/ms-removebg-preview.png';
-import coinsImage from '../assets/عملات.PNG';
+import coinsImage from '../assets/ms-coins.webp';
 import styles from './Auth.module.css';
 
 const GoogleMark = () => (
@@ -474,7 +474,7 @@ const countryOptions = useMemo(() => {
   };
 
   const authSelectClassName =
-    'h-11 w-full rounded-[var(--radius-md)] px-4 text-sm outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-55';
+    'h-11 w-full rounded-[var(--radius-md)] px-4 text-base outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-55 sm:text-sm';
   const authLinkClassName = 'font-semibold text-[var(--color-primary)] transition hover:text-[var(--color-primary-hover)]';
   const modeConfig = isLogin
     ? {

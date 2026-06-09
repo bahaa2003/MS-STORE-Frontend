@@ -23,9 +23,9 @@
         align-items: center;
         justify-content: center;
         background:
-          radial-gradient(circle at 50% 45%, rgb(14 165 233 / 0.16), transparent 52%),
-          radial-gradient(circle at 10% 0%, rgb(14 165 233 / 0.1), transparent 35%),
-          linear-gradient(180deg, #090d16 0%, #060912 100%);
+          radial-gradient(circle at 50% 45%, rgb(216 180 90 / 0.18), transparent 52%),
+          radial-gradient(circle at 10% 0%, rgb(244 220 145 / 0.1), transparent 35%),
+          linear-gradient(180deg, #0b0905 0%, #050403 100%);
         transition: opacity 240ms ease, visibility 240ms ease;
       }
 
@@ -39,8 +39,8 @@
         width: clamp(90px, 19vw, 132px);
         height: clamp(90px, 19vw, 132px);
         object-fit: contain;
-        animation: boot-logo-motion 1.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        filter: drop-shadow(0 10px 24px rgb(14 165 233 / 0.38));
+        animation: boot-logo-motion 1.7s cubic-bezier(0.4, 0, 0.2, 1) 1;
+        filter: drop-shadow(0 10px 24px rgb(216 180 90 / 0.28));
       }
 
       @keyframes boot-logo-motion {
@@ -49,11 +49,11 @@
         }
 
         50% {
-          transform: translateY(-4px) rotate(180deg) scale(1);
+          transform: translateY(-3px) scale(1);
         }
 
         100% {
-          transform: translateY(0) rotate(360deg) scale(0.985);
+          transform: translateY(0) scale(0.985);
         }
       }
 

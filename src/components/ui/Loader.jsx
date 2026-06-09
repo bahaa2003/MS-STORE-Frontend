@@ -7,7 +7,7 @@ const Loader = () => {
       <img
         src={logoImage}
         alt="MS STORE"
-        className="h-24 w-24 object-contain drop-shadow-[0_8px_20px_rgb(var(--color-primary-rgb)/0.35)] animate-[logo-soft-spin_1.7s_cubic-bezier(0.4,0,0.2,1)_infinite] sm:h-28 sm:w-28"
+        className="h-24 w-24 object-contain drop-shadow-[0_8px_20px_rgb(var(--color-primary-rgb)/0.28)] sm:h-28 sm:w-28"
       />
     </div>
   );

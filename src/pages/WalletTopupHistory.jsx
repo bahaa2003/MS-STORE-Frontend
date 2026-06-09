@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo } from 'react';
-import { ClipboardList, CreditCard, RefreshCw, WalletCards } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ClipboardList, CreditCard, Eye, RefreshCw, WalletCards } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import Badge from '../components/ui/Badge';
 import Button, { cn } from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
 import useAuthStore from '../store/useAuthStore';
 import useTopupStore from '../store/useTopupStore';
 import { useLanguage } from '../context/LanguageContext';
@@ -44,11 +46,14 @@ const getTopupAmount = (topup) => Number(
 );
 
 const WalletTopupHistory = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { dir } = useLanguage();
   const { user } = useAuthStore();
-  const { topups, loadTopups } = useTopupStore();
+  const { topups, loadTopups, getTopupById } = useTopupStore();
   const isRTL = dir === 'rtl';
   const userId = String(user?.id || '').trim();
+  const topupIdParam = String(searchParams.get('topupId') || '').trim();
+  const [selectedTopup, setSelectedTopup] = useState(null);
 
   useEffect(() => {
     void loadTopups({ force: true });
@@ -60,6 +65,46 @@ const WalletTopupHistory = () => {
       .filter((topup) => !userId || String(topup?.userId || '').trim() === userId)
       .sort((left, right) => new Date(right?.createdAt || right?.date || 0) - new Date(left?.createdAt || left?.date || 0))
   ), [topups, userId]);
+
+  useEffect(() => {
+    if (!topupIdParam) return undefined;
+    let isActive = true;
+
+    const openTopupFromQuery = async () => {
+      const cached = myTopups.find((topup) => String(topup?.id || topup?._id || '').trim() === topupIdParam);
+      if (cached) {
+        setSelectedTopup(cached);
+        return;
+      }
+
+      try {
+        const fetched = await getTopupById(topupIdParam, userId);
+        if (isActive && fetched) setSelectedTopup(fetched);
+      } catch (_error) {
+        // The notification can outlive the request record.
+      }
+    };
+
+    void openTopupFromQuery();
+
+    return () => {
+      isActive = false;
+    };
+  }, [getTopupById, myTopups, topupIdParam, userId]);
+
+  const openTopupDetails = (topup) => {
+    setSelectedTopup(topup);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('topupId', topup.id);
+    setSearchParams(nextParams);
+  };
+
+  const closeTopupDetails = () => {
+    setSelectedTopup(null);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('topupId');
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const stats = useMemo(() => {
     const summary = { all: myTopups.length, pending: 0, approved: 0, rejected: 0 };
@@ -172,6 +217,13 @@ const WalletTopupHistory = () => {
                     {topup.adminNote}
                   </p>
                 ) : null}
+
+                <div className={cn('mt-3 flex', isRTL ? 'justify-end' : 'justify-start')}>
+                  <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={() => openTopupDetails(topup)}>
+                    <Eye className="h-4 w-4" />
+                    تفاصيل
+                  </Button>
+                </div>
               </article>
             );
           })}
@@ -185,6 +237,61 @@ const WalletTopupHistory = () => {
           </p>
         </section>
       )}
+
+      <Modal
+        isOpen={Boolean(selectedTopup)}
+        onClose={closeTopupDetails}
+        title="تفاصيل طلب إضافة الرصيد"
+        size="lg"
+        footer={<Button variant="ghost" onClick={closeTopupDetails}>إغلاق</Button>}
+      >
+        {selectedTopup ? (() => {
+          const statusMeta = getStatusMeta(selectedTopup.status);
+          const currency = resolveTopupExecutionCurrency(selectedTopup, user?.currency || 'USD');
+          const amount = getTopupAmount(selectedTopup);
+          return (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.78)] bg-[color:rgb(var(--color-surface-rgb)/0.62)] p-3">
+                <div>
+                  <p className="text-xs text-[var(--color-text-secondary)]">رقم الطلب</p>
+                  <p className="mt-1 font-black text-[var(--color-text)]">#{selectedTopup.id}</p>
+                </div>
+                <Badge className={statusMeta.className}>{statusMeta.label}</Badge>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                  <p className="text-xs text-[var(--color-text-secondary)]">طريقة الدفع</p>
+                  <p className="mt-1 font-semibold text-[var(--color-text)]">{selectedTopup.paymentChannel || selectedTopup.method || '-'}</p>
+                </div>
+                <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                  <p className="text-xs text-[var(--color-text-secondary)]">التاريخ</p>
+                  <p className="mt-1 font-semibold text-[var(--color-text)]">{formatDateTime(selectedTopup.createdAt || selectedTopup.date, 'ar-EG') || '-'}</p>
+                </div>
+                <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                  <p className="text-xs text-[var(--color-text-secondary)]">المبلغ المطلوب</p>
+                  <p className="mt-1 font-black text-[var(--color-primary)]">
+                    {formatWalletAmount(Number(selectedTopup.requestedAmount ?? selectedTopup.amount ?? amount), currency || 'USD')}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] p-3">
+                  <p className="text-xs text-[var(--color-text-secondary)]">الإجمالي</p>
+                  <p className="mt-1 font-black text-[var(--color-text)]">{formatWalletAmount(amount, currency || 'USD')}</p>
+                </div>
+              </div>
+
+              {selectedTopup.adminNote ? (
+                <div className="rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[color:rgb(var(--color-surface-rgb)/0.46)] p-3">
+                  <p className="text-xs text-[var(--color-text-secondary)]">ملاحظة</p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--color-text)]">{selectedTopup.adminNote}</p>
+                </div>
+              ) : null}
+            </div>
+          );
+        })() : (
+          <p className="text-sm text-[var(--color-text-secondary)]">تعذر تحميل تفاصيل الطلب.</p>
+        )}
+      </Modal>
     </div>
   );
 };

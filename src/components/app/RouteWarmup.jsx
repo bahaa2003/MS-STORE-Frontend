@@ -3,28 +3,13 @@ import useAuthStore from '../../store/useAuthStore';
 
 const loadLayout = () => import('../layout/Layout');
 const loadAuth = () => import('../../pages/Auth');
-const loadDashboard = () => import('../../pages/Dashboard');
-const loadProducts = () => import('../../pages/Products');
-const loadOrders = () => import('../../pages/Orders');
-const loadWallet = () => import('../../pages/Wallet');
-const loadSettings = () => import('../../pages/Settings');
 const loadAdminDashboard = () => import('../../pages/AdminDashboard');
-const loadAdminOrders = () => import('../../pages/admin/AdminOrders');
-const loadAdminProducts = () => import('../../pages/admin/AdminProducts');
 
 const warmupByRole = {
-  guest: [loadAuth, loadLayout],
-  customer: [loadLayout, loadDashboard, loadProducts, loadOrders, loadWallet],
-  manager: [loadLayout, loadAdminDashboard, loadAdminOrders, loadSettings],
-  admin: [
-    loadLayout,
-    loadDashboard,
-    loadProducts,
-    loadAdminDashboard,
-    loadAdminOrders,
-    loadAdminProducts,
-    loadSettings,
-  ],
+  guest: [loadAuth],
+  customer: [loadLayout],
+  manager: [loadLayout, loadAdminDashboard],
+  admin: [loadLayout, loadAdminDashboard],
 };
 
 const scheduleIdle = (callback) => {
@@ -49,6 +34,7 @@ const canWarmRoutes = () => {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   if (connection?.saveData) return false;
   const effectiveType = String(connection?.effectiveType || '').toLowerCase();
+  if (Number(navigator.deviceMemory || 8) <= 4) return false;
   return !effectiveType.includes('2g');
 };
 

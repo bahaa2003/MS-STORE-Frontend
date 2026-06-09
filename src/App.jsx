@@ -49,6 +49,7 @@ const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers'));
 const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
 const AdminUserTransactions = lazy(() => import('./pages/admin/AdminUserTransactions'));
 const AdminTargetRequests = lazy(() => import('./pages/admin/AdminTargetRequests'));
+const WhatsAppSettings = lazy(() => import('./pages/admin/WhatsAppSettings'));
 const BuyTarget = lazy(() => import('./pages/BuyTarget'));
 const TargetOrders = lazy(() => import('./pages/TargetOrders'));
 const AddBalance = lazy(() => import('./pages/AddBalance'));
@@ -378,6 +379,14 @@ const AnimatedAppRoutes = () => {
               element={(
                 <ProtectedRoute roles={ADMIN_PANEL_ROLES} permission={PERMISSIONS.ADMIN_SUPPLIERS}>
                   {renderSuspended(<AdminSuppliers />)}
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/admin/whatsapp"
+              element={(
+                <ProtectedRoute roles={ADMIN_ROLES}>
+                  {renderSuspended(<WhatsAppSettings />)}
                 </ProtectedRoute>
               )}
             />

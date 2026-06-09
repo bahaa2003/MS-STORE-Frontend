@@ -22,7 +22,7 @@ import { cn } from '../components/ui/Button';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import BrandMark from '../components/layout/BrandMark';
 import PublicSidebar from '../components/layout/PublicSidebar';
-import digitechLogo from '../assets/digitech-solutions.png';
+import digitechLogo from '../assets/digitech.jpg';
 import ahmedImage from '../assets/WhatsApp Image 2026-03-26 at 7.18.08 AM.jpeg';
 import kareemImage from '../assets/WhatsApp Image 2026-03-26 at 7.18.08 AM (1).jpeg';
 import bahaaImage from '../assets/WhatsApp Image 2026-03-26 at 7.18.08 AM (2).jpeg';
@@ -138,7 +138,7 @@ const CreatedByPage = ({ embedded = false }) => {
     <div className={cn(embedded ? 'min-h-0 pb-2' : 'min-h-screen pb-5 pt-[4.75rem]')}>
       {!embedded ? (
         <>
-          <header className="fixed inset-x-0 top-0 z-50 border-b border-[color:rgb(var(--color-border-rgb)/0.32)] bg-[color:rgb(var(--color-background-rgb)/0.9)] shadow-[0_18px_44px_-34px_rgb(var(--color-primary-rgb)/0.36)] backdrop-blur-xl">
+          <header className="fixed inset-x-0 top-0 z-50 border-b border-[color:rgb(var(--color-border-rgb)/0.32)] bg-[color:rgb(var(--color-bg-rgb)/0.9)] shadow-[0_18px_44px_-34px_rgb(var(--color-primary-rgb)/0.28)] backdrop-blur-md">
             <div className="mx-auto max-w-[var(--shell-max-width)] px-3 py-2.5 sm:px-4 lg:px-6">
               <div className="flex items-center justify-between gap-2 rounded-[1.35rem] border border-[color:rgb(var(--color-border-rgb)/0.22)] bg-[color:rgb(var(--color-card-rgb)/0.22)] px-3 py-2 shadow-[var(--shadow-subtle)] backdrop-blur-xl sm:px-4 sm:py-2.5">
                 <div className="flex items-center gap-2">

@@ -167,9 +167,10 @@ const normalizeNotification = (item = {}) => ({
   read: Boolean(item.read ?? item.isRead),
   targetUrl: item.targetUrl || item.url || item.link || '',
   targetType: item.targetType || item.entityType || item.resourceType || '',
-  targetId: item.targetId || item.entityId || item.resourceId || item.orderId || item.topupId || item.userId || '',
+  targetId: item.targetId || item.entityId || item.resourceId || item.orderId || item.topupId || item.depositId || item.targetRequestId || item.requestId || item.userId || '',
   orderId: item.orderId || '',
-  topupId: item.topupId || '',
+  topupId: item.topupId || item.depositId || '',
+  targetRequestId: item.targetRequestId || item.targetPurchaseId || item.targetOrderId || item.requestId || '',
   userId: item.userId || '',
   source: item.source || '',
 });
@@ -189,15 +190,17 @@ const useNotificationStore = create((set, get) => ({
       read: false,
       targetUrl: payload?.targetUrl || payload?.url || payload?.link || '',
       targetType: payload?.targetType || payload?.entityType || '',
-      targetId: payload?.targetId || payload?.entityId || payload?.orderId || payload?.topupId || payload?.userId || '',
+      targetId: payload?.targetId || payload?.entityId || payload?.orderId || payload?.topupId || payload?.depositId || payload?.targetRequestId || payload?.requestId || payload?.userId || '',
       orderId: payload?.orderId || '',
-      topupId: payload?.topupId || '',
+      topupId: payload?.topupId || payload?.depositId || '',
+      targetRequestId: payload?.targetRequestId || payload?.targetPurchaseId || payload?.targetOrderId || payload?.requestId || '',
       userId: payload?.userId || '',
       source: payload?.source || '',
     });
 
     set((state) => ({
       notifications: [next, ...state.notifications].slice(0, 30),
+      unreadCount: Number(state.unreadCount || 0) + 1,
     }));
   },
 
@@ -257,7 +260,7 @@ const useNotificationStore = create((set, get) => ({
     }
   },
 
-  clearNotifications: () => set({ notifications: [] }),
+  clearNotifications: () => set({ notifications: [], unreadCount: 0 }),
 }));
 
 export default useNotificationStore;
