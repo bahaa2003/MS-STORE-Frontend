@@ -469,7 +469,7 @@ const AdminPaymentMethods = () => {
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mx-auto grid w-full max-w-xl grid-cols-3 gap-1.5 sm:gap-2">
         {[
           {
             label: tx('إجمالي المجموعات', 'Total Groups'),
@@ -486,10 +486,10 @@ const AdminPaymentMethods = () => {
         ].map((card) => (
           <div
             key={card.label}
-            className="admin-premium-stat p-5"
+            className="admin-premium-stat flex min-h-[3.75rem] flex-col items-center justify-center text-center !rounded-xl !p-1.5 sm:min-h-[4.25rem] sm:!p-2"
           >
-            <p className="text-sm text-[var(--color-text-secondary)]">{card.label}</p>
-            <p className="mt-3 text-3xl font-bold text-[var(--color-text)]">{formatNumber(card.value, isEnglish ? 'en-US' : 'ar-EG')}</p>
+            <p className="line-clamp-2 text-[8px] font-semibold leading-3 text-[var(--color-text-secondary)] sm:text-[9px]">{card.label}</p>
+            <p className="mt-0.5 text-base font-black leading-none text-[var(--color-primary)] sm:text-lg">{formatNumber(card.value, isEnglish ? 'en-US' : 'ar-EG')}</p>
           </div>
         ))}
       </div>

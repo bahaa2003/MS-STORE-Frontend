@@ -46,6 +46,7 @@ const AdminPaymentMethods = lazy(() => import('./pages/admin/AdminPaymentMethods
 const AdminSupervisors = lazy(() => import('./pages/admin/AdminSupervisors'));
 const SupervisorMonitoring = lazy(() => import('./pages/admin/SupervisorMonitoring'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers'));
+const AdminSupplierPriceCompetition = lazy(() => import('./pages/admin/AdminSupplierPriceCompetition'));
 const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
 const AdminUserTransactions = lazy(() => import('./pages/admin/AdminUserTransactions'));
 const AdminTargetRequests = lazy(() => import('./pages/admin/AdminTargetRequests'));
@@ -379,6 +380,14 @@ const AnimatedAppRoutes = () => {
               element={(
                 <ProtectedRoute roles={ADMIN_PANEL_ROLES} permission={PERMISSIONS.ADMIN_SUPPLIERS}>
                   {renderSuspended(<AdminSuppliers />)}
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/admin/supplier-price-competition"
+              element={(
+                <ProtectedRoute roles={ADMIN_PANEL_ROLES} permission={PERMISSIONS.ADMIN_SUPPLIERS}>
+                  {renderSuspended(<AdminSupplierPriceCompetition />)}
                 </ProtectedRoute>
               )}
             />

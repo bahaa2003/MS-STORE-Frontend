@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,6 +7,7 @@ import {
   Copy,
   LoaderCircle,
   Package2,
+  WalletCards,
   X,
   Zap,
 } from 'lucide-react';
@@ -38,6 +39,16 @@ import {
 } from '../../utils/productPurchase';
 import { isApprovedAccountStatus } from '../../utils/accountStatus';
 import { devLogger } from '../../utils/devLogger';
+import apiClient from '../../services/client';
+import {
+  getXenaTargetErrorMessage,
+  getXenaTargetField,
+  isXenaTargetField,
+  isXenaVerificationSatisfied,
+  makeXenaVerificationRequestBody,
+  normalizeXenaTargetUid,
+  validateXenaTargetUid,
+} from '../../utils/xenaTargetVerification';
 
 const getCopy = (language = 'ar') => {
   if (language === 'en') {
@@ -79,6 +90,10 @@ const getCopy = (language = 'ar') => {
       invalidQuantity: 'Selected quantity is not valid for this product.',
       fieldRequired: (label) => `${label} is required.`,
       placeholder: (label) => `Enter ${label}`,
+      verifyXenaId: 'Verify Xena ID',
+      verifyingXenaId: 'Verifying...',
+      verifiedXenaId: 'Xena ID verified',
+      xenaNeedsVerification: 'Verify the Xena ID before buying.',
     };
   }
 
@@ -226,10 +241,10 @@ const resolvePurchaseState = (item, language, copy) => {
 };
 
 const statusToneStyles = {
-  info: 'border-[color:rgb(var(--color-primary-rgb)/0.28)] bg-[color:rgb(var(--color-primary-rgb)/0.12)] text-white',
-  warning: 'border-[color:rgb(var(--color-warning-rgb)/0.34)] bg-[color:rgb(var(--color-warning-rgb)/0.15)] text-white',
-  danger: 'border-[color:rgb(var(--color-error-rgb)/0.34)] bg-[color:rgb(var(--color-error-rgb)/0.15)] text-white',
-  success: 'border-[color:rgb(var(--color-success-rgb)/0.34)] bg-[color:rgb(var(--color-success-rgb)/0.16)] text-white',
+  info: 'border-[color:rgb(var(--color-primary-rgb)/0.32)] bg-[color:rgb(var(--color-primary-rgb)/0.1)] text-[color:rgb(var(--color-primary-rgb)/0.96)]',
+  warning: 'border-[color:rgb(var(--color-warning-rgb)/0.38)] bg-[color:rgb(var(--color-warning-rgb)/0.12)] text-[color:rgb(var(--color-warning-rgb)/0.98)]',
+  danger: 'border-[color:rgb(var(--color-error-rgb)/0.36)] bg-[color:rgb(var(--color-error-rgb)/0.1)] text-[color:rgb(var(--color-error-rgb)/0.96)]',
+  success: 'border-[color:rgb(var(--color-success-rgb)/0.36)] bg-[color:rgb(var(--color-success-rgb)/0.11)] text-[color:rgb(var(--color-success-rgb)/0.96)]',
 };
 
 const statusToneIcon = {
@@ -265,6 +280,17 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   const [statusCard, setStatusCard] = useState({ tone: 'info', title: '', message: '' });
   const [successfulOrderId, setSuccessfulOrderId] = useState(null);
   const [successMeta, setSuccessMeta] = useState({ amount: '', identifier: '', orderNumber: '' });
+  const [isTopupPromptOpen, setIsTopupPromptOpen] = useState(false);
+  const [topupAmount, setTopupAmount] = useState('');
+  const [xenaVerification, setXenaVerification] = useState({
+    status: 'idle',
+    targetUid: '',
+    user: null,
+    errorCode: '',
+    errorMessage: '',
+  });
+  const xenaVerifySeqRef = useRef(0);
+  const fieldValuesRef = useRef({});
 
   const orderFields = useMemo(
     () => resolveProductOrderFields(product, language),
@@ -274,6 +300,11 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   const quantityMeta = useMemo(
     () => getProductQuantityMeta(product),
     [product]
+  );
+
+  const xenaTargetField = useMemo(
+    () => getXenaTargetField(orderFields, product),
+    [orderFields, product]
   );
 
   const productTitle = useMemo(() => {
@@ -310,6 +341,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
       nextFields[field.key] = '';
     });
 
+    fieldValuesRef.current = nextFields;
     setFieldValues(nextFields);
     setFieldErrors({});
     setQuantity(quantityMeta.minQty);
@@ -319,7 +351,21 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setStatusCard({ tone: 'info', title: '', message: '' });
     setSuccessfulOrderId(null);
     setSuccessMeta({ amount: '', identifier: '', orderNumber: '' });
+    setIsTopupPromptOpen(false);
+    setTopupAmount('');
+    xenaVerifySeqRef.current += 1;
+    setXenaVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
   }, [orderFields, product?.id, quantityMeta.minQty]);
+
+  useEffect(() => {
+    fieldValuesRef.current = fieldValues;
+  }, [fieldValues]);
+
+  useEffect(() => {
+    if (isOpen) return;
+    xenaVerifySeqRef.current += 1;
+    setXenaVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -422,12 +468,26 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     && !quantityError
     && quantity === clampProductQuantity(quantity, product)
   );
+  const xenaTargetValue = xenaTargetField ? (fieldValues[xenaTargetField.key] || '') : '';
+  const xenaTargetValidation = xenaTargetField
+    ? validateXenaTargetUid(xenaTargetValue, language)
+    : { valid: true, targetUid: '', message: '' };
+  const xenaVerificationRequired = Boolean(xenaTargetField);
+  const xenaVerificationPending = xenaVerification.status === 'pending';
+  const xenaVerificationReady = !xenaVerificationRequired || (
+    xenaTargetValidation.valid
+    && !xenaVerificationPending
+    && isXenaVerificationSatisfied({
+      fieldValue: xenaTargetValue,
+      verification: xenaVerification,
+    })
+  );
   const canSubmit = (
     productState.isPurchasable
     && isApproved
-    && canAfford
     && hasValidAmount
     && selectedQuantityIsValid
+    && xenaVerificationReady
     && !isPreparing
     && !isSubmitting
     && statusCard.tone !== 'success'
@@ -479,9 +539,22 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   };
 
   const handleFieldChange = (fieldKey, value) => {
+    const nextValue = sanitizeOrderFieldValue(value);
+    fieldValuesRef.current = {
+      ...fieldValuesRef.current,
+      [fieldKey]: nextValue,
+    };
+    const shouldClearXenaVerification = xenaTargetField?.key === fieldKey
+      && normalizeXenaTargetUid(nextValue) !== xenaVerification.targetUid;
+
+    if (shouldClearXenaVerification) {
+      xenaVerifySeqRef.current += 1;
+      setXenaVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
+    }
+
     setFieldValues((prev) => ({
       ...prev,
-      [fieldKey]: sanitizeOrderFieldValue(value),
+      [fieldKey]: nextValue,
     }));
 
     setFieldErrors((prev) => {
@@ -490,6 +563,83 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
       delete next[fieldKey];
       return next;
     });
+  };
+
+  const handleVerifyXenaTarget = async () => {
+    if (!xenaTargetField || xenaVerification.status === 'pending') return;
+
+    const validation = validateXenaTargetUid(fieldValues[xenaTargetField.key], language);
+    if (!validation.valid) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        [xenaTargetField.key]: validation.message,
+      }));
+      setXenaVerification({
+        status: 'error',
+        targetUid: validation.targetUid,
+        user: null,
+        errorCode: 'INVALID_XENA_TARGET_UID',
+        errorMessage: validation.message,
+      });
+      return;
+    }
+
+    const requestSeq = xenaVerifySeqRef.current + 1;
+    xenaVerifySeqRef.current = requestSeq;
+    const requestedUid = validation.targetUid;
+
+    setFieldErrors((prev) => {
+      if (!prev[xenaTargetField.key]) return prev;
+      const next = { ...prev };
+      delete next[xenaTargetField.key];
+      return next;
+    });
+    setXenaVerification({
+      status: 'pending',
+      targetUid: requestedUid,
+      user: null,
+      errorCode: '',
+      errorMessage: '',
+    });
+
+    try {
+      const result = await apiClient.products.verifyTarget(
+        resolveProductId(product),
+        makeXenaVerificationRequestBody(requestedUid)
+      );
+      const currentUid = normalizeXenaTargetUid(fieldValuesRef.current[xenaTargetField.key]);
+      if (xenaVerifySeqRef.current !== requestSeq || currentUid !== requestedUid) return;
+
+      setXenaVerification({
+        status: 'success',
+        targetUid: requestedUid,
+        user: result?.user || {
+          uid: result?.uid || requestedUid,
+          nickname: result?.nickname || '',
+          avatar: result?.avatar || null,
+          country: result?.country || '',
+        },
+        errorCode: '',
+        errorMessage: '',
+      });
+    } catch (error) {
+      const currentUid = normalizeXenaTargetUid(fieldValuesRef.current[xenaTargetField.key]);
+      if (xenaVerifySeqRef.current !== requestSeq || currentUid !== requestedUid) return;
+
+      const code = String(error?.code || error?.response?.data?.code || '').trim().toUpperCase();
+      const message = getXenaTargetErrorMessage(code, language);
+      setXenaVerification({
+        status: 'error',
+        targetUid: requestedUid,
+        user: null,
+        errorCode: code || 'XENA_VERIFICATION_UNAVAILABLE',
+        errorMessage: message,
+      });
+      setFieldErrors((prev) => ({
+        ...prev,
+        [xenaTargetField.key]: message,
+      }));
+    }
   };
 
   const applyQuantity = (rawValue) => {
@@ -540,6 +690,12 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   };
 
   const handleSubmit = async () => {
+    if (productState.isPurchasable && isApproved && !canAfford) {
+      setTopupAmount(String(normalizeMoneyAmount(Math.max(0, totalPrice - spendableBalance))));
+      setIsTopupPromptOpen(true);
+      return;
+    }
+
     const nextErrors = {};
     orderFields.forEach((field) => {
       const label = resolveFieldLabel(field, language);
@@ -551,6 +707,23 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors);
       return;
+    }
+
+    if (xenaVerificationRequired) {
+      if (!xenaTargetValidation.valid) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          [xenaTargetField.key]: xenaTargetValidation.message,
+        }));
+        return;
+      }
+      if (!xenaVerificationReady) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          [xenaTargetField.key]: copy.xenaNeedsVerification || (language === 'en' ? 'Verify the Xena ID before buying.' : 'يرجى التحقق من Xena ID قبل الشراء.'),
+        }));
+        return;
+      }
     }
 
     if (!selectedQuantityIsValid) {
@@ -568,13 +741,6 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     if (!isApproved) {
       setStatusCard({ tone: 'warning', title: copy.pendingTitle, message: copy.pendingMessage });
       addToast(copy.pendingMessage, 'warning');
-      return;
-    }
-
-    if (!canAfford) {
-      const message = copy.insufficientMessage(missingAmount);
-      setStatusCard({ tone: 'danger', title: copy.insufficientTitle, message });
-      addToast(copy.insufficientTitle, 'error');
       return;
     }
 
@@ -832,7 +998,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                       onBlur={handleQuantityBlur}
                       disabled={isSubmitting}
                       placeholder={language === 'en' ? 'Enter quantity' : 'اكتب الكمية'}
-                      className="h-9 rounded-md border-white/15 bg-white/8 text-xs text-white placeholder:text-white/45 focus:bg-white/12 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:rounded-lg sm:text-[13px]"
+                      className="h-9 rounded-md border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)] text-xs font-semibold text-[var(--color-text)] placeholder:text-[var(--color-muted)] focus:border-[color:rgb(var(--color-primary-rgb)/0.55)] focus:bg-[rgb(var(--color-card-rgb))] disabled:cursor-not-allowed disabled:opacity-70 sm:h-10 sm:rounded-lg sm:text-[13px]"
                     />
 
                     <p className="text-[11px] font-medium text-[color:rgb(var(--color-text-rgb)/0.65)]">
@@ -840,7 +1006,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                     </p>
 
                     {quantityError ? (
-                      <p className="text-[11px] font-medium text-[#ffb4b4]">{quantityError}</p>
+                      <p className="text-[11px] font-semibold text-[color:rgb(var(--color-error-rgb)/0.96)]">{quantityError}</p>
                     ) : null}
                   </div>
 
@@ -850,7 +1016,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                     value={formattedTotalPrice}
                     readOnly
                     disabled
-                    className="h-9 rounded-md border-white/15 bg-white/8 text-xs text-white placeholder:text-white/45 focus:bg-white/12 disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:rounded-lg sm:text-[13px]"
+                    className="h-9 rounded-md border-[color:rgb(var(--color-primary-rgb)/0.3)] bg-[color:rgb(var(--color-primary-rgb)/0.09)] text-xs font-bold text-[color:rgb(var(--color-primary-rgb)/0.98)] disabled:cursor-not-allowed disabled:opacity-100 sm:h-10 sm:rounded-lg sm:text-[13px]"
                   />
 
                   {orderFields.length > 0 ? (
@@ -861,11 +1027,12 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                           const fieldType = resolveFieldType(field);
                           const options = resolveSelectOptions(field);
                           const fallbackAsInput = fieldType === 'select' && options.length === 0;
+                          const isXenaField = isXenaTargetField(field, product);
 
                           if (fieldType === 'select' && !fallbackAsInput) {
                             return (
                               <div key={field.key}>
-                                <label className="mb-1.5 block text-xs font-medium text-white/80 sm:text-sm">
+                                <label className="mb-1.5 block text-xs font-semibold text-[var(--color-text-secondary)] sm:text-sm">
                                   {label}
                                   {isFieldRequired(field) ? ' *' : ''}
                                 </label>
@@ -873,19 +1040,76 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                                   value={fieldValues[field.key] || ''}
                                   onChange={(event) => handleFieldChange(field.key, event.target.value)}
                                   disabled={isSubmitting || statusCard.tone === 'success'}
-                                  className="h-9 w-full rounded-md border border-white/15 bg-white/8 px-3 text-xs text-white outline-none transition-colors focus:border-[#d4af37]/45 focus:bg-white/12 sm:h-10 sm:rounded-lg sm:text-[13px]"
+                                  className="h-9 w-full rounded-md border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)] px-3 text-xs text-[var(--color-text)] outline-none transition-colors focus:border-[color:rgb(var(--color-primary-rgb)/0.55)] focus:bg-[rgb(var(--color-card-rgb))] sm:h-10 sm:rounded-lg sm:text-[13px]"
                                 >
-                                  <option value="" className="bg-[rgb(var(--color-card-rgb))] text-white/80">
+                                  <option value="" className="bg-[rgb(var(--color-card-rgb))] text-[var(--color-text-secondary)]">
                                     {field.placeholder || copy.placeholder(label)}
                                   </option>
                                   {options.map((option) => (
-                                    <option key={option.value} value={option.value} className="bg-[rgb(var(--color-card-rgb))] text-white">
+                                    <option key={option.value} value={option.value} className="bg-[rgb(var(--color-card-rgb))] text-[var(--color-text)]">
                                       {option.label}
                                     </option>
                                   ))}
                                 </select>
                                 {fieldErrors[field.key] ? (
-                                  <p className="mt-1 text-xs text-[#ffb4b4]">{fieldErrors[field.key]}</p>
+                                  <p className="mt-1 text-xs font-semibold text-[color:rgb(var(--color-error-rgb)/0.96)]">{fieldErrors[field.key]}</p>
+                                ) : null}
+                              </div>
+                            );
+                          }
+
+                          if (isXenaField) {
+                            const safeUser = xenaVerification.user || {};
+                            const showVerified = xenaVerificationReady && xenaVerification.status === 'success';
+                            const verifyDisabled = (
+                              isSubmitting
+                              || statusCard.tone === 'success'
+                              || xenaVerificationPending
+                              || !xenaTargetValidation.valid
+                            );
+                            return (
+                              <div key={field.key} className="space-y-2">
+                                <Input
+                                  label={`${label}${isFieldRequired(field) ? ' *' : ''}`}
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  value={fieldValues[field.key] || ''}
+                                  onChange={(event) => handleFieldChange(field.key, event.target.value)}
+                                  error={fieldErrors[field.key]}
+                                  placeholder={field.placeholder || copy.placeholder(label)}
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  disabled={isSubmitting || statusCard.tone === 'success'}
+                                  className="h-9 rounded-md border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)] text-xs text-[var(--color-text)] placeholder:text-[var(--color-muted)] focus:border-[color:rgb(var(--color-primary-rgb)/0.55)] focus:bg-[rgb(var(--color-card-rgb))] sm:h-10 sm:rounded-lg sm:text-[13px]"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleVerifyXenaTarget}
+                                  disabled={verifyDisabled}
+                                  className="h-9 w-full rounded-md border-[color:rgb(var(--color-primary-rgb)/0.42)] bg-[color:rgb(var(--color-card-rgb)/0.72)] text-xs font-bold text-[color:rgb(var(--color-primary-rgb)/0.98)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)] sm:h-10 sm:rounded-lg"
+                                >
+                                  {xenaVerificationPending ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  ) : showVerified ? (
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  ) : null}
+                                  {xenaVerificationPending
+                                    ? (copy.verifyingXenaId || (language === 'en' ? 'Verifying...' : 'جاري التحقق...'))
+                                    : (copy.verifyXenaId || (language === 'en' ? 'Verify Xena ID' : 'تحقق من Xena ID'))}
+                                </Button>
+                                {showVerified ? (
+                                  <div className="rounded-lg border border-[color:rgb(var(--color-success-rgb)/0.36)] bg-[color:rgb(var(--color-success-rgb)/0.11)] px-2.5 py-2 text-[11px] font-semibold text-[color:rgb(var(--color-success-rgb)/0.98)] sm:text-xs">
+                                    <p>{copy.verifiedXenaId || (language === 'en' ? 'Xena ID verified' : 'تم التحقق من Xena ID')}</p>
+                                    <p className="mt-0.5 font-medium text-[var(--color-text-secondary)]" dir="ltr">
+                                      {[safeUser.nickname, safeUser.uid || xenaVerification.targetUid, safeUser.country].filter(Boolean).join(' · ')}
+                                    </p>
+                                  </div>
+                                ) : xenaVerification.status === 'error' && xenaVerification.errorMessage ? (
+                                  <p className="text-xs font-semibold text-[color:rgb(var(--color-error-rgb)/0.96)]">
+                                    {xenaVerification.errorMessage}
+                                  </p>
                                 ) : null}
                               </div>
                             );
@@ -904,7 +1128,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                               autoComplete="off"
                               spellCheck={false}
                               disabled={isSubmitting || statusCard.tone === 'success'}
-                              className="h-9 rounded-md border-white/15 bg-white/8 text-xs text-white placeholder:text-white/45 focus:border-[#d4af37]/45 focus:bg-white/12 sm:h-10 sm:rounded-lg sm:text-[13px]"
+                              className="h-9 rounded-md border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)] text-xs text-[var(--color-text)] placeholder:text-[var(--color-muted)] focus:border-[color:rgb(var(--color-primary-rgb)/0.55)] focus:bg-[rgb(var(--color-card-rgb))] sm:h-10 sm:rounded-lg sm:text-[13px]"
                             />
                           );
                         })}
@@ -913,24 +1137,17 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                   ) : null}
                 </div>
 
-                {!canAfford && isApproved && productState.isPurchasable ? (
-                  <div className="rounded-xl border border-[color:rgb(var(--color-error-rgb)/0.38)] bg-[color:rgb(var(--color-error-rgb)/0.14)] p-2.5 sm:rounded-2xl sm:p-3">
-                    <p className="text-[11px] font-semibold text-white sm:text-xs">{copy.insufficientTitle}</p>
-                    <p className="mt-0.5 text-[11px] text-white/80 sm:text-xs">{copy.insufficientMessage(missingAmount)}</p>
-                  </div>
-                ) : null}
-
                 {!isApproved ? (
                   <div className="rounded-xl border border-[color:rgb(var(--color-warning-rgb)/0.36)] bg-[color:rgb(var(--color-warning-rgb)/0.14)] p-2.5 sm:rounded-2xl sm:p-3">
-                    <p className="text-[11px] font-semibold text-white sm:text-xs">{copy.pendingTitle}</p>
-                    <p className="mt-0.5 text-[11px] text-white/80 sm:text-xs">{copy.pendingMessage}</p>
+                    <p className="text-[11px] font-bold text-[color:rgb(var(--color-warning-rgb)/0.98)] sm:text-xs">{copy.pendingTitle}</p>
+                    <p className="mt-0.5 text-[11px] font-medium text-[var(--color-text-secondary)] sm:text-xs">{copy.pendingMessage}</p>
                   </div>
                 ) : null}
 
                 {!productState.isPurchasable ? (
                   <div className="rounded-xl border border-[color:rgb(var(--color-warning-rgb)/0.36)] bg-[color:rgb(var(--color-warning-rgb)/0.14)] p-2.5 sm:rounded-2xl sm:p-3">
-                    <p className="text-[11px] font-semibold text-white sm:text-xs">{copy.unavailableTitle}</p>
-                    <p className="mt-0.5 text-[11px] text-white/80 sm:text-xs">{productState.helperText || copy.unavailableMessage}</p>
+                    <p className="text-[11px] font-bold text-[color:rgb(var(--color-warning-rgb)/0.98)] sm:text-xs">{copy.unavailableTitle}</p>
+                    <p className="mt-0.5 text-[11px] font-medium text-[var(--color-text-secondary)] sm:text-xs">{productState.helperText || copy.unavailableMessage}</p>
                   </div>
                 ) : null}
 
@@ -942,7 +1159,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                     <StatusIcon className={cn('mt-0.5 h-4 w-4 shrink-0', statusCard.tone === 'info' && isSubmitting && 'animate-spin')} />
                     <div>
                       {statusCard.title ? <p className="font-semibold">{statusCard.title}</p> : null}
-                      <p className="mt-0.5 text-[11px] leading-4 text-white/90 sm:text-xs sm:leading-5">{statusCard.message}</p>
+                      <p className="mt-0.5 text-[11px] leading-4 text-[var(--color-text-secondary)] sm:text-xs sm:leading-5">{statusCard.message}</p>
                     </div>
                   </div>
                 ) : null}
@@ -982,6 +1199,82 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
               </footer>
             </motion.section>
           </div>
+
+          <AnimatePresence>
+            {isTopupPromptOpen ? (
+              <div className="absolute inset-0 z-[95] flex items-center justify-center p-4">
+                <motion.button
+                  type="button"
+                  className="absolute inset-0 bg-black/50 backdrop-blur-[3px]"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsTopupPromptOpen(false)}
+                  aria-label={copy.cancel}
+                />
+
+                <motion.section
+                  role="dialog"
+                  aria-modal="true"
+                  initial={{ opacity: 0, scale: 0.92, y: 18 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 12 }}
+                  className="relative z-10 w-full max-w-sm rounded-[1.6rem] border border-[color:rgb(var(--color-primary-rgb)/0.38)] bg-[rgb(var(--color-card-rgb))] p-5 text-[var(--color-text)] shadow-[0_28px_80px_-34px_rgb(var(--color-primary-rgb)/0.5)]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsTopupPromptOpen(false)}
+                    className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.75)] bg-[color:rgb(var(--color-surface-rgb)/0.85)] text-[var(--color-text-secondary)] transition hover:text-[var(--color-text)]"
+                    aria-label={copy.cancel}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[color:rgb(var(--color-primary-rgb)/0.3)] bg-[color:rgb(var(--color-primary-rgb)/0.11)] text-[var(--color-primary)]">
+                    <WalletCards className="h-6 w-6" />
+                  </span>
+                  <h3 className="mt-3 text-lg font-bold">
+                    {language === 'en' ? 'Add balance to continue' : 'أضف رصيدًا لإكمال الطلب'}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-[var(--color-text-secondary)]">
+                    {language === 'en' ? 'The required amount is filled in automatically. You can edit it before continuing.' : 'تم إدخال المبلغ الناقص تلقائيًا، ويمكنك تعديله قبل المتابعة.'}
+                  </p>
+
+                  <div className="mt-4">
+                    <Input
+                      label={language === 'en' ? `Top-up amount (${userCurrencyCode})` : `مبلغ الإضافة (${userCurrencyCode})`}
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={topupAmount}
+                      onChange={(event) => setTopupAmount(event.target.value)}
+                      className="h-11 rounded-xl font-bold"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-2.5">
+                    <Button type="button" variant="outline" onClick={() => setIsTopupPromptOpen(false)} className="h-11 rounded-xl">
+                      {copy.cancel}
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={!Number.isFinite(Number(topupAmount)) || Number(topupAmount) <= 0}
+                      onClick={() => {
+                        const amount = Number(topupAmount);
+                        if (!Number.isFinite(amount) || amount <= 0) return;
+                        onClose();
+                        navigate(`/wallet/add-balance?amount=${encodeURIComponent(String(amount))}`);
+                      }}
+                      className="h-11 rounded-xl"
+                    >
+                      {language === 'en' ? 'Add balance' : 'إضافة الرصيد'}
+                    </Button>
+                  </div>
+                </motion.section>
+              </div>
+            ) : null}
+          </AnimatePresence>
 
           <AnimatePresence>
             {successfulOrderId ? (

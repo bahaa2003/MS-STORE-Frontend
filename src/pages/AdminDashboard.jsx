@@ -37,7 +37,6 @@ import ActivityFeedSection from '../components/admin-dashboard/ActivityFeedSecti
 import SupplierBalancesSection from '../components/admin-dashboard/SupplierBalancesSection';
 import DashboardDateRangeFilter from '../components/admin-dashboard/DashboardDateRangeFilter';
 import OrderDetailsDrawer from '../components/orders/OrderDetailsDrawer';
-import Card from '../components/ui/Card';
 import { useToast } from '../components/ui/Toast';
 import { formatDateTime, formatNumber, getNumericLocale } from '../utils/intl';
 import { enrichOrders } from '../utils/orders';
@@ -47,7 +46,6 @@ import { PERMISSIONS, hasPermission } from '../utils/permissions';
 const PENDING_STATUSES = ['pending', 'requested', 'under_review', 'processing'];
 const COMPLETED_STATUSES = ['completed', 'approved', 'success'];
 const REJECTED_STATUSES = ['rejected', 'denied', 'cancelled', 'canceled'];
-const DASHBOARD_DEFAULT_RANGE_DAYS = 30;
 
 const asNumber = (value) => {
   const parsed = Number(value);
@@ -64,13 +62,6 @@ const isPendingStatus = (status) => PENDING_STATUSES.includes(normalizeStatus(st
 const isCompletedStatus = (status) => COMPLETED_STATUSES.includes(normalizeStatus(status));
 const isRejectedStatus = (status) => REJECTED_STATUSES.includes(normalizeStatus(status));
 const isManualTopup = (topup) => String(topup?.type || '').trim().toLowerCase() !== 'game_topup';
-
-const shiftDateByDays = (inputDate, days) => {
-  const nextDate = new Date(inputDate);
-  nextDate.setHours(0, 0, 0, 0);
-  nextDate.setDate(nextDate.getDate() + days);
-  return nextDate;
-};
 
 const toDateInputValue = (value) => {
   const date = new Date(value);
@@ -173,9 +164,11 @@ const extractSupplierBalanceSnapshot = (payload = {}) => {
 };
 
 const getDefaultDashboardRange = () => {
-  const today = shiftDateByDays(new Date(), 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   return {
-    startDate: toDateInputValue(shiftDateByDays(today, -(DASHBOARD_DEFAULT_RANGE_DAYS - 1))),
+    startDate: toDateInputValue(monthStart),
     endDate: toDateInputValue(today),
   };
 };
@@ -226,6 +219,16 @@ const AdminDashboard = () => {
   const canViewSuppliers = hasPermission(user, PERMISSIONS.ADMIN_SUPPLIERS);
   const canViewTargets = hasPermission(user, PERMISSIONS.ADMIN_TARGET_REQUESTS);
   const canConfirmTargets = hasPermission(user, PERMISSIONS.CONFIRM_TARGET_REQUESTS);
+
+  useEffect(() => {
+    document.documentElement.classList.add('admin-dashboard-page-scroll');
+    document.body.classList.add('admin-dashboard-page-scroll');
+
+    return () => {
+      document.documentElement.classList.remove('admin-dashboard-page-scroll');
+      document.body.classList.remove('admin-dashboard-page-scroll');
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -1030,14 +1033,14 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="admin-dashboard-shell min-w-0 space-y-4 pb-3 md:space-y-8 md:pb-4">
+    <div className="admin-dashboard-shell mx-auto min-w-0 max-w-[90rem] space-y-4 pb-3 md:space-y-6 md:pb-5">
       <DashboardHeader
         isArabic={isArabic}
         userName={user?.name}
         currentDateLabel={currentDateLabel}
       />
 
-      <Card variant="premium" className="admin-dashboard-filter-card overflow-visible p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-[80rem] justify-center px-1">
         <DashboardDateRangeFilter
           isArabic={isArabic}
           formatRangeDate={formatRangeDate}
@@ -1046,11 +1049,11 @@ const AdminDashboard = () => {
           endDate={endDate}
           onRangeChange={applyDateRangeSelection}
         />
-      </Card>
+      </div>
 
       <StatsGrid stats={stats} isLoading={isLoadingDashboardStats} />
 
-      <div className="grid place-items-center gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.95fr)] xl:place-items-stretch xl:gap-6">
+      <div className="mx-auto grid w-full max-w-[80rem] place-items-center gap-4 xl:grid-cols-2 xl:place-items-stretch xl:gap-5">
         <div className="w-full space-y-4 md:space-y-6">
           {canViewOrders ? (
             <RecentOrdersSection

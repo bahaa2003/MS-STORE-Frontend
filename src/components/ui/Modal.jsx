@@ -14,6 +14,40 @@ const sizeClassNames = {
 const Modal = ({ isOpen, onClose, title, children, footer, size = 'md', className: modalClassName, placement = 'responsive' }) => {
   const backdropZ = modalClassName || 'z-50';
   const isCentered = placement === 'center';
+
+  React.useEffect(() => {
+    if (!isOpen || typeof document === 'undefined' || typeof window === 'undefined') return undefined;
+
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const computedPaddingRight = Number.parseFloat(window.getComputedStyle(body).paddingRight) || 0;
+    const scrollbarWidth = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+    const previousStyles = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+      paddingRight: body.style.paddingRight,
+    };
+
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) body.style.paddingRight = `${computedPaddingRight + scrollbarWidth}px`;
+
+    return () => {
+      Object.entries(previousStyles).forEach(([property, value]) => {
+        body.style[property] = value;
+      });
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (

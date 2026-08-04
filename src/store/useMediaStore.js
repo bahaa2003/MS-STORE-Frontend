@@ -168,6 +168,8 @@ const normalizeProductRecord = (product = {}, categories = mockCategories) => {
     externalProductId,
     externalProductName: product.externalProductName || '',
     autoFulfillmentEnabled: product.autoFulfillmentEnabled !== false,
+    connectionType: product.connectionType
+      || (product.executionType === 'manual' || product.autoFulfillmentEnabled === false ? 'manual' : 'auto'),
     fallbackSupplierId: product.fallbackSupplierId || '',
     supplierFieldMappings: Array.isArray(product.supplierFieldMappings) ? product.supplierFieldMappings : [],
     externalPricingMode,

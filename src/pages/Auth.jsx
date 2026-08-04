@@ -860,12 +860,12 @@ const countryOptions = useMemo(() => {
                   whileTap={reduceMotion ? undefined : { scale: 0.99 }}
                   onClick={handleGoogleAuth}
                   disabled={isLoading}
-                  className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl border border-[color:rgb(var(--color-primary-rgb)/0.16)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,244,234,0.92))] px-4 py-3 text-sm font-semibold text-[var(--color-text)] shadow-[0_18px_42px_-26px_rgba(15,23,42,0.28)] transition-all hover:border-[color:rgb(var(--color-primary-rgb)/0.28)] hover:shadow-[0_24px_48px_-26px_rgba(212,175,55,0.26)] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[linear-gradient(180deg,rgba(17,19,26,0.96),rgba(9,10,13,0.92))]"
+                  className={styles.googleButton}
                 >
-                  <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                  <span className={styles.googleIcon}>
                     <GoogleMark />
                   </span>
-                  <span className="relative">
+                  <span className={styles.googleButtonText}>
                     {t('auth.continueWithGoogle', {
                       defaultValue: dir === 'rtl' ? 'المتابعة عبر Google' : 'Continue with Google',
                     })}

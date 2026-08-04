@@ -1,9 +1,15 @@
 :root {
-  --auth-gold: #d4af37;
-  --auth-gold-soft: #f3de9b;
-  --auth-dark: #070707;
-  --auth-panel: rgba(255, 255, 255, 0.03);
-  --auth-light: #fbf8ef;
+  --auth-gold: var(--color-primary);
+  --auth-gold-soft: var(--color-primary-soft);
+  --auth-dark: #0c0c0e;
+  --auth-panel: rgb(var(--color-card-rgb) / 0.72);
+  --auth-light: #f4f0e8;
+}
+
+@property --auth-neon-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
 }
 
 .authPage {
@@ -12,8 +18,9 @@
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(46rem circle at 12% 8%, rgb(212 175 55 / 0.1), transparent 42%),
-    linear-gradient(180deg, #0b0b0b 0%, #050505 100%);
+    radial-gradient(48rem circle at 10% 4%, rgb(var(--color-primary-rgb) / 0.15), transparent 44%),
+    radial-gradient(34rem circle at 54% 100%, rgb(126 100 58 / 0.07), transparent 46%),
+    linear-gradient(155deg, #18171a 0%, #0c0c0e 58%, #121214 100%);
   color: var(--color-text);
 }
 
@@ -22,11 +29,7 @@
   position: absolute;
   inset: 0;
   z-index: -2;
-  background:
-    linear-gradient(90deg, rgb(255 255 255 / 0.018) 1px, transparent 1px),
-    linear-gradient(180deg, rgb(255 255 255 / 0.014) 1px, transparent 1px);
-  background-size: 84px 84px;
-  mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.72), transparent 96%);
+  background: none;
 }
 
 .authPage::after {
@@ -35,8 +38,8 @@
   inset: -20%;
   z-index: -1;
   background:
-    radial-gradient(circle at 75% 18%, rgb(212 175 55 / 0.22), transparent 22%),
-    radial-gradient(circle at 90% 74%, rgb(243 222 155 / 0.12), transparent 28%);
+    radial-gradient(circle at 75% 18%, rgb(var(--color-primary-rgb) / 0.2), transparent 24%),
+    radial-gradient(circle at 90% 74%, rgb(126 100 58 / 0.1), transparent 30%);
   filter: blur(48px);
   opacity: 0.62;
 }
@@ -176,11 +179,12 @@
   gap: 0.35rem;
   width: min(100%, 30rem);
   margin: 0 auto 0.75rem;
-  border: 1px solid rgb(212 175 55 / 0.16);
-  border-radius: 1.15rem;
-  background: rgb(255 255 255 / 0.035);
-  padding: 0.3rem;
-  backdrop-filter: blur(10px);
+  border: 1px solid rgb(var(--color-primary-rgb) / 0.2);
+  border-radius: 1rem;
+  background: rgb(var(--color-card-rgb) / 0.5);
+  padding: 0.32rem;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  backdrop-filter: blur(14px);
 }
 
 .modeToggleActive {
@@ -193,16 +197,23 @@
 .formCard {
   width: min(100%, 30rem);
   margin: 0 auto;
-  border: 1px solid rgb(212 175 55 / 0.22);
-  border-radius: 20px;
+  border: 1px solid rgb(var(--color-primary-rgb) / 0.26);
+  border-radius: 24px;
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.018)),
+    radial-gradient(24rem circle at top right, rgb(var(--color-primary-rgb) / 0.1), transparent 48%),
+    linear-gradient(160deg, rgb(var(--color-card-rgb) / 0.92), rgb(var(--color-surface-rgb) / 0.78)),
     var(--auth-panel);
   padding: clamp(1.15rem, 2.8vw, 1.75rem);
   box-shadow:
-    0 34px 86px -54px rgb(0 0 0 / 0.96),
-    inset 0 1px 0 rgb(255 255 255 / 0.05);
-  backdrop-filter: blur(12px);
+    0 34px 86px -48px rgb(0 0 0 / 0.82),
+    0 0 0 1px rgb(255 255 255 / 0.025),
+    inset 0 1px 0 rgb(255 255 255 / 0.09);
+  backdrop-filter: blur(18px);
+}
+
+.formCard :global(label) {
+  color: var(--color-text) !important;
+  font-weight: 700 !important;
 }
 
 .formIntro {
@@ -308,37 +319,173 @@
 
 .authInput,
 .authSelect {
-  border-color: rgb(212 175 55 / 0.2) !important;
-  background: rgb(255 255 255 / 0.045) !important;
-  color: #f4eedb !important;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035) !important;
+  min-height: 3rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 0.95rem !important;
+  background:
+    linear-gradient(rgb(var(--color-bg-rgb) / 0.96), rgb(var(--color-bg-rgb) / 0.96)) padding-box,
+    conic-gradient(
+      from var(--auth-neon-angle),
+      rgb(var(--color-border-rgb) / 0.7) 0deg 250deg,
+      rgb(var(--color-primary-rgb) / 0.26) 275deg,
+      rgb(var(--color-primary-rgb) / 1) 310deg,
+      rgb(255 239 183 / 0.95) 326deg,
+      rgb(var(--color-primary-rgb) / 0.3) 344deg,
+      rgb(var(--color-border-rgb) / 0.7) 360deg
+    ) border-box !important;
+  color: var(--color-text) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.045) !important;
+  animation: auth-neon-orbit 3s linear infinite;
 }
 
 .authInput::placeholder {
-  color: rgb(237 237 237 / 0.36) !important;
+  color: var(--color-muted) !important;
+  opacity: 0.68;
 }
 
 .authInput:focus,
 .authSelect:focus {
-  border-color: rgb(212 175 55 / 0.58) !important;
+  border-color: transparent !important;
   background:
-    linear-gradient(180deg, rgb(212 175 55 / 0.12), rgb(255 255 255 / 0.055)) !important;
-  color: #fff7d9 !important;
-  box-shadow:
-    0 0 0 4px rgb(212 175 55 / 0.12),
-    0 0 28px rgb(212 175 55 / 0.18),
-    0 14px 34px -28px rgb(212 175 55 / 0.48) !important;
+    linear-gradient(rgb(var(--color-card-rgb) / 0.96), rgb(var(--color-card-rgb) / 0.96)) padding-box,
+    conic-gradient(
+      from var(--auth-neon-angle),
+      rgb(var(--color-primary-rgb) / 0.28) 0deg 245deg,
+      rgb(var(--color-primary-rgb) / 0.55) 278deg,
+      rgb(var(--color-primary-rgb) / 1) 310deg,
+      rgb(255 241 190 / 1) 328deg,
+      rgb(var(--color-primary-rgb) / 0.48) 348deg,
+      rgb(var(--color-primary-rgb) / 0.28) 360deg
+    ) border-box !important;
+  color: var(--color-text) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07) !important;
+  animation: auth-neon-orbit 1.65s linear infinite;
+}
+
+@keyframes auth-neon-orbit {
+  to {
+    --auth-neon-angle: 360deg;
+  }
 }
 
 .authSelect option {
-  background: #151515;
-  color: #ededed;
+  background: rgb(var(--color-card-rgb));
+  color: var(--color-text);
 }
 
 .primaryButton {
   width: 100%;
-  border-radius: 999px !important;
-  min-height: 2.9rem;
+  min-height: 3rem;
+  border: 1px solid rgb(var(--color-primary-rgb) / 0.62) !important;
+  border-radius: 0.95rem !important;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-soft)) !important;
+  color: var(--color-button-text) !important;
+  box-shadow: 0 18px 34px -22px rgb(var(--color-primary-rgb) / 0.72) !important;
+  transition: transform 180ms ease, filter 180ms ease, box-shadow 180ms ease !important;
+}
+
+.primaryButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow: 0 22px 40px -22px rgb(var(--color-primary-rgb) / 0.82) !important;
+}
+
+.googleButton {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 1rem;
+  background:
+    linear-gradient(rgb(var(--color-card-rgb) / 0.96), rgb(var(--color-surface-rgb) / 0.9)) padding-box,
+    conic-gradient(
+      from var(--auth-neon-angle),
+      #4285f4,
+      #34a853,
+      #fbbc05,
+      #ea4335,
+      #4285f4
+    ) border-box;
+  padding: 0.4rem 0.85rem;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 800;
+  box-shadow: 0 18px 38px -28px rgb(0 0 0 / 0.58);
+  animation: auth-neon-orbit 5s linear infinite;
+  transition: box-shadow 220ms ease, filter 220ms ease, border-color 220ms ease;
+}
+
+.googleButton::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: -35%;
+  width: 22%;
+  transform: skewX(-22deg);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.34), transparent);
+  animation: google-button-shine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.googleButton:hover:not(:disabled) {
+  filter: brightness(1.04);
+  box-shadow:
+    0 20px 42px -26px rgb(66 133 244 / 0.24),
+    0 14px 36px -28px rgb(52 168 83 / 0.22);
+}
+
+.googleButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.googleIcon {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(226 232 240 / 0.92);
+  border-radius: 0.8rem;
+  background: #ffffff;
+  box-shadow: 0 10px 24px -18px rgb(15 23 42 / 0.58);
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 260ms ease;
+}
+
+.googleButton:hover .googleIcon {
+  transform: rotate(-7deg) scale(1.08);
+  box-shadow: 0 12px 26px -16px rgb(66 133 244 / 0.52);
+}
+
+.googleButtonText {
+  position: relative;
+  z-index: 1;
+  letter-spacing: 0.01em;
+}
+
+@keyframes google-button-shine {
+  0%, 42% {
+    left: -35%;
+    opacity: 0;
+  }
+
+  52% {
+    opacity: 0.9;
+  }
+
+  72%, 100% {
+    left: 115%;
+    opacity: 0;
+  }
 }
 
 .stepActions {
@@ -440,9 +587,9 @@
   overflow: hidden;
   border-inline-start: 1px solid rgb(212 175 55 / 0.16);
   background:
-    radial-gradient(38rem circle at 30% 22%, rgb(212 175 55 / 0.2), transparent 44%),
-    radial-gradient(36rem circle at 80% 80%, rgb(243 222 155 / 0.1), transparent 46%),
-    linear-gradient(145deg, #121212 0%, #050505 58%, #0f0b02 100%);
+    radial-gradient(38rem circle at 30% 22%, rgb(var(--color-primary-rgb) / 0.2), transparent 44%),
+    radial-gradient(36rem circle at 80% 80%, rgb(126 100 58 / 0.1), transparent 46%),
+    linear-gradient(145deg, #1b1a1e 0%, #0c0c0e 58%, #151417 100%);
 }
 
 .visualPane::before {
@@ -548,23 +695,31 @@
 
 :global(:root:not(.dark)) .authPage {
   background:
-    radial-gradient(42rem circle at 12% 8%, rgb(212 175 55 / 0.13), transparent 42%),
-    linear-gradient(180deg, #fffdf8 0%, #f6efe0 100%);
+    radial-gradient(44rem circle at 8% 4%, rgb(155 106 28 / 0.13), transparent 44%),
+    radial-gradient(36rem circle at 58% 100%, rgb(104 122 148 / 0.07), transparent 46%),
+    linear-gradient(155deg, #fffefa 0%, #f4f0e8 58%, #ebe4d8 100%);
 }
 
 :global(:root:not(.dark)) .authPage::before {
-  background:
-    linear-gradient(90deg, rgb(127 106 50 / 0.07) 1px, transparent 1px),
-    linear-gradient(180deg, rgb(127 106 50 / 0.055) 1px, transparent 1px);
+  background: none;
 }
 
 :global(:root:not(.dark)) .topControlsInner,
 :global(:root:not(.dark)) .backButton,
 :global(:root:not(.dark)) .modeToggle,
-:global(:root:not(.dark)) .formCard,
 :global(:root:not(.dark)) .privacyStrip > div {
-  background: rgb(255 255 255 / 0.72);
-  box-shadow: 0 24px 62px -46px rgb(80 64 24 / 0.32);
+  background: rgb(255 254 250 / 0.82);
+  box-shadow: 0 24px 62px -46px rgb(54 43 26 / 0.34);
+}
+
+:global(:root:not(.dark)) .formCard {
+  border-color: rgb(155 106 28 / 0.25);
+  background:
+    radial-gradient(24rem circle at top right, rgb(189 141 54 / 0.11), transparent 48%),
+    linear-gradient(160deg, rgb(255 254 250 / 0.98), rgb(244 240 232 / 0.94));
+  box-shadow:
+    0 30px 72px -46px rgb(54 43 26 / 0.34),
+    inset 0 1px 0 rgb(255 255 255 / 0.92);
 }
 
 :global(:root:not(.dark)) .formTitle {
@@ -588,8 +743,19 @@
 
 :global(:root:not(.dark)) .authInput,
 :global(:root:not(.dark)) .authSelect {
-  background: rgb(255 255 255 / 0.86) !important;
-  color: #161616 !important;
+  border-color: transparent !important;
+  background:
+    linear-gradient(rgb(255 254 250 / 0.98), rgb(255 254 250 / 0.98)) padding-box,
+    conic-gradient(
+      from var(--auth-neon-angle),
+      rgb(212 194 159 / 0.82) 0deg 250deg,
+      rgb(155 106 28 / 0.28) 275deg,
+      rgb(155 106 28 / 1) 310deg,
+      rgb(230 187 91 / 1) 327deg,
+      rgb(155 106 28 / 0.32) 345deg,
+      rgb(212 194 159 / 0.82) 360deg
+    ) border-box !important;
+  color: #18140f !important;
 }
 
 :global(:root:not(.dark)) .authInput::placeholder {
@@ -604,8 +770,31 @@
 :global(:root:not(.dark)) .authInput:focus,
 :global(:root:not(.dark)) .authSelect:focus {
   background:
-    linear-gradient(180deg, rgb(255 248 224 / 0.96), rgb(255 255 255 / 0.92)) !important;
-  color: #171717 !important;
+    linear-gradient(rgb(255 252 243 / 1), rgb(255 252 243 / 1)) padding-box,
+    conic-gradient(
+      from var(--auth-neon-angle),
+      rgb(155 106 28 / 0.3) 0deg 245deg,
+      rgb(155 106 28 / 0.55) 278deg,
+      rgb(155 106 28 / 1) 310deg,
+      rgb(238 200 111 / 1) 329deg,
+      rgb(155 106 28 / 0.5) 348deg,
+      rgb(155 106 28 / 0.3) 360deg
+    ) border-box !important;
+  color: #18140f !important;
+}
+
+:global(:root:not(.dark)) .googleButton {
+  background:
+    linear-gradient(rgb(255 254 250 / 0.98), rgb(248 244 235 / 0.96)) padding-box,
+    conic-gradient(
+      from var(--auth-neon-angle),
+      #4285f4,
+      #34a853,
+      #fbbc05,
+      #ea4335,
+      #4285f4
+    ) border-box;
+  box-shadow: 0 18px 38px -28px rgb(54 43 26 / 0.32);
 }
 
 :global(:root:not(.dark)) .stepProgress::before {
@@ -697,5 +886,14 @@
 
   .privacyStrip > div {
     border-radius: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .authInput,
+  .authSelect,
+  .googleButton,
+  .googleButton::before {
+    animation: none;
   }
 }

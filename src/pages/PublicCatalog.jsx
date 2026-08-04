@@ -6,9 +6,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ChevronLeft,
-  Menu,
   MessageCircle,
-  LogIn,
   Search,
   UserPlus,
   Sparkles,
@@ -22,9 +20,8 @@ import useMediaStore from '../store/useMediaStore';
 import useGroupStore from '../store/useGroupStore';
 import Button from '../components/ui/Button';
 import { cn } from '../components/ui/Button';
-import ThemeToggle from '../components/ui/ThemeToggle';
-import LanguageSwitcher from '../components/ui/LanguageSwitcher';
-import BrandMark from '../components/layout/BrandMark';
+import PublicLoginButton from '../components/ui/PublicLoginButton';
+import PublicHeader from '../components/layout/PublicHeader';
 import PublicSidebar from '../components/layout/PublicSidebar';
 import HeroSlider from '../components/home/HeroSlider';
 import CategoryCard from '../components/home/CategoryCard';
@@ -69,21 +66,6 @@ const GoogleMark = () => (
     <path fill="#4A90E2" d="M6.2 13.7c-.2-.6-.3-1.1-.3-1.7s.1-1.2.3-1.7L3 7.8C2.4 9 2 10.4 2 12s.4 3 1 4.2l3.2-2.5z" />
     <path fill="#FBBC05" d="M12 5c1.5 0 2.9.5 4 1.6l3-3C17 1.8 14.7 1 12 1 8 1 4.7 3.4 3 7.8l3.2 2.5C7 6.8 9.3 5 12 5z" />
   </svg>
-);
-
-const GoldShineButton = ({ children, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="group relative inline-flex h-11 w-full items-center justify-center overflow-hidden rounded-full border border-[#d8b36b]/75 bg-[linear-gradient(180deg,#f6e4a2_0%,#d4af37_48%,#b98a1e_100%)] px-4 text-sm font-extrabold text-white shadow-[0_18px_34px_-20px_rgba(212,175,55,0.95)] transition-all hover:-translate-y-0.5"
-  >
-    <span className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.65),transparent_42%)] opacity-85" />
-    <span className="absolute left-[18%] top-[-18%] h-[140%] w-[18%] rotate-[16deg] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.16),rgba(255,255,255,0.52),rgba(255,255,255,0.16),transparent)] blur-[1px] mix-blend-screen" />
-    <span className="relative z-10 flex items-center gap-2">
-      <LogIn className="h-4 w-4" />
-      {children}
-    </span>
-  </button>
 );
 
 const PublicCatalog = () => {
@@ -209,34 +191,18 @@ const PublicCatalog = () => {
   if (isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen pb-5 pt-[4.75rem]">
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-[color:rgb(var(--color-border-rgb)/0.32)] bg-[color:rgb(var(--color-bg-rgb)/0.88)] shadow-[0_18px_44px_-34px_rgb(var(--color-primary-rgb)/0.28)] backdrop-blur-md">
-        <div className="mx-auto max-w-[var(--shell-max-width)] px-3 py-2.5 sm:px-4 lg:px-6">
-          <div className="flex flex-col items-start gap-2 rounded-[1.5rem] border border-[color:rgb(var(--color-border-rgb)/0.22)] bg-[color:rgb(var(--color-card-rgb)/0.22)] px-3 py-2 shadow-[var(--shadow-subtle)] backdrop-blur-xl sm:px-4 sm:py-2.5">
-            <div className="flex w-full items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsMenuOpen((previous) => !previous)}
-                  className="inline-flex h-9.5 w-9.5 items-center justify-center rounded-full border border-[color:rgb(var(--color-border-rgb)/0.72)] bg-[color:rgb(var(--color-surface-rgb)/0.55)] text-[var(--color-text)] transition-all hover:-translate-y-0.5 hover:text-[var(--color-primary)]"
-                  aria-label={isArabic ? 'القائمة' : 'Menu'}
-                >
-                  <Menu className="h-4.5 w-4.5" />
-                </button>
-                <BrandMark size="xs" />
-              </div>
-
-              <ThemeToggle variant="glass" compact className="h-8 w-8" />
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen pb-5 pt-[4.9rem] sm:pt-[6.5rem]">
+      <PublicHeader
+        isArabic={isArabic}
+        onMenuToggle={() => setIsMenuOpen((previous) => !previous)}
+        onHome={handleHome}
+      />
 
       <div className="px-4 pt-3 sm:px-6 lg:px-8 lg:hidden">
         <div className="mx-auto max-w-[var(--shell-max-width)]">
-          <GoldShineButton onClick={handleLogin}>
+          <PublicLoginButton onClick={handleLogin}>
             {isArabic ? 'تسجيل الدخول' : 'Login'}
-          </GoldShineButton>
+          </PublicLoginButton>
         </div>
       </div>
 

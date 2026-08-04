@@ -4,7 +4,7 @@ import { cn } from '../ui/Button';
 
 const DashboardHeader = ({ isArabic, userName, currentDateLabel }) => {
   return (
-    <section className="admin-dashboard-header relative mx-auto w-[calc(100vw-1.5rem)] max-w-[42rem] overflow-hidden rounded-[1.5rem] border border-[color:rgb(var(--color-primary-rgb)/0.2)] p-4 sm:w-full sm:p-6 lg:max-w-none lg:p-7">
+    <section className="admin-dashboard-header relative mx-auto w-[calc(100vw-1.5rem)] max-w-[42rem] overflow-hidden rounded-[1.5rem] border border-[color:rgb(var(--color-primary-rgb)/0.2)] p-4 sm:w-full sm:p-5 lg:max-w-[80rem] lg:p-6">
       <div className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgb(var(--color-primary-rgb)/0.72),transparent)]" />
       <div className="relative flex flex-col items-center gap-4 text-center sm:gap-5 lg:flex-row lg:items-end lg:justify-between lg:text-start">
         <div className="space-y-2.5 sm:space-y-4">
@@ -14,7 +14,7 @@ const DashboardHeader = ({ isArabic, userName, currentDateLabel }) => {
           </span>
 
           <div className="space-y-1.5 sm:space-y-2">
-            <h1 className="text-xl font-black text-[var(--color-text)] sm:text-4xl">
+            <h1 className="text-xl font-black tracking-tight text-[var(--color-text)] sm:text-3xl">
               {isArabic ? 'لوحة تحكم الإدارة' : 'Admin Dashboard'}
             </h1>
             <p className="mx-auto max-w-2xl text-[11px] leading-5 text-[var(--color-text-secondary)] sm:text-base sm:leading-6 lg:mx-0">

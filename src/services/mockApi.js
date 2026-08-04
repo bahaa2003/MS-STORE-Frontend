@@ -929,6 +929,52 @@ const mockApi = {
       const products = await mockApi.products.list();
       return products.find(p => p.id === id);
     },
+
+    verifyTarget: async (_productId, payload = {}) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const targetUid = String(payload?.targetUid ?? payload ?? '').trim();
+      if (!/^\d{1,50}$/.test(targetUid) || targetUid === '404') {
+        const err = new Error('Xena ID is invalid or does not exist.');
+        err.code = 'XENA_TARGET_INVALID';
+        err.status = 404;
+        throw err;
+      }
+      if (targetUid === '409') {
+        const err = new Error('Xena needs admin reauthentication.');
+        err.code = 'XENA_REAUTHENTICATION_REQUIRED';
+        err.status = 409;
+        throw err;
+      }
+      if (targetUid === '403') {
+        const err = new Error('Xena provider authentication failed.');
+        err.code = 'XENA_PROVIDER_AUTH_FAILED';
+        err.status = 502;
+        throw err;
+      }
+      if (targetUid === '429') {
+        const err = new Error('Xena verification is rate limited.');
+        err.code = 'XENA_RATE_LIMITED';
+        err.status = 429;
+        throw err;
+      }
+      if (targetUid === '503') {
+        const err = new Error('Xena verification is unavailable.');
+        err.code = 'XENA_VERIFICATION_UNAVAILABLE';
+        err.status = 503;
+        throw err;
+      }
+      return {
+        valid: true,
+        targetUid,
+        user: {
+          uid: targetUid,
+          nickname: `Mock Xena ${targetUid.slice(-4)}`,
+          avatar: null,
+          country: 'MOCK',
+        },
+        source: 'mock',
+      };
+    },
     
     create: async (productData) => {
       await new Promise(resolve => setTimeout(resolve, DELAY));

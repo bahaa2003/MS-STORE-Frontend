@@ -27,7 +27,7 @@ const SearchBar = ({
       <div className="relative">
         <Search
           className={cn(
-            'pointer-events-none absolute top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--color-muted)]',
+            'pointer-events-none absolute top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[var(--color-primary)] drop-shadow-[0_2px_6px_rgb(var(--color-primary-rgb)/0.28)] transition-colors',
             isIconOnRight ? 'right-4' : 'left-4'
           )}
         />

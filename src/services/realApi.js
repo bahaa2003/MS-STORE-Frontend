@@ -1288,6 +1288,7 @@ const productToBE = (fe) => {
   if (fe.category !== undefined) body.category = fe.category;
   if (fe.category !== undefined) body.categoryId = fe.category;
   if (fe.displayOrder !== undefined) body.displayOrder = fe.displayOrder;
+  if (fe.stepQty !== undefined) body.stepQty = Number(fe.stepQty);
   if (fe.orderFields !== undefined) body.orderFields = fe.orderFields;
   if (fe.dynamicFields !== undefined) {
     body.dynamicFields = (Array.isArray(fe.dynamicFields) ? fe.dynamicFields : [])
@@ -1328,6 +1329,9 @@ const productToBE = (fe) => {
   if (fe.originalPriceCoins !== undefined) body.originalPriceCoins = String(fe.originalPriceCoins || '');
   if (fe.originalPrice !== undefined) body.originalPrice = String(fe.originalPrice || '');
   if (fe.costPrice !== undefined) body.costPrice = String(fe.costPrice || '');
+  if (fe.syncedProviderBasePrice !== undefined && fe.syncedProviderBasePrice !== null) {
+    body.syncedProviderBasePrice = String(fe.syncedProviderBasePrice || '');
+  }
 
   // Quantity: FE uses minimumOrderQty / maximumOrderQty, BE uses minQty / maxQty
   if (fe.minimumOrderQty !== undefined) body.minQty = Number(fe.minimumOrderQty);
@@ -1341,7 +1345,9 @@ const productToBE = (fe) => {
   else if (fe.isActive !== undefined) body.isActive = fe.isActive;
 
   // Execution: FE uses autoFulfillmentEnabled, BE uses executionType
-  if (fe.autoFulfillmentEnabled !== undefined) {
+  if (fe.connectionType !== undefined) {
+    body.executionType = fe.connectionType === 'manual' ? 'manual' : 'automatic';
+  } else if (fe.autoFulfillmentEnabled !== undefined) {
     body.executionType = fe.autoFulfillmentEnabled ? 'automatic' : 'manual';
   } else if (fe.executionType !== undefined) {
     body.executionType = fe.executionType;
@@ -1755,16 +1761,47 @@ const realApi = {
       return fallback;
     },
 
+    verifyTarget: async (productId, payload = {}) => {
+      const targetUid = String(payload?.targetUid ?? payload ?? '').trim();
+      const res = await http.post(`/me/products/${productId}/verify-target`, { targetUid });
+      return unwrap(res);
+    },
+
     /**
-     * POST /admin/products — manual product creation.
-     *
-     * Maps FE field names back to BE model field names.
-     * BE accepts: { name, description, basePrice, minQty, maxQty, category,
-     *               image, displayOrder, isActive, executionType, orderFields, providerMapping }
+     * Create a platform product.
+     * Manual products use /admin/products, while automatic products must use
+     * the provider publishing route so the providerProduct link is persisted
+     * as part of the very first save.
      */
     create: async (productData) => {
       const body = productToBE(productData);
-      return runProductMutation('post', '/admin/products', body);
+      const isProviderProduct = Boolean(
+        body.providerProductId
+        && (body.executionType === 'automatic' || productData?.autoFulfillmentEnabled === true)
+      );
+
+      if (!isProviderProduct) {
+        return runProductMutation('post', '/admin/products', body);
+      }
+
+      const providerCreateEndpoints = [
+        '/admin/products/from-provider',
+        '/products/publish',
+        '/providers/products/publish',
+      ];
+      let lastRouteError = null;
+
+      for (const endpoint of providerCreateEndpoints) {
+        try {
+          return await runProductMutation('post', endpoint, body);
+        } catch (error) {
+          const status = Number(error?.response?.status || 0);
+          if (status !== 404 && status !== 405) throw error;
+          lastRouteError = error;
+        }
+      }
+
+      throw lastRouteError || new Error('Provider product publishing endpoint is unavailable.');
     },
 
     /**

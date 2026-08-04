@@ -467,21 +467,21 @@ const AdminSuppliers = () => {
           </Button>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-3 grid w-full max-w-3xl grid-cols-4 gap-1 sm:gap-1.5">
           {summaryCards.map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.key} className="rounded-[1.05rem] border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/70">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-semibold tracking-[0.14em] text-gray-500 dark:text-gray-400">{item.label}</p>
-                    <p className="mt-2 text-2xl font-black text-gray-950 dark:text-white">{formatNumber(supplierStats[item.key], 'ar-EG')}</p>
+              <div key={item.key} className="min-w-0 rounded-xl border border-white/70 bg-white/80 p-1.5 text-center shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/70 sm:p-2">
+                <div className="flex items-start justify-between gap-1 text-start">
+                  <div className="min-w-0">
+                    <p className="line-clamp-2 text-[7px] font-bold leading-3 text-gray-500 dark:text-gray-400 sm:text-[8px]">{item.label}</p>
+                    <p className="mt-0.5 text-base font-black leading-none text-[var(--color-primary)] sm:text-lg">{formatNumber(supplierStats[item.key], 'ar-EG')}</p>
                   </div>
-                  <span className="rounded-xl border border-[color:rgb(var(--color-primary-rgb)/0.24)] bg-[color:rgb(var(--color-primary-rgb)/0.08)] p-2.5 text-[var(--color-primary)]">
-                    <Icon className="h-4 w-4" />
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[color:rgb(var(--color-primary-rgb)/0.07)] text-[var(--color-primary)] sm:h-6 sm:w-6">
+                    <Icon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   </span>
                 </div>
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{item.hint}</p>
+                <p className="mt-1 line-clamp-2 text-[7px] leading-3 text-gray-500 dark:text-gray-400 sm:text-[8px]">{item.hint}</p>
               </div>
             );
           })}

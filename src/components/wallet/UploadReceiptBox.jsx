@@ -62,7 +62,7 @@ const UploadReceiptBox = ({ onFileUpload }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {!uploadedFile ? (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -81,7 +81,7 @@ const UploadReceiptBox = ({ onFileUpload }) => {
               setIsDragOver(false);
             }}
             onClick={() => fileInputRef.current?.click()}
-            className={`relative cursor-pointer overflow-hidden rounded-[1.1rem] border border-dashed p-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-all sm:p-7 ${
+            className={`relative cursor-pointer overflow-hidden rounded-xl border border-dashed p-3.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition-all sm:p-4 ${
               isDragOver
                 ? 'border-emerald-400 bg-emerald-50/80 shadow-[0_18px_34px_-28px_rgba(16,185,129,0.55)] dark:border-emerald-500/60 dark:bg-emerald-950/24'
                 : 'border-slate-300 bg-slate-50/75 hover:-translate-y-0.5 hover:border-sky-400 hover:bg-white dark:border-slate-700 dark:bg-slate-900/55 dark:hover:border-sky-500/60 dark:hover:bg-slate-900'
@@ -95,21 +95,21 @@ const UploadReceiptBox = ({ onFileUpload }) => {
               className="hidden"
             />
 
-            <div className="flex flex-col items-center gap-4">
+            <div className="flex flex-col items-center gap-2">
               <motion.div
-                className={`flex h-14 w-14 items-center justify-center rounded-[1rem] border border-white/70 bg-gradient-to-br from-[var(--color-primary)] via-sky-500 to-emerald-500 shadow-[0_16px_28px_-20px_rgba(14,165,233,0.75)] transition-transform ${
+                className={`flex h-10 w-10 items-center justify-center rounded-xl border border-white/70 bg-gradient-to-br from-[var(--color-primary)] via-sky-500 to-emerald-500 shadow-[0_12px_22px_-18px_rgba(14,165,233,0.75)] transition-transform ${
                   isDragOver ? 'scale-110' : ''
                 }`}
               >
-                <Upload className="h-7 w-7 text-white" />
+                <Upload className="h-5 w-5 text-white" />
               </motion.div>
 
               <div>
-                <h3 className="mb-2 text-base font-black text-slate-950 dark:text-white">
+                <h3 className="mb-0.5 text-sm font-black text-slate-950 dark:text-white">
                   {isDragOver ? t('payments.upload.dropHere') : t('payments.upload.uploadTitle')}
                 </h3>
-                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{t('payments.upload.uploadDescription')}</p>
-                <p className="mt-2 text-xs font-bold text-slate-500 dark:text-slate-400">{t('payments.upload.uploadHint')}</p>
+                <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">{t('payments.upload.uploadDescription')}</p>
+                <p className="mt-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-400">{t('payments.upload.uploadHint')}</p>
               </div>
             </div>
 
@@ -126,7 +126,7 @@ const UploadReceiptBox = ({ onFileUpload }) => {
           transition={{ duration: 0.24, ease: 'easeOut' }}
           className="rounded-[1.1rem] border border-emerald-200 bg-emerald-50/70 p-4 shadow-[0_14px_30px_-26px_rgba(16,185,129,0.5)] backdrop-blur-xl dark:border-emerald-900/70 dark:bg-emerald-950/20"
         >
-          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[0.9rem] border border-emerald-200 bg-white text-emerald-700 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.45)] dark:border-emerald-800 dark:bg-slate-950 dark:text-emerald-300">
               <FileImage className="h-6 w-6" />
             </div>
@@ -154,14 +154,14 @@ const UploadReceiptBox = ({ onFileUpload }) => {
           animate={{ opacity: 1, y: 0 }}
           className="rounded-[1rem] border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/70 dark:bg-rose-950/25"
         >
-          <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className="flex items-center gap-3">
             <AlertCircle className="h-5 w-5 flex-shrink-0 text-rose-600 dark:text-rose-300" />
             <p className="text-sm font-medium text-rose-700 dark:text-rose-200">{error}</p>
           </div>
         </motion.div>
       )}
 
-      <div className={`rounded-[1rem] border border-slate-200 bg-white/70 p-3 text-xs leading-5 text-slate-500 dark:border-slate-800 dark:bg-slate-900/45 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
+      <div className={`rounded-xl border border-slate-200 bg-white/70 px-2.5 py-2 text-[10px] leading-4 text-slate-500 dark:border-slate-800 dark:bg-slate-900/45 dark:text-slate-400 ${isRTL ? 'text-right' : 'text-left'}`}>
         <p>{`• ${t('payments.upload.clearTip1')}`}</p>
         <p>{`• ${t('payments.upload.clearTip2')}`}</p>
         <p>{`• ${t('payments.upload.clearTip3')}`}</p>

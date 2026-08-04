@@ -53,7 +53,7 @@ const ProductCardSimple = React.memo(({
         )}
       </div>
 
-      <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[var(--color-text)] transition-colors duration-200 group-hover:text-[var(--color-primary)]">
+      <h3 className="mt-2 w-full line-clamp-2 text-center text-sm font-semibold leading-5 text-[var(--color-text)] transition-colors duration-200 group-hover:text-[var(--color-primary)]">
         {displayName}
       </h3>
     </button>

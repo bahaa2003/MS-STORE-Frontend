@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Building2, ChevronDown, Smartphone, Wallet } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../context/LanguageContext';
 import useAuthStore from '../store/useAuthStore';
@@ -96,6 +96,7 @@ const AddBalance = () => {
     const { dir } = useLanguage();
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { user } = useAuthStore();
     const { paymentSettings, loadPaymentSettings } = useSystemStore();
     const isRTL = dir === 'rtl';
@@ -128,7 +129,11 @@ const AddBalance = () => {
     }, [paymentGroups]);
 
     const handleMethodSelect = (method) => {
-        navigate(`/wallet/payment-details/${method.id}`);
+        const requestedAmount = Number(searchParams.get('amount'));
+        const amountQuery = Number.isFinite(requestedAmount) && requestedAmount > 0
+            ? `?amount=${encodeURIComponent(String(requestedAmount))}`
+            : '';
+        navigate(`/wallet/payment-details/${method.id}${amountQuery}`);
     };
 
     return (

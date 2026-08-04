@@ -88,12 +88,24 @@ export const resolveProductOrderFields = (product, language = 'ar') => {
         placeholder: (language === 'ar' ? field?.placeholderAr : field?.placeholder) || field?.placeholder || '',
         type: normalizeFieldType(field?.type),
         required: field?.required !== false,
+        verifiable: field?.verifiable === true,
+        validation: field?.validation || null,
+        verification: field?.verification || null,
+        verificationType: field?.verificationType || null,
         options: resolveFieldOptions(field),
       };
     });
 
     const hasPlayerId = mappedFields.some((field) => String(field?.key || '').trim().toLowerCase() === 'playerid');
-    if (!hasPlayerId) {
+    const hasVerifiableTarget = mappedFields.some((field) => (
+      String(field?.key || '').trim() === 'target_uid'
+      && (
+        field?.verifiable === true
+        || field?.verification?.required === true
+        || String(field?.verification?.type || field?.verificationType || '').trim().toLowerCase() === 'xena_target'
+      )
+    ));
+    if (!hasPlayerId && !hasVerifiableTarget) {
       return [{
         key: 'playerId',
         label: FIELD_COPY.playerId[language] || FIELD_COPY.playerId.en,
