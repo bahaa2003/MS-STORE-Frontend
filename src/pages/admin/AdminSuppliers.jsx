@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Activity,
-  Boxes,
+  Bot,
   Bug,
+  CircleDollarSign,
   Clock3,
   Eye,
   Link2,
+  LogIn,
   Pencil,
   PlugZap,
   Plus,
@@ -23,6 +24,8 @@ import { useToast } from '../../components/ui/Toast';
 import useAuthStore from '../../store/useAuthStore';
 import { formatDateTime, formatNumber } from '../../utils/intl';
 import { useLanguage } from '../../context/LanguageContext';
+import XenaBotLoginModal from '../../components/admin/XenaBotLoginModal';
+import XenaBotPricingModal from '../../components/admin/XenaBotPricingModal';
 
 const defaultForm = {
   supplierName: '',
@@ -68,12 +71,11 @@ const glowInputClass = 'focus:ring-[color:rgb(var(--color-primary-rgb)/0.3)] foc
 const glowSelectClass = 'h-10 rounded-lg border border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.95)] px-3 text-sm text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[color:rgb(var(--color-primary-rgb)/0.3)] focus:ring-offset-2 focus:ring-offset-[color:rgb(var(--color-surface-rgb)/1)]';
 const compactActionBtnClass = 'h-8 rounded-lg px-2.5 text-[11px] gap-1';
 const supplierTypeLabels = { api: 'API', manual: 'يدوي', hybrid: 'مختلط' };
-const summaryCards = [
-  { key: 'total', label: 'إجمالي الموردين', hint: 'كل الموردين المسجلين', icon: Activity },
-  { key: 'active', label: 'الموردون النشطون', hint: 'المتاحون للتنفيذ', icon: PlugZap },
-  { key: 'syncEnabled', label: 'المزامنة مفعلة', hint: 'الموردون الجاهزون للسحب', icon: RefreshCw },
-  { key: 'syncedProducts', label: 'منتجات متزامنة', hint: 'آخر نتائج مزامنة محفوظة', icon: Boxes },
-];
+const XENA_PROVIDER_CODE = 'xena-recharge';
+
+const isXenaSupplier = (supplier = {}) => String(
+  supplier.supplierCode || supplier.code || supplier.providerCode || supplier.slug || ''
+).trim().toLowerCase() === XENA_PROVIDER_CODE;
 
 const parseHeaders = (text) => String(text || '')
   .split('\n')
@@ -196,6 +198,11 @@ const AdminSuppliers = () => {
   const [productsLoading, setProductsLoading] = useState(false);
   const [syncingSupplierId, setSyncingSupplierId] = useState(null);
   const [testingSupplierId, setTestingSupplierId] = useState(null);
+  const [activeSection, setActiveSection] = useState('suppliers');
+  const [xenaLoginOpen, setXenaLoginOpen] = useState(false);
+  const [xenaLoginSupplier, setXenaLoginSupplier] = useState(null);
+  const [xenaPricingOpen, setXenaPricingOpen] = useState(false);
+  const [xenaPricingSupplier, setXenaPricingSupplier] = useState(null);
 
   // ── Debug modal state ──────────────────────────────────────────────────────
   const [isDebugOpen, setIsDebugOpen] = useState(false);
@@ -244,15 +251,38 @@ const AdminSuppliers = () => {
     [filteredSuppliers, runtimeSupplierState]
   );
 
-  const supplierStats = useMemo(() => {
-    const mergedSuppliers = (suppliers || []).map((supplier) => ({ ...supplier, ...(runtimeSupplierState[supplier.id] || {}) }));
-    return {
-      total: mergedSuppliers.length,
-      active: mergedSuppliers.filter((supplier) => supplier.isActive).length,
-      syncEnabled: mergedSuppliers.filter((supplier) => supplier.enableProductSync).length,
-      syncedProducts: mergedSuppliers.reduce((sum, supplier) => sum + Number(supplier.syncedProductsCount || 0), 0),
-    };
-  }, [suppliers, runtimeSupplierState]);
+  const xenaSupplier = useMemo(
+    () => {
+      const supplier = (suppliers || []).find(isXenaSupplier) || null;
+      return supplier ? { ...supplier, ...(runtimeSupplierState[supplier.id] || {}) } : null;
+    },
+    [suppliers, runtimeSupplierState]
+  );
+
+  const xenaConnectionStatus = String(
+    xenaSupplier?.xenaConnectionStatus
+    || xenaSupplier?.connectionStatus
+    || xenaSupplier?.xenaConnection?.status
+    || 'disconnected'
+  ).trim().toLowerCase();
+
+  const openXenaLogin = (supplier) => {
+    if (!supplier?.id) {
+      addToast('تعذر العثور على مورد Xena Recharge', 'error');
+      return;
+    }
+    setXenaLoginSupplier(supplier);
+    setXenaLoginOpen(true);
+  };
+
+  const openXenaPricing = (supplier) => {
+    if (!supplier?.id) {
+      addToast('تعذر العثور على مورد Xena Recharge', 'error');
+      return;
+    }
+    setXenaPricingSupplier(supplier);
+    setXenaPricingOpen(true);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -450,45 +480,71 @@ const AdminSuppliers = () => {
 
   return (
     <div className="min-w-0 space-y-4" dir={dir}>
-      <section className="admin-premium-hero overflow-hidden p-4 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl space-y-2">
-            <Badge variant="premium" className="w-fit">إدارة الموردين وربط الكتالوج</Badge>
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-gray-950 dark:text-white sm:text-2xl">مزامنة منتجات الموردين من نفس الصفحة</h1>
-              <p className="mt-1.5 max-w-2xl text-xs leading-6 text-gray-600 dark:text-gray-300 sm:text-sm">
-                راجع حالة الاتصال، اسحب كتالوج المورد، وافتح قائمة المنتجات الحية مباشرة من لوحة الموردين بدون التنقل بين أكثر من شاشة.
-              </p>
-            </div>
-          </div>
-          <Button onClick={openCreate} size="sm" className="self-start">
-            <Plus className="h-3.5 w-3.5" />
-            إضافة مورد جديد
-          </Button>
-        </div>
-
-        <div className="mt-3 grid w-full max-w-3xl grid-cols-4 gap-1 sm:gap-1.5">
-          {summaryCards.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.key} className="min-w-0 rounded-xl border border-white/70 bg-white/80 p-1.5 text-center shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/70 sm:p-2">
-                <div className="flex items-start justify-between gap-1 text-start">
-                  <div className="min-w-0">
-                    <p className="line-clamp-2 text-[7px] font-bold leading-3 text-gray-500 dark:text-gray-400 sm:text-[8px]">{item.label}</p>
-                    <p className="mt-0.5 text-base font-black leading-none text-[var(--color-primary)] sm:text-lg">{formatNumber(supplierStats[item.key], 'ar-EG')}</p>
-                  </div>
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[color:rgb(var(--color-primary-rgb)/0.18)] bg-[color:rgb(var(--color-primary-rgb)/0.07)] text-[var(--color-primary)] sm:h-6 sm:w-6">
-                    <Icon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-[7px] leading-3 text-gray-500 dark:text-gray-400 sm:text-[8px]">{item.hint}</p>
-              </div>
-            );
-          })}
-        </div>
+      <section className="flex justify-end">
+        <Button onClick={openCreate} size="sm">
+          <Plus className="h-3.5 w-3.5" />
+          إضافة مورد جديد
+        </Button>
       </section>
 
-      <section className="rounded-[1.25rem] border border-gray-200 bg-white/95 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/95">
+      <nav className="grid grid-cols-2 gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800" aria-label="أقسام الموردين والبوتات">
+        <button
+          type="button"
+          onClick={() => setActiveSection('suppliers')}
+          className={`flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-xs font-bold transition ${activeSection === 'suppliers' ? 'bg-[var(--color-primary)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}`}
+        >
+          <PlugZap className="h-4 w-4" />
+          الموردون
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSection('bots')}
+          className={`flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-xs font-bold transition ${activeSection === 'bots' ? 'bg-[var(--color-primary)] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}`}
+        >
+          <Bot className="h-4 w-4" />
+          البوتات الخاصة بـ MS
+        </button>
+      </nav>
+
+      {activeSection === 'bots' ? (
+        <section className="rounded-[1.25rem] border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
+          <article className="overflow-hidden rounded-2xl border border-[color:rgb(var(--color-primary-rgb)/0.2)] bg-[color:rgb(var(--color-primary-rgb)/0.05)]">
+            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-primary)] text-white shadow-sm">
+                  <Bot className="h-6 w-6" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-black text-gray-950 dark:text-white">Xena Recharge</h2>
+                    <Badge variant="premium">بوت</Badge>
+                    {xenaSupplier ? <Badge variant={xenaSupplier.isActive ? 'success' : 'secondary'}>{xenaSupplier.isActive ? 'نشط' : 'غير نشط'}</Badge> : null}
+                    {xenaSupplier ? <Badge variant={xenaConnectionStatus === 'connected' ? 'success' : 'secondary'}>{xenaConnectionStatus === 'connected' ? 'متصل' : 'غير متصل'}</Badge> : null}
+                  </div>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400" dir="ltr">xena-recharge</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" onClick={() => openXenaLogin(xenaSupplier)} disabled={!xenaSupplier?.id}>
+                  <LogIn className="h-4 w-4" />
+                  تسجيل دخول للبوت
+                </Button>
+                <Button type="button" size="sm" variant="secondary" onClick={() => openXenaPricing(xenaSupplier)} disabled={!xenaSupplier?.id}>
+                  <CircleDollarSign className="h-4 w-4" />
+                  تسعير البوت
+                </Button>
+              </div>
+            </div>
+            {!xenaSupplier ? (
+              <p className="border-t border-gray-200 px-4 py-3 text-xs text-amber-700 dark:border-gray-700 dark:text-amber-300">
+                لم يتم العثور على مورد Xena Recharge المسجل حاليًا.
+              </p>
+            ) : null}
+          </article>
+        </section>
+      ) : null}
+
+      <section className={activeSection === 'suppliers' ? 'rounded-[1.25rem] border border-gray-200 bg-white/95 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800/95' : 'hidden'}>
         <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,1.55fr)_210px]">
           <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث باسم المورد أو الكود أو الرابط الأساسي..." variant="search" className="h-11 rounded-xl text-sm shadow-none focus:shadow-none" />
           <select className="h-10 rounded-xl border border-gray-300 bg-white px-3 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -499,7 +555,7 @@ const AdminSuppliers = () => {
         </div>
       </section>
 
-      <div className="space-y-2.5 md:hidden">
+      <div className={activeSection === 'suppliers' ? 'space-y-2.5 md:hidden' : 'hidden'}>
         {visibleSuppliers.length ? visibleSuppliers.map((row) => {
           const isSyncing = syncingSupplierId === row.id;
           const isTesting = testingSupplierId === row.id;
@@ -509,7 +565,10 @@ const AdminSuppliers = () => {
               <div className="border-b border-gray-100 bg-[linear-gradient(135deg,rgba(248,250,252,0.92),rgba(245,243,255,0.9))] p-2.5 dark:border-gray-700 dark:bg-[linear-gradient(135deg,rgba(31,41,55,0.95),rgba(51,65,85,0.92))]">
                 <div className="flex items-start justify-between gap-2.5">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-gray-950 dark:text-white">{row.supplierName}</p>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <p className="truncate text-sm font-bold text-gray-950 dark:text-white">{row.supplierName}</p>
+                      {isXenaSupplier(row) ? <Badge variant="premium">بوت</Badge> : null}
+                    </div>
                     <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">{row.supplierCode}</p>
                   </div>
                   <Badge variant={row.isActive ? 'success' : 'secondary'}>{row.isActive ? 'نشط' : 'غير نشط'}</Badge>
@@ -522,6 +581,18 @@ const AdminSuppliers = () => {
               </div>
 
               <div className="flex flex-wrap gap-1 border-t border-gray-100 p-2.5 dark:border-gray-700">
+                {isXenaSupplier(row) ? (
+                  <>
+                    <Button size="sm" className={compactActionBtnClass} onClick={() => openXenaLogin(row)}>
+                      <LogIn className="h-3.5 w-3.5" />
+                      تسجيل دخول للبوت
+                    </Button>
+                    <Button size="sm" className={compactActionBtnClass} variant="secondary" onClick={() => openXenaPricing(row)}>
+                      <CircleDollarSign className="h-3.5 w-3.5" />
+                      تسعير البوت
+                    </Button>
+                  </>
+                ) : null}
                 <Button size="sm" className={compactActionBtnClass} variant="outline" onClick={() => testConnection(row)} disabled={isTesting}>
                   <PlugZap className={`h-3.5 w-3.5 ${isTesting ? 'animate-pulse' : ''}`} />
                   اختبار الاتصال
@@ -556,7 +627,7 @@ const AdminSuppliers = () => {
         )}
       </div>
 
-      <div className="hidden overflow-hidden rounded-[1.25rem] border border-gray-200 bg-white shadow-sm md:block dark:border-gray-700 dark:bg-gray-800">
+      <div className={activeSection === 'suppliers' ? 'hidden overflow-hidden rounded-[1.25rem] border border-gray-200 bg-white shadow-sm md:block dark:border-gray-700 dark:bg-gray-800' : 'hidden'}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -575,6 +646,7 @@ const AdminSuppliers = () => {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="font-semibold text-gray-950 dark:text-white">{row.supplierName}</div>
+                        {isXenaSupplier(row) ? <Badge variant="premium">بوت</Badge> : null}
                         <Badge variant={row.isActive ? 'success' : 'secondary'}>{row.isActive ? 'نشط' : 'غير نشط'}</Badge>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -586,6 +658,18 @@ const AdminSuppliers = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex max-w-[360px] flex-wrap justify-end gap-2">
+                      {isXenaSupplier(row) ? (
+                        <>
+                          <Button size="sm" onClick={() => openXenaLogin(row)}>
+                            <LogIn className="h-4 w-4" />
+                            دخول البوت
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => openXenaPricing(row)}>
+                            <CircleDollarSign className="h-4 w-4" />
+                            تسعير البوت
+                          </Button>
+                        </>
+                      ) : null}
                       <Button size="sm" variant="outline" onClick={() => testConnection(row)} disabled={isTesting}>
                         <PlugZap className={`h-4 w-4 ${isTesting ? 'animate-pulse' : ''}`} />
                         اختبار
@@ -900,6 +984,31 @@ const AdminSuppliers = () => {
           </div>
         ) : null}
       </Modal>
+
+      <XenaBotLoginModal
+        isOpen={xenaLoginOpen}
+        onClose={() => {
+          setXenaLoginOpen(false);
+          setXenaLoginSupplier(null);
+        }}
+        supplier={xenaLoginSupplier}
+        onConnected={() => {
+          if (xenaLoginSupplier?.id) {
+            mergeRuntimeSupplierState(xenaLoginSupplier.id, { xenaConnectionStatus: 'connected' });
+          }
+        }}
+      />
+
+      <XenaBotPricingModal
+        isOpen={xenaPricingOpen}
+        onClose={() => {
+          setXenaPricingOpen(false);
+          setXenaPricingSupplier(null);
+        }}
+        supplier={xenaPricingSupplier}
+        suppliers={suppliers}
+        onSaved={load}
+      />
     </div>
   );
 };

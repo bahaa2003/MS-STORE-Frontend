@@ -14,6 +14,30 @@ const ORDERS_CACHE_TTL = 0; // disable caching; always fetch fresh by default
 let ordersRequest = null;
 let ordersRequestScope = '';
 
+const preserveXenaVerificationSnapshot = (incomingOrder, existingOrder = null) => {
+  if (!incomingOrder || !existingOrder) return incomingOrder;
+
+  const incomingCustomerInput = incomingOrder?.customerInput || {};
+  const existingCustomerInput = existingOrder?.customerInput || {};
+  const verificationSnapshot = incomingOrder?.xenaVerificationSnapshot
+    || incomingCustomerInput?.verificationSnapshot
+    || existingOrder?.xenaVerificationSnapshot
+    || existingCustomerInput?.verificationSnapshot
+    || null;
+
+  if (!verificationSnapshot) return incomingOrder;
+
+  return {
+    ...incomingOrder,
+    xenaVerificationSnapshot: incomingOrder?.xenaVerificationSnapshot || verificationSnapshot,
+    customerInput: {
+      ...existingCustomerInput,
+      ...incomingCustomerInput,
+      verificationSnapshot,
+    },
+  };
+};
+
 const useOrderStore = create((set, get) => ({
       // =====================================================================================
       // FINANCIAL SNAPSHOT SYSTEM - CRITICAL BUSINESS LOGIC
@@ -70,7 +94,11 @@ const useOrderStore = create((set, get) => ({
         ordersRequestScope = scope;
         ordersRequest = apiClient.orders.list(userId)
           .then((items) => {
-            const nextOrders = Array.isArray(items) ? items : (isRealProvider ? [] : mockOrders);
+            const fetchedOrders = Array.isArray(items) ? items : (isRealProvider ? [] : mockOrders);
+            const existingById = new Map((get().orders || []).map((entry) => [String(entry?.id || ''), entry]));
+            const nextOrders = fetchedOrders.map((entry) => (
+              preserveXenaVerificationSnapshot(entry, existingById.get(String(entry?.id || '')))
+            ));
             set({
               orders: nextOrders,
               ordersLastLoadedAt: Date.now(),
@@ -110,12 +138,15 @@ const useOrderStore = create((set, get) => ({
         const fetchedOrder = await apiClient.orders.getById(normalizedOrderId, userId);
         if (!fetchedOrder) return null;
 
+        const existingOrder = (get().orders || []).find((entry) => entry.id === fetchedOrder.id) || null;
+        const resolvedOrder = preserveXenaVerificationSnapshot(fetchedOrder, existingOrder);
+
         set((state) => {
           const existingOrders = Array.isArray(state.orders) ? state.orders : [];
-          const existingIndex = existingOrders.findIndex((entry) => entry.id === fetchedOrder.id);
+          const existingIndex = existingOrders.findIndex((entry) => entry.id === resolvedOrder.id);
           const nextOrders = existingIndex >= 0
-            ? existingOrders.map((entry) => (entry.id === fetchedOrder.id ? { ...entry, ...fetchedOrder } : entry))
-            : [fetchedOrder, ...existingOrders];
+            ? existingOrders.map((entry) => (entry.id === resolvedOrder.id ? { ...entry, ...resolvedOrder } : entry))
+            : [resolvedOrder, ...existingOrders];
 
           return {
             orders: nextOrders,
@@ -124,7 +155,7 @@ const useOrderStore = create((set, get) => ({
           };
         });
 
-        return fetchedOrder;
+        return resolvedOrder;
       },
       
       addOrder: async (order) => {
@@ -197,13 +228,23 @@ const useOrderStore = create((set, get) => ({
 
           const created = await apiClient.orders.create(orderWithSnapshot);
           const createdOrder = created?.order || created || {};
+          const localCustomerInput = orderWithSnapshot.customerInput || {};
+          const serverCustomerInput = createdOrder?.customerInput || {};
           const nextOrder = {
             ...orderWithSnapshot,
             ...createdOrder,
             customInputs: createdOrder?.customInputs ?? orderWithSnapshot.customInputs,
             orderFields: createdOrder?.orderFields || createdOrder?.orderFieldsValues || orderWithSnapshot.orderFields,
             orderFieldsValues: createdOrder?.orderFieldsValues || createdOrder?.orderFields || orderWithSnapshot.orderFieldsValues,
-            customerInput: createdOrder?.customerInput || orderWithSnapshot.customerInput,
+            customerInput: {
+              ...localCustomerInput,
+              ...serverCustomerInput,
+              values: serverCustomerInput?.values || localCustomerInput?.values,
+              fieldsSnapshot: serverCustomerInput?.fieldsSnapshot || localCustomerInput?.fieldsSnapshot,
+              quantitySnapshot: serverCustomerInput?.quantitySnapshot || localCustomerInput?.quantitySnapshot,
+              verificationSnapshot: serverCustomerInput?.verificationSnapshot || localCustomerInput?.verificationSnapshot,
+            },
+            xenaVerificationSnapshot: createdOrder?.xenaVerificationSnapshot || orderWithSnapshot.xenaVerificationSnapshot,
           };
 
           set((state) => ({

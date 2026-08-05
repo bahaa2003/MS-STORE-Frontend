@@ -163,6 +163,25 @@ const extractSupplierBalanceSnapshot = (payload = {}) => {
   };
 };
 
+const supplierSupportsLiveBalance = (supplier = {}) => {
+  if (supplier?.isActive === false) return false;
+
+  const supplierCode = String(
+    supplier?.supplierCode || supplier?.slug || supplier?.providerCode || ''
+  ).trim().toLowerCase();
+  const supportedFeatures = Array.isArray(supplier?.supportedFeatures)
+    ? supplier.supportedFeatures.map((feature) => String(feature || '').trim().toLowerCase())
+    : [];
+  const explicitlySupported = supportedFeatures.some((feature) => [
+    'balance',
+    'getbalance',
+    'fetchbalance',
+    'livebalance',
+  ].includes(feature.replace(/[\s_-]+/g, '')));
+
+  return explicitlySupported || ['royal-crown', 'xena-recharge'].includes(supplierCode);
+};
+
 const getDefaultDashboardRange = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -312,15 +331,19 @@ const AdminDashboard = () => {
       try {
         const suppliers = await apiClient.suppliers.list();
         const rows = Array.isArray(suppliers) ? suppliers : [];
+        const balanceSuppliers = rows.filter(supplierSupportsLiveBalance);
         const results = await Promise.allSettled(
-          rows.map((supplier) => apiClient.suppliers.getBalance(supplier.id))
+          balanceSuppliers.map((supplier) => apiClient.suppliers.getBalance(supplier.id))
+        );
+        const resultsBySupplierId = new Map(
+          balanceSuppliers.map((supplier, index) => [String(supplier.id), results[index]])
         );
 
         if (!isMounted) return;
 
         const nextBalances = rows
-          .map((supplier, index) => {
-            const result = results[index];
+          .map((supplier) => {
+            const result = resultsBySupplierId.get(String(supplier.id));
             const snapshot = result?.status === 'fulfilled'
               ? extractSupplierBalanceSnapshot(result.value)
               : { balance: null, rawBalance: null, currency: '' };

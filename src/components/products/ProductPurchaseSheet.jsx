@@ -38,6 +38,7 @@ import {
   sanitizeOrderFieldValue,
 } from '../../utils/productPurchase';
 import { isApprovedAccountStatus } from '../../utils/accountStatus';
+import { isAdminRole } from '../../utils/authRoles';
 import { devLogger } from '../../utils/devLogger';
 import apiClient from '../../services/client';
 import {
@@ -47,6 +48,7 @@ import {
   isXenaVerificationSatisfied,
   makeXenaVerificationRequestBody,
   normalizeXenaTargetUid,
+  normalizeXenaVerifiedUser,
   validateXenaTargetUid,
 } from '../../utils/xenaTargetVerification';
 
@@ -274,7 +276,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   const [fieldValues, setFieldValues] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
   const [quantity, setQuantity] = useState(1);
-  const [quantityInput, setQuantityInput] = useState('1');
+  const [quantityInput, setQuantityInput] = useState('');
   const [quantityError, setQuantityError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusCard, setStatusCard] = useState({ tone: 'info', title: '', message: '' });
@@ -291,6 +293,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   });
   const xenaVerifySeqRef = useRef(0);
   const fieldValuesRef = useRef({});
+  const orderFieldsContainerRef = useRef(null);
 
   const orderFields = useMemo(
     () => resolveProductOrderFields(product, language),
@@ -333,8 +336,15 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     return isLinked && isAuto;
   }, [product?.autoFulfillmentEnabled, product?.externalProductId, product?.providerId, product?.providerProductId, product?.supplierId]);
 
+  const purchaseResetKey = [
+    isOpen ? 'open' : 'closed',
+    product?.id || '',
+    quantityMeta.minQty,
+    orderFields.map((field) => field?.key || '').join(','),
+  ].join('|');
+
   useEffect(() => {
-    if (!product) return;
+    if (!product || !isOpen) return;
 
     const nextFields = {};
     orderFields.forEach((field) => {
@@ -345,7 +355,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setFieldValues(nextFields);
     setFieldErrors({});
     setQuantity(quantityMeta.minQty);
-    setQuantityInput(String(quantityMeta.minQty));
+    setQuantityInput('');
     setQuantityError('');
     setIsSubmitting(false);
     setStatusCard({ tone: 'info', title: '', message: '' });
@@ -355,7 +365,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setTopupAmount('');
     xenaVerifySeqRef.current += 1;
     setXenaVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
-  }, [orderFields, product?.id, quantityMeta.minQty]);
+  }, [purchaseResetKey]);
 
   useEffect(() => {
     fieldValuesRef.current = fieldValues;
@@ -364,6 +374,8 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   useEffect(() => {
     if (isOpen) return;
     xenaVerifySeqRef.current += 1;
+    setSuccessfulOrderId(null);
+    setSuccessMeta({ amount: '', identifier: '', orderNumber: '' });
     setXenaVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
   }, [isOpen]);
 
@@ -407,19 +419,6 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
       active = false;
     };
   }, [currencies, isOpen, loadCurrencies]);
-
-  // Auto-close the sheet after a successful order so the user sees the success card briefly.
-  useEffect(() => {
-    if (!successfulOrderId) return undefined;
-
-    const timer = setTimeout(() => {
-      setSuccessfulOrderId(null);
-      setSuccessMeta({ amount: '', identifier: '', orderNumber: '' });
-      onClose();
-    }, 4000);
-
-    return () => clearTimeout(timer);
-  }, [successfulOrderId, onClose]);
 
   const userCurrencyCode = String(user?.currency || 'USD').toUpperCase();
   const pricingGroup = user?.groupId || user?.group || 'Normal';
@@ -523,7 +522,8 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setSuccessfulOrderId(null);
     setSuccessMeta({ amount: '', identifier: '', orderNumber: '' });
     onClose();
-    navigate(`/orders?orderId=${encodeURIComponent(orderId)}`);
+    const ordersPath = isAdminRole(user?.role) ? '/admin/orders' : '/orders';
+    navigate(`${ordersPath}?orderId=${encodeURIComponent(orderId)}`);
   };
 
   const handleCopyOrderNumber = async () => {
@@ -613,12 +613,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
       setXenaVerification({
         status: 'success',
         targetUid: requestedUid,
-        user: result?.user || {
-          uid: result?.uid || requestedUid,
-          nickname: result?.nickname || '',
-          avatar: result?.avatar || null,
-          country: result?.country || '',
-        },
+        user: normalizeXenaVerifiedUser(result, requestedUid),
         errorCode: '',
         errorMessage: '',
       });
@@ -671,7 +666,6 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   const handleQuantityBlur = () => {
     const trimmed = String(quantityInput ?? '').trim();
     if (!trimmed) {
-      setQuantityInput(String(quantity));
       setQuantityError('');
       return;
     }
@@ -687,6 +681,34 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setQuantity(normalized);
     setQuantityInput(String(normalized));
     setQuantityError(normalized !== numeric ? copy.invalidQuantity : '');
+  };
+
+  const handleQuantityKeyDown = (event) => {
+    if (event.key !== 'Enter') return;
+
+    event.preventDefault();
+    const trimmed = String(event.currentTarget.value || '').trim();
+    const numeric = Number(trimmed);
+    const isValidQuantity = Boolean(
+      trimmed
+      && Number.isFinite(numeric)
+      && numeric === clampProductQuantity(numeric, product)
+    );
+
+    if (!isValidQuantity) {
+      setQuantityError(copy.invalidQuantity);
+      return;
+    }
+
+    const nextField = orderFieldsContainerRef.current?.querySelector(
+      'input:not(:disabled), select:not(:disabled), textarea:not(:disabled)'
+    );
+    if (nextField instanceof HTMLElement) {
+      nextField.focus();
+      nextField.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+      event.currentTarget.blur();
+    }
   };
 
   const handleSubmit = async () => {
@@ -821,6 +843,13 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
           placeholder: field.placeholder,
         })));
       const freshQuantityMeta = getProductQuantityMeta(freshProduct);
+      const xenaVerificationSnapshot = xenaVerificationRequired && xenaVerificationReady
+        ? {
+            type: 'xena_target',
+            targetUid: xenaVerification.targetUid,
+            user: normalizeXenaVerifiedUser(xenaVerification, xenaVerification.targetUid),
+          }
+        : null;
 
       const createResult = await addOrder({
         id: `ord-${Date.now()}`,
@@ -842,7 +871,9 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
           values: normalizedFields,
           fieldsSnapshot,
           quantitySnapshot: freshQuantityMeta,
+          verificationSnapshot: xenaVerificationSnapshot,
         },
+        xenaVerificationSnapshot,
         quantitySnapshot: freshQuantityMeta,
         status: 'pending',
         createdAt: new Date().toISOString(),
@@ -922,8 +953,17 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 22, scale: 0.99 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="relative flex max-h-[min(94vh,56rem)] w-full max-w-[24rem] flex-col overflow-hidden rounded-[1.6rem] border border-[color:rgb(var(--color-border-rgb)/0.92)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.94),rgb(var(--color-surface-rgb)/0.56))] text-[var(--color-text)] shadow-[var(--shadow-medium),var(--shadow-gold),0_0_24px_rgba(255,214,102,0.32)] ring-1 ring-[color:rgb(var(--color-primary-rgb)/0.56)] sm:rounded-[2rem]"
+              className={cn(
+                'relative flex max-h-[min(94vh,56rem)] w-full max-w-[24rem] flex-col overflow-hidden rounded-[1.6rem] text-[var(--color-text)] sm:rounded-[2rem]',
+                successfulOrderId
+                  ? 'border border-transparent bg-transparent shadow-none ring-0'
+                  : 'border border-[color:rgb(var(--color-border-rgb)/0.92)] bg-[linear-gradient(180deg,rgb(var(--color-card-rgb)/0.94),rgb(var(--color-surface-rgb)/0.56))] shadow-[var(--shadow-medium),var(--shadow-gold),0_0_24px_rgba(255,214,102,0.32)] ring-1 ring-[color:rgb(var(--color-primary-rgb)/0.56)]'
+              )}
             >
+              <div
+                className={cn('contents', successfulOrderId && 'pointer-events-none invisible')}
+                aria-hidden={successfulOrderId ? 'true' : undefined}
+              >
               <button
                 type="button"
                 onClick={handleClose}
@@ -996,8 +1036,11 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                       value={quantityInput}
                       onChange={(event) => applyQuantity(event.target.value)}
                       onBlur={handleQuantityBlur}
+                      onKeyDown={handleQuantityKeyDown}
                       disabled={isSubmitting}
                       placeholder={language === 'en' ? 'Enter quantity' : 'اكتب الكمية'}
+                      enterKeyHint={orderFields.length > 0 ? 'next' : 'done'}
+                      autoFocus
                       className="h-9 rounded-md border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)] text-xs font-semibold text-[var(--color-text)] placeholder:text-[var(--color-muted)] focus:border-[color:rgb(var(--color-primary-rgb)/0.55)] focus:bg-[rgb(var(--color-card-rgb))] disabled:cursor-not-allowed disabled:opacity-70 sm:h-10 sm:rounded-lg sm:text-[13px]"
                     />
 
@@ -1020,7 +1063,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                   />
 
                   {orderFields.length > 0 ? (
-                    <section className="col-span-2 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.48)] bg-[color:rgb(var(--color-surface-rgb)/0.32)] p-2.5 sm:rounded-2xl sm:p-3">
+                    <section ref={orderFieldsContainerRef} className="col-span-2 rounded-xl border border-[color:rgb(var(--color-border-rgb)/0.48)] bg-[color:rgb(var(--color-surface-rgb)/0.32)] p-2.5 sm:rounded-2xl sm:p-3">
                       <div className="space-y-2">
                         {orderFields.map((field) => {
                           const label = resolveFieldLabel(field, language);
@@ -1197,6 +1240,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                   </Badge>
                 </div>
               </footer>
+              </div>
             </motion.section>
           </div>
 
@@ -1281,7 +1325,7 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
               <div className="absolute inset-0 z-[90] flex items-center justify-center p-4">
                 <motion.button
                   type="button"
-                  className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+                  className="absolute inset-0 bg-transparent"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}

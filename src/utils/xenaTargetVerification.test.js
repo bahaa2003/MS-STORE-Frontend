@@ -6,6 +6,7 @@ import {
   isXenaVerificationSatisfied,
   makeXenaVerificationRequestBody,
   normalizeXenaTargetUid,
+  normalizeXenaVerifiedUser,
   validateXenaTargetUid,
 } from './xenaTargetVerification.js';
 
@@ -62,6 +63,22 @@ test('verification is satisfied only for the exact normalized uid', () => {
   }), false);
 });
 
+test('keeps the verified Xena nickname and accepts safe backend name aliases', () => {
+  assert.deepEqual(normalizeXenaVerifiedUser({
+    targetUid: '32668525',
+    user: { uid: '32668525', nickname: 'Xena Player', country: 'EG' },
+  }), {
+    uid: '32668525',
+    nickname: 'Xena Player',
+    avatar: null,
+    country: 'EG',
+  });
+
+  assert.equal(normalizeXenaVerifiedUser({
+    user: { uid: '32668525', displayName: 'Displayed Player' },
+  }).nickname, 'Displayed Player');
+});
+
 test('maps normalized Xena error codes to customer-safe Arabic messages', () => {
   assert.equal(getXenaTargetErrorMessage('XENA_TARGET_INVALID', 'ar'), 'معرّف Xena غير صحيح أو غير موجود.');
   assert.equal(getXenaTargetErrorMessage('XENA_REAUTHENTICATION_REQUIRED', 'ar'), 'خدمة Xena تحتاج إلى إعادة تسجيل الدخول من الإدارة.');
@@ -69,4 +86,3 @@ test('maps normalized Xena error codes to customer-safe Arabic messages', () => 
   assert.equal(getXenaTargetErrorMessage('XENA_RATE_LIMITED', 'ar'), 'التحقق مشغول مؤقتًا، حاول مرة أخرى بعد قليل.');
   assert.equal(getXenaTargetErrorMessage('XENA_VERIFICATION_UNAVAILABLE', 'ar'), 'تعذر التحقق من Xena مؤقتًا، حاول مرة أخرى.');
 });
-
