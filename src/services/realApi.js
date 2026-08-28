@@ -13,6 +13,7 @@
 import axios from 'axios';
 import { devLogger } from '../utils/devLogger';
 import { normalizePaymentGroups } from '../utils/paymentSettings';
+import { getHttpErrorCode, getHttpErrorMessage, isSessionTokenAuthError } from '../utils/httpAuthError';
 import {
   resolveWalletTransactionExecutionCurrency,
   resolveWalletTransactionOriginalCurrency,
@@ -243,37 +244,11 @@ const isPublicAuthRequest = (url = '') => {
   );
 };
 
-const isTokenAuthError = (error) => {
-  const status = Number(error?.response?.status || 0);
-  const code = String(error?.response?.data?.code || '').toLowerCase();
-  const message = String(
-    error?.response?.data?.message
-    || error?.response?.data?.error
-    || error?.message
-    || ''
-  ).toLowerCase();
-
-  const looksLikeTokenFailure = (
-    /jwt|token/.test(message) && /expired|invalid|missing|malformed|revoked/.test(message)
-  ) || [
-    'token_expired',
-    'jwt_expired',
-    'invalid_token',
-    'auth_token_invalid',
-  ].includes(code);
-
-  return status === 401 || looksLikeTokenFailure;
-};
-
 const wrapHttpError = (error) => {
-  const msg =
-    error?.response?.data?.message ||
-    error?.response?.data?.error ||
-    error?.message ||
-    'Network error';
+  const msg = getHttpErrorMessage(error) || 'Network error';
   const wrapped = new Error(msg);
   wrapped.status = error?.response?.status || error?.status;
-  wrapped.code = error?.response?.data?.code || error?.code;
+  wrapped.code = getHttpErrorCode(error);
   return wrapped;
 };
 
@@ -337,7 +312,7 @@ http.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error?.config || {};
-    const unauthorized = isTokenAuthError(error);
+    const unauthorized = isSessionTokenAuthError(error);
     const skipAuthHandling = isPublicAuthRequest(originalRequest?.url);
 
     if (unauthorized && !skipAuthHandling) {
@@ -818,10 +793,20 @@ const normaliseOrder = (o) => {
     playerId: o.playerId
       || o.customerInput?.values?.playerId
       || o.customerInput?.values?.player_id
+      || o.customerInput?.values?.target_uid
+      || o.customerInput?.values?.targetUid
       || o.orderFieldsValues?.playerId
       || o.orderFieldsValues?.player_id
+      || o.orderFieldsValues?.target_uid
+      || o.orderFieldsValues?.targetUid
       || o.orderFields?.playerId
       || o.orderFields?.player_id
+      || o.orderFields?.target_uid
+      || o.orderFields?.targetUid
+      || o.customInputs?.playerId
+      || o.customInputs?.player_id
+      || o.customInputs?.target_uid
+      || o.customInputs?.targetUid
       || '',
     orderFieldsValues: o.orderFieldsValues
       || o.customerInput?.values
@@ -854,6 +839,70 @@ const normaliseOrder = (o) => {
     // Timestamps
     date: o.createdAt || o.date,
   };
+};
+
+const normalizeOrderSearchText = (value) => String(value ?? '')
+  .trim()
+  .toLowerCase()
+  .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+  .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+
+const collectPrimitiveOrderValues = (source, depth = 0) => {
+  if (!source || typeof source !== 'object' || depth > 2) return [];
+
+  return Object.values(source).flatMap((value) => {
+    if (value === null || value === undefined) return [];
+    if (typeof value === 'object') return collectPrimitiveOrderValues(value, depth + 1);
+    return [String(value)];
+  });
+};
+
+const orderMatchesAdminSearch = (order = {}, search = '') => {
+  const term = normalizeOrderSearchText(search);
+  if (!term) return true;
+
+  const product = typeof order?.productId === 'object' ? order.productId : null;
+  const user = typeof order?.userId === 'object' ? order.userId : null;
+  const searchableValues = [
+    order?._id,
+    order?.id,
+    order?.orderNumber,
+    order?.internalOrderNumber,
+    order?.externalOrderId,
+    order?.supplierOrderNumber,
+    order?.playerId,
+    order?.productName,
+    order?.productNameAr,
+    order?.userName,
+    order?.userEmail,
+    product?.name,
+    product?.nameAr,
+    user?.name,
+    user?.email,
+    ...collectPrimitiveOrderValues(order?.customerInput?.values),
+    ...collectPrimitiveOrderValues(order?.orderFieldsValues),
+    ...collectPrimitiveOrderValues(order?.orderFields),
+    ...collectPrimitiveOrderValues(order?.customInputs),
+    ...collectPrimitiveOrderValues(order?.supplierRequestSnapshot),
+  ];
+
+  return searchableValues.some((value) => normalizeOrderSearchText(value).includes(term));
+};
+
+const parseAdminOrdersPage = (response, fallback = {}) => {
+  const raw = response?.data || {};
+  const payload = raw?.data;
+  const orders = Array.isArray(payload)
+    ? payload
+    : (Array.isArray(payload?.orders) ? payload.orders : (Array.isArray(raw?.orders) ? raw.orders : []));
+  const pagination = raw?.pagination || payload?.pagination || {
+    page: fallback.page || 1,
+    limit: fallback.limit || orders.length || 20,
+    total: orders.length,
+    pages: 1,
+  };
+
+  return { orders, pagination };
 };
 
 /**
@@ -2017,6 +2066,44 @@ const realApi = {
       return normaliseProvider(unwrap(res)?.provider || unwrap(res));
     },
 
+    /** GET /admin/providers/:id/xena/connection */
+    getXenaConnection: async (id) => {
+      const res = await http.get(`/admin/providers/${id}/xena/connection`);
+      const data = unwrap(res);
+      return data?.connection || data;
+    },
+
+    /** POST /admin/providers/:id/xena/challenge */
+    challengeXena: async (id, payload) => {
+      const res = await http.post(`/admin/providers/${id}/xena/challenge`, {
+        displayName: payload?.displayName,
+        username: payload?.username,
+        password: payload?.password,
+      });
+      const data = unwrap(res);
+      return data?.connection || data;
+    },
+
+    /** POST /admin/providers/:id/xena/verify */
+    verifyXena: async (id, payload) => {
+      const res = await http.post(`/admin/providers/${id}/xena/verify`, { code: payload?.code });
+      const data = unwrap(res);
+      return data?.connection || data;
+    },
+
+    /** PATCH /admin/providers/:id/xena/product-config */
+    updateXenaProductConfig: async (id, payload) => {
+      const res = await http.patch(`/admin/providers/${id}/xena/product-config`, {
+        name: payload?.name,
+        unitPrice: payload?.unitPrice,
+        minAmount: payload?.minAmount,
+        maxAmount: payload?.maxAmount,
+        isActive: payload?.isActive,
+      });
+      const data = unwrap(res);
+      return data?.config || data?.productConfig || data;
+    },
+
     /**
      * POST /admin/providers → sendCreated(res, { provider }, ...)
      *
@@ -2609,25 +2696,78 @@ const realApi = {
      * @param {number}  [params.page=1]
      * @param {number}  [params.limit=20]
      * @param {string}  [params.status]
-     * @param {string}  [params.search]    - free-text search (orderNumber, _id, playerID)
+     * @param {string}  [params.search]    - client-side search across order and player identifiers
      * @param {string}  [params.startDate] - ISO date string (from)
      * @param {string}  [params.endDate]   - ISO date string (to)
      */
     listPaginated: async ({ page = 1, limit = 20, status, search, startDate, endDate } = {}) => {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('limit', String(limit));
-      if (status && status !== 'all') params.set('status', status);
-      if (search && String(search).trim()) params.set('search', String(search).trim());
-      if (startDate) params.set('from', startDate);
-      if (endDate) params.set('to', endDate);
+      const normalizedSearch = normalizeOrderSearchText(search);
+      const requestedPage = Math.max(1, Number(page) || 1);
+      const requestedLimit = Math.max(1, Number(limit) || 20);
+      const makeParams = (targetPage, targetLimit) => {
+        const params = new URLSearchParams();
+        params.set('page', String(targetPage));
+        params.set('limit', String(targetLimit));
+        if (status && status !== 'all') params.set('status', status);
+        if (startDate) params.set('from', startDate);
+        if (endDate) params.set('to', endDate);
+        return params;
+      };
 
-      const res = await http.get(`/admin/orders?${params.toString()}`);
-      const raw = res.data;
-      const ordersArr = Array.isArray(raw?.data) ? raw.data : (raw?.data?.orders || []);
+      if (normalizedSearch) {
+        // The documented admin-orders endpoint does not expose a search query.
+        // Load its paginated result set, then search order/customer identifiers
+        // and dynamic input values (including player_id and target_uid) locally.
+        const scanLimit = Math.max(100, requestedLimit);
+        const firstResponse = await http.get(`/admin/orders?${makeParams(1, scanLimit).toString()}`);
+        const firstPage = parseAdminOrdersPage(firstResponse, { page: 1, limit: scanLimit });
+        const backendPageSize = Math.max(1, Number(firstPage.pagination?.limit) || scanLimit);
+        const totalOrders = Math.max(firstPage.orders.length, Number(firstPage.pagination?.total) || 0);
+        const totalPages = Math.max(
+          1,
+          Number(firstPage.pagination?.pages) || Math.ceil(totalOrders / backendPageSize)
+        );
+        const allOrders = [...firstPage.orders];
+
+        // Fetch in small batches so large order histories do not create an
+        // unbounded burst of admin API requests.
+        for (let batchStart = 2; batchStart <= totalPages; batchStart += 4) {
+          const pageNumbers = Array.from(
+            { length: Math.min(4, totalPages - batchStart + 1) },
+            (_, index) => batchStart + index
+          );
+          const responses = await Promise.all(pageNumbers.map((pageNumber) => (
+            http.get(`/admin/orders?${makeParams(pageNumber, backendPageSize).toString()}`)
+          )));
+
+          responses.forEach((response, index) => {
+            allOrders.push(...parseAdminOrdersPage(response, {
+              page: pageNumbers[index],
+              limit: backendPageSize,
+            }).orders);
+          });
+        }
+
+        const matchedOrders = allOrders.filter((order) => orderMatchesAdminSearch(order, normalizedSearch));
+        const startIndex = (requestedPage - 1) * requestedLimit;
+        const pageOrders = matchedOrders.slice(startIndex, startIndex + requestedLimit);
+
+        return {
+          orders: pageOrders.map(normaliseOrder),
+          pagination: {
+            page: requestedPage,
+            limit: requestedLimit,
+            total: matchedOrders.length,
+            pages: Math.max(1, Math.ceil(matchedOrders.length / requestedLimit)),
+          },
+        };
+      }
+
+      const res = await http.get(`/admin/orders?${makeParams(requestedPage, requestedLimit).toString()}`);
+      const parsedPage = parseAdminOrdersPage(res, { page: requestedPage, limit: requestedLimit });
       return {
-        orders: ordersArr.map(normaliseOrder),
-        pagination: raw?.pagination || { page, limit, total: ordersArr.length, pages: 1 },
+        orders: parsedPage.orders.map(normaliseOrder),
+        pagination: parsedPage.pagination,
       };
     },
 

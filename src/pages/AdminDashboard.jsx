@@ -135,16 +135,35 @@ const extractSupplierBalanceSnapshot = (payload = {}) => {
   const balanceNode = raw?.balance;
   const innerData = (typeof balanceNode === 'object' && balanceNode !== null) ? balanceNode : {};
   const deepData = (typeof innerData?.data === 'object' && innerData.data !== null) ? innerData.data : {};
+  const responseData = (typeof raw?.data === 'object' && raw.data !== null) ? raw.data : {};
+  const responseResult = (typeof raw?.result === 'object' && raw.result !== null) ? raw.result : {};
   const balanceCandidate = (
-    deepData?.user_balance
+    raw?.availableBalance
+    ?? raw?.currentBalance
+    ?? raw?.walletBalance
+    ?? raw?.amount
+    ?? deepData?.user_balance
+    ?? deepData?.balance
+    ?? deepData?.availableBalance
+    ?? deepData?.amount
     ?? innerData?.balance
     ?? innerData?.user_balance
     ?? innerData?.remains
     ?? innerData?.credits
+    ?? innerData?.availableBalance
+    ?? innerData?.amount
     ?? raw?.user_balance
-    ?? raw?.availableBalance
     ?? raw?.remains
     ?? raw?.credits
+    ?? responseData?.user_balance
+    ?? responseData?.balance
+    ?? responseData?.availableBalance
+    ?? responseData?.currentBalance
+    ?? responseData?.walletBalance
+    ?? responseData?.amount
+    ?? responseResult?.balance
+    ?? responseResult?.availableBalance
+    ?? responseResult?.amount
     ?? (typeof balanceNode !== 'object' ? balanceNode : null)
   );
   const parsedBalance = Number(balanceCandidate);
@@ -158,6 +177,10 @@ const extractSupplierBalanceSnapshot = (payload = {}) => {
       ?? innerData?.user_currency
       ?? raw?.currency
       ?? raw?.balanceCurrency
+      ?? responseData?.currency
+      ?? responseData?.currencyCode
+      ?? responseResult?.currency
+      ?? responseResult?.currencyCode
       ?? ''
     ).trim().toUpperCase(),
   };
@@ -315,12 +338,15 @@ const AdminDashboard = () => {
         const results = await Promise.allSettled(
           rows.map((supplier) => apiClient.suppliers.getBalance(supplier.id))
         );
+        const resultsBySupplierId = new Map(
+          rows.map((supplier, index) => [String(supplier.id), results[index]])
+        );
 
         if (!isMounted) return;
 
         const nextBalances = rows
-          .map((supplier, index) => {
-            const result = results[index];
+          .map((supplier) => {
+            const result = resultsBySupplierId.get(String(supplier.id));
             const snapshot = result?.status === 'fulfilled'
               ? extractSupplierBalanceSnapshot(result.value)
               : { balance: null, rawBalance: null, currency: '' };
@@ -685,10 +711,14 @@ const AdminDashboard = () => {
   const statsFinancials = dashboardStats?.financials || {};
   const statsUsers = dashboardStats?.users || {};
   const statsProducts = dashboardStats?.products || {};
-  const monthlyTargetUsd = 100;
+  const firstMonthlyTargetUsd = 500;
+  const nextMonthlyTargetUsd = 1000;
   const monthlyTargetProfitUsd = asNumber(statsFinancials.totalProfitUsd ?? statsFinancials.netProfit);
-  const monthlyTargetProgress = Math.min(100, Math.round((monthlyTargetProfitUsd / monthlyTargetUsd) * 100));
-  const monthlyTargetRemaining = Math.max(0, monthlyTargetUsd - monthlyTargetProfitUsd);
+  const firstMonthlyTargetProgress = Math.min(100, Math.round((monthlyTargetProfitUsd / firstMonthlyTargetUsd) * 100));
+  const firstMonthlyTargetRemaining = Math.max(0, firstMonthlyTargetUsd - monthlyTargetProfitUsd);
+  const hasReachedFirstMonthlyTarget = monthlyTargetProfitUsd >= firstMonthlyTargetUsd;
+  const nextMonthlyTargetProgress = Math.min(100, Math.round((monthlyTargetProfitUsd / nextMonthlyTargetUsd) * 100));
+  const nextMonthlyTargetRemaining = Math.max(0, nextMonthlyTargetUsd - monthlyTargetProfitUsd);
 
   const stats = useMemo(
     () => [
@@ -754,24 +784,51 @@ const AdminDashboard = () => {
       },
       {
         title: isArabic ? 'تارجت الشهر' : 'Monthly Target',
-        value: `${formatMoney(monthlyTargetProfitUsd, 'USD')} / ${formatMoney(monthlyTargetUsd, 'USD')}`,
-        note: monthlyTargetRemaining > 0
+        value: `${formatMoney(monthlyTargetProfitUsd, 'USD')} / ${formatMoney(firstMonthlyTargetUsd, 'USD')}`,
+        note: firstMonthlyTargetRemaining > 0
           ? (isArabic
-            ? `متبقي ${formatMoney(monthlyTargetRemaining, 'USD')} للوصول لهدف ربح الشهر`
-            : `${formatMoney(monthlyTargetRemaining, 'USD')} remaining to reach this month's profit target`)
-          : (isArabic ? 'تم تحقيق هدف ربح الشهر' : 'This month’s profit target is complete'),
+            ? `متبقي ${formatMoney(firstMonthlyTargetRemaining, 'USD')} للوصول لهدف ربح الشهر`
+            : `${formatMoney(firstMonthlyTargetRemaining, 'USD')} remaining to reach this month's profit target`)
+          : (isArabic ? 'مبروك! تم تحقيق تارجت 500$ لهذا الشهر.' : 'Congratulations! The $500 monthly target is complete.'),
         icon: Target,
-        progress: monthlyTargetProgress,
+        progress: firstMonthlyTargetProgress,
         wide: true,
+        badge: hasReachedFirstMonthlyTarget
+          ? (isArabic ? 'تم الوصول إلى 500$ ✨' : '$500 achieved ✨')
+          : (isArabic ? 'الهدف الأول' : 'First milestone'),
+        className: hasReachedFirstMonthlyTarget
+          ? 'admin-stat-card--target-complete'
+          : 'admin-stat-card--target-active',
       },
+      ...(hasReachedFirstMonthlyTarget ? [{
+        title: isArabic ? 'التارجت التالي' : 'Next Monthly Target',
+        value: `${formatMoney(monthlyTargetProfitUsd, 'USD')} / ${formatMoney(nextMonthlyTargetUsd, 'USD')}`,
+        note: nextMonthlyTargetRemaining > 0
+          ? (isArabic
+            ? `رائع! متبقي ${formatMoney(nextMonthlyTargetRemaining, 'USD')} للوصول إلى تارجت 1000$.`
+            : `Great work! ${formatMoney(nextMonthlyTargetRemaining, 'USD')} left to reach $1,000.`)
+          : (isArabic ? 'مبروك! حققت تارجت 1000$ — إنجاز استثنائي.' : 'Congratulations! You reached $1,000 — an exceptional achievement.'),
+        icon: TrendingUp,
+        progress: nextMonthlyTargetProgress,
+        wide: true,
+        badge: nextMonthlyTargetRemaining > 0
+          ? (isArabic ? 'المرحلة الثانية ✦' : 'Second milestone ✦')
+          : (isArabic ? 'تم الوصول إلى 1000$ ✨' : '$1,000 achieved ✨'),
+        className: nextMonthlyTargetRemaining > 0
+          ? 'admin-stat-card--target-next'
+          : 'admin-stat-card--target-complete',
+      }] : []),
     ],
     [
       formatCount,
       formatMoney,
       isArabic,
       monthlyTargetProfitUsd,
-      monthlyTargetProgress,
-      monthlyTargetRemaining,
+      firstMonthlyTargetProgress,
+      firstMonthlyTargetRemaining,
+      hasReachedFirstMonthlyTarget,
+      nextMonthlyTargetProgress,
+      nextMonthlyTargetRemaining,
       pendingApprovalUsers.length,
       pendingManualTopups.length,
       productMetricNote,

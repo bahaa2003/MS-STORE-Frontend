@@ -3,6 +3,7 @@ import { getMoneyFormatOptions } from './money';
 import { formatCurrencyAmount } from './pricing';
 import { getProductQuantityMeta, resolveProductOrderFields } from './productPurchase';
 import { resolveOrderExecutionCurrency } from './transactionCurrency';
+import { normalizeXenaTargetUid, normalizeXenaVerifiedUser } from './xenaTargetVerification';
 
 const ORDER_STATUS_META = {
   completed: {
@@ -551,6 +552,51 @@ export const getOrderRequestDetails = (order = {}, { product = null, language = 
       value: entry.value,
     });
   });
+
+  const xenaVerificationCandidates = [
+    order?.xenaVerificationSnapshot,
+    order?.targetVerification,
+    order?.verificationSnapshot,
+    order?.xenaUser,
+    order?.targetUser,
+    order?.verifiedUser,
+    order?.customerInput?.verificationSnapshot,
+    order?.customerInput?.verification,
+    order?.supplierResponseSnapshot?.user,
+    order?.supplierResponseSnapshot?.data?.user,
+  ].filter(Boolean);
+  const xenaVerificationSnapshot = xenaVerificationCandidates.find((candidate) => (
+    normalizeXenaVerifiedUser(candidate).nickname
+  )) || xenaVerificationCandidates[0] || null;
+  const verifiedXenaUser = normalizeXenaVerifiedUser(xenaVerificationSnapshot || {});
+  const targetUid = normalizeXenaTargetUid(valuesByKey.get('targetuid')?.value);
+  const verifiedTargetUid = normalizeXenaTargetUid(
+    xenaVerificationSnapshot?.targetUid || verifiedXenaUser.uid
+  );
+  const hasMatchingVerifiedName = Boolean(
+    verifiedXenaUser.nickname
+    && targetUid
+    && (!verifiedTargetUid || verifiedTargetUid === targetUid)
+  );
+  const hasExistingXenaName = fields.some((field) => [
+    'xenanickname',
+    'xenausername',
+    'targetnickname',
+    'targetusername',
+    'xenaverifiedname',
+  ].includes(normalizeDynamicFieldKey(field?.key)));
+
+  if (hasMatchingVerifiedName && !hasExistingXenaName) {
+    const targetFieldIndex = fields.findIndex((field) => normalizeDynamicFieldKey(field?.key) === 'targetuid');
+    const nameField = {
+      key: 'xena_verified_name',
+      label: language === 'ar' ? 'اسم مستخدم Xena' : 'Xena username',
+      placeholder: '',
+      value: verifiedXenaUser.nickname,
+    };
+
+    fields.splice(targetFieldIndex >= 0 ? targetFieldIndex + 1 : fields.length, 0, nameField);
+  }
 
   const quantitySnapshot = order?.customerInput?.quantitySnapshot || order?.quantitySnapshot || {};
   const quantityMeta = getProductQuantityMeta({

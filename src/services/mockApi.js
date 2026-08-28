@@ -1142,6 +1142,49 @@ const mockApi = {
       return sanitizeSupplierForUi(found);
     },
 
+    getXenaConnection: async (id) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getSuppliersDb();
+      const found = (db.state.suppliers || []).find((s) => s.id === id);
+      if (!found) throw new Error('Supplier not found');
+      return found.xenaConnection || { status: 'disconnected' };
+    },
+
+    challengeXena: async (id, payload = {}) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getSuppliersDb();
+      const found = (db.state.suppliers || []).find((s) => s.id === id);
+      if (!found) throw new Error('Supplier not found');
+      if (!payload.username || !payload.password) throw new Error('Email and password are required');
+      found.xenaConnection = { status: 'verification_required' };
+      saveDB('suppliers-storage', db);
+      return found.xenaConnection;
+    },
+
+    verifyXena: async (id, payload = {}) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getSuppliersDb();
+      const found = (db.state.suppliers || []).find((s) => s.id === id);
+      if (!found) throw new Error('Supplier not found');
+      if (!/^\d{4}$/.test(String(payload.code || ''))) throw new Error('Invalid verification code');
+      found.xenaConnection = { status: 'connected', lastCheckedAt: new Date().toISOString() };
+      saveDB('suppliers-storage', db);
+      return found.xenaConnection;
+    },
+
+    updateXenaProductConfig: async (id, payload = {}) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getSuppliersDb();
+      const found = (db.state.suppliers || []).find((s) => s.id === id);
+      if (!found) throw new Error('Supplier not found');
+      found.xenaProductConfig = {
+        externalProductId: 'xena-dynamic-recharge',
+        ...payload,
+      };
+      saveDB('suppliers-storage', db);
+      return found.xenaProductConfig;
+    },
+
     create: async (payload, actorContext) => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getSuppliersDb();

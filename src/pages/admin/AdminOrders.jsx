@@ -223,6 +223,7 @@ const AdminOrders = () => {
   // New: provider filter
   const [providerFilter, setProviderFilter] = useState('all');
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [selectedOrderRecord, setSelectedOrderRecord] = useState(null);
   const [actionOrderId, setActionOrderId] = useState('');
   const [syncingOrderId, setSyncingOrderId] = useState('');
   const [statusConfirm, setStatusConfirm] = useState(null);
@@ -339,18 +340,46 @@ const AdminOrders = () => {
 
   const summary = useMemo(() => summarizeOrders(filteredOrders), [filteredOrders]);
 
-  const selectedOrder = useMemo(
-    () => enrichedOrders.find((order) => order.id === selectedOrderId) || null,
-    [enrichedOrders, selectedOrderId]
-  );
+  const selectedOrder = useMemo(() => {
+    if (!selectedOrderId) return null;
+
+    const orderFromList = enrichedOrders.find(
+      (order) => String(order.id) === String(selectedOrderId)
+    ) || null;
+    const fetchedOrder = selectedOrderRecord
+      && String(selectedOrderRecord.id) === String(selectedOrderId)
+      ? selectedOrderRecord
+      : null;
+    const resolvedOrder = orderFromList && fetchedOrder
+      ? { ...orderFromList, ...fetchedOrder }
+      : (fetchedOrder || orderFromList);
+
+    if (!resolvedOrder) return null;
+    return enrichOrders(
+      [resolvedOrder],
+      { users, products, language: isArabic ? 'ar' : 'en' }
+    )[0] || resolvedOrder;
+  }, [enrichedOrders, isArabic, products, selectedOrderId, selectedOrderRecord, users]);
 
   useEffect(() => {
     const orderIdFromQuery = String(searchParams.get('orderId') || '').trim();
     if (!orderIdFromQuery) return;
 
+    let isCurrent = true;
     setSelectedOrderId(orderIdFromQuery);
-    void getOrderById(orderIdFromQuery).catch(() => {});
-  }, [getOrderById, searchParams]);
+    void getOrderById(orderIdFromQuery)
+      .then((order) => {
+        if (isCurrent && order) setSelectedOrderRecord(order);
+      })
+      .catch((error) => {
+        if (!isCurrent) return;
+        addToast(error?.message || (isArabic ? 'تعذر تحميل تفاصيل الطلب' : 'Unable to load order details'), 'error');
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [addToast, getOrderById, isArabic, searchParams]);
 
   const formatCount = (value) => formatNumber(value, locale);
 
@@ -452,21 +481,17 @@ const AdminOrders = () => {
     }
   }, [addToast, isArabic, syncOrderSupplierStatus]);
 
-  const handleViewOrder = useCallback(async (order) => {
+  const handleViewOrder = useCallback((order) => {
     setSelectedOrderId(order.id);
+    setSelectedOrderRecord(order);
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('orderId', order.id);
     setSearchParams(nextParams, { replace: true });
-
-    try {
-      await getOrderById(order.id);
-    } catch (error) {
-      addToast(error?.message || (isArabic ? 'تعذر تحميل تفاصيل الطلب' : 'Unable to load order details'), 'error');
-    }
-  }, [addToast, getOrderById, isArabic, searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams]);
 
   const handleCloseOrderDetails = useCallback(() => {
     setSelectedOrderId(null);
+    setSelectedOrderRecord(null);
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('orderId');
     setSearchParams(nextParams, { replace: true });

@@ -32,6 +32,59 @@ const FALLBACK_ERROR = {
 
 export const normalizeXenaTargetUid = (value) => String(value ?? '').trim();
 
+const firstNonEmptyText = (...values) => (
+  values
+    .map((value) => String(value ?? '').trim())
+    .find(Boolean) || ''
+);
+
+/**
+ * Normalizes the safe profile returned by Xena verification without inventing
+ * any missing display data. The documented field is `nickname`; aliases are
+ * accepted defensively because some backend envelopes use generic user names.
+ */
+export const normalizeXenaVerifiedUser = (payload = {}, fallbackTargetUid = '') => {
+  const candidates = [
+    payload?.user,
+    payload?.targetUser,
+    payload?.profile,
+    payload?.account,
+    payload?.verification?.user,
+    payload?.data?.user,
+  ];
+  const user = candidates.find((candidate) => (
+    candidate && typeof candidate === 'object' && !Array.isArray(candidate)
+  )) || {};
+
+  return {
+    uid: firstNonEmptyText(
+      user?.uid,
+      user?.targetUid,
+      user?.userId,
+      payload?.targetUid,
+      payload?.uid,
+      fallbackTargetUid
+    ),
+    nickname: firstNonEmptyText(
+      user?.nickname,
+      user?.displayName,
+      user?.display_name,
+      user?.name,
+      user?.username,
+      payload?.nickname,
+      payload?.displayName,
+      payload?.name,
+      payload?.username
+    ),
+    avatar: firstNonEmptyText(user?.avatar, user?.avatarUrl, payload?.avatar) || null,
+    country: firstNonEmptyText(user?.country, user?.countryCode, payload?.country),
+  };
+};
+
+export const getXenaVerifiedUserName = (payload = {}) => (
+  normalizeXenaVerifiedUser(payload).nickname
+);
+
 export const getXenaTargetErrorMessage = (code, language = 'ar') => {
   const normalizedCode = String(code || '').trim().toUpperCase();
   const messages = XENA_ERROR_MESSAGES[normalizedCode] || FALLBACK_ERROR;
@@ -91,4 +144,3 @@ export const isXenaVerificationSatisfied = ({ fieldValue, verification }) => {
 export const makeXenaVerificationRequestBody = (targetUid) => ({
   targetUid: normalizeXenaTargetUid(targetUid),
 });
-

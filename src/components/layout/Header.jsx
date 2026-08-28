@@ -171,8 +171,9 @@ const Header = ({ toggleSidebar }) => {
 
             <button
               type="button"
-              onClick={() => navigate(getDefaultRouteForRole(user?.role))}
+              onClick={() => navigate('/dashboard')}
               className="rounded-[14px] px-0 py-0 transition-all hover:-translate-y-0.5"
+              aria-label={language === 'ar' ? 'الانتقال إلى الرئيسية' : 'Go to home'}
             >
               <span className="sm:hidden flex min-w-0 items-center gap-1">
                 <span className="scale-[0.78] min-[380px]:scale-[0.86]">

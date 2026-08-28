@@ -3,7 +3,16 @@ import Card from '../ui/Card';
 import { cn } from '../ui/Button';
 import './AdminNeonGlow.css';
 
-const StatCard = ({ title, value, note, icon: Icon, progress = 40, wide = false }) => {
+const StatCard = ({
+  title,
+  value,
+  note,
+  icon: Icon,
+  progress = 40,
+  wide = false,
+  className,
+  badge,
+}) => {
   const progressValue = Math.max(0, Math.min(100, Number(progress) || 0));
 
   return (
@@ -11,11 +20,17 @@ const StatCard = ({ title, value, note, icon: Icon, progress = 40, wide = false 
       variant="elevated"
       className={cn(
         'admin-stat-card relative w-full p-0 transition-all duration-300',
-        wide && 'col-span-2'
+        wide && 'col-span-2',
+        className
       )}
     >
       <span className="admin-stat-card-shimmer" aria-hidden="true" />
       <div className="relative flex min-h-[7.5rem] flex-col items-center justify-center overflow-hidden rounded-[inherit] p-3 text-center sm:min-h-[8.5rem] sm:p-4">
+        {badge ? (
+          <span className="admin-target-badge relative z-10 mb-1.5 inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black sm:text-[10px]">
+            {badge}
+          </span>
+        ) : null}
         <div className="pointer-events-none absolute left-1/2 top-1/2 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[color:rgb(var(--color-primary-rgb)/0.08)] bg-[color:rgb(var(--color-primary-rgb)/0.035)] text-[var(--color-primary)] opacity-50 sm:h-32 sm:w-32">
           <Icon className="h-10 w-10 opacity-20 sm:h-12 sm:w-12" />
         </div>
@@ -40,7 +55,7 @@ const StatCard = ({ title, value, note, icon: Icon, progress = 40, wide = false 
 
         <div className="relative z-10 mt-2.5 h-1 w-full max-w-[15rem] overflow-hidden rounded-full bg-[color:rgb(var(--color-border-rgb)/0.42)]">
           <div
-            className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary),var(--color-primary-hover))] transition-all duration-500"
+            className="admin-stat-card-progress h-full rounded-full bg-[linear-gradient(90deg,var(--color-primary),var(--color-primary-hover))] transition-all duration-500"
             style={{ width: `${progressValue}%` }}
           />
         </div>
