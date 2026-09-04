@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, CheckCircle, Copy, ImageUp, Landmark, Loader, ReceiptText, ShieldCheck } from 'lucide-react';
+import { AlertCircle, BadgeDollarSign, CalendarClock, CheckCircle, Copy, CreditCard, Hash, ImageUp, KeyRound, Landmark, Loader, PenLine, ReceiptText, ShieldCheck, Smartphone, WalletCards } from 'lucide-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import UploadReceiptBox from '../components/wallet/UploadReceiptBox';
@@ -9,7 +9,6 @@ import useSystemStore from '../store/useSystemStore';
 import useTopupStore from '../store/useTopupStore';
 import useAuthStore from '../store/useAuthStore';
 import { useToast } from '../components/ui/Toast';
-import { inputBaseClassName, textareaClassName } from '../components/ui/Input';
 import { findPaymentMethodById } from '../utils/paymentSettings';
 import { devLogger } from '../utils/devLogger';
 import { resolveImageUrl } from '../utils/imageUrl';
@@ -52,6 +51,22 @@ const getMethodPresentation = (method) => {
 
   return { icon: 'PM', color: 'from-emerald-500 to-teal-600' };
 };
+
+const getPaymentFieldAppearance = (field) => {
+  const appearances = {
+    amount: { icon: BadgeDollarSign, accent: 'bg-amber-400 text-slate-950' },
+    senderNumber: { icon: Smartphone, accent: 'bg-rose-500 text-white' },
+    transactionId: { icon: Hash, accent: 'bg-indigo-500 text-white' },
+    cardNumber: { icon: CreditCard, accent: 'bg-sky-500 text-white' },
+    expiryDate: { icon: CalendarClock, accent: 'bg-violet-500 text-white' },
+    cvv: { icon: KeyRound, accent: 'bg-fuchsia-500 text-white' },
+    notes: { icon: PenLine, accent: 'bg-slate-600 text-white' },
+  };
+
+  return appearances[field] || { icon: Hash, accent: 'bg-indigo-500 text-white' };
+};
+
+const paymentFieldInputClassName = 'h-14 w-full rounded-[1.15rem] border border-slate-700 bg-slate-950 px-4 text-sm font-bold text-white placeholder:text-slate-400 shadow-[0_12px_24px_-18px_rgba(0,0,0,0.9)] outline-none transition-colors focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color:rgb(var(--color-primary-rgb)/0.24)] disabled:cursor-not-allowed disabled:opacity-55';
 
 const getCurrencyRate = (currencies = [], currencyCode = 'USD') => {
   const normalizedCode = String(currencyCode || '').trim().toUpperCase();
@@ -482,22 +497,30 @@ const PaymentDetails = () => {
           {visibleMethodFields.map((field) => {
             const config = fieldConfigs[field];
             if (!config) return null;
+            const appearance = getPaymentFieldAppearance(field);
+            const FieldIcon = appearance.icon;
 
             return (
               <div key={field} className="mb-4 last:mb-0">
-                <label className={`mb-2 block text-sm font-bold text-[var(--color-text)] ${isRTL ? 'text-right' : 'text-left'}`}>
+                <label htmlFor={`payment-${field}`} className={`mb-1.5 block text-sm font-black text-[var(--color-text)] ${isRTL ? 'text-right' : 'text-left'}`}>
                   {config.label}
                 </label>
-                <input
-                  type={config.type}
-                  value={formData[field] || ''}
-                  onChange={(e) => handleInputChange(field, e.target.value)}
-                  placeholder={config.placeholder}
-                  min={config.min}
-                  step={config.step}
-                  className={`${inputBaseClassName} ${isRTL ? 'text-right' : 'text-left'}`}
-                  disabled={isSubmitting}
-                />
+                <div className="relative">
+                  <input
+                    id={`payment-${field}`}
+                    type={config.type}
+                    value={formData[field] || ''}
+                    onChange={(e) => handleInputChange(field, e.target.value)}
+                    placeholder={config.placeholder}
+                    min={config.min}
+                    step={config.step}
+                    className={`${paymentFieldInputClassName} ${isRTL ? 'pl-[4.25rem] text-right' : 'pr-[4.25rem] text-left'}`}
+                    disabled={isSubmitting}
+                  />
+                  <span className={`pointer-events-none absolute inset-y-0 flex w-14 items-center justify-center ${appearance.accent} ${isRTL ? 'left-0 rounded-l-[1rem]' : 'right-0 rounded-r-[1rem]'}`}>
+                    <FieldIcon className="h-5 w-5" />
+                  </span>
+                </div>
                 {field === 'amount' && usdPreviewLabel && (
                   <p className={`mt-1.5 text-xs font-bold text-[var(--color-primary)] ${isRTL ? 'text-right' : 'text-left'}`}>
                     {usdPreviewLabel}
@@ -509,34 +532,46 @@ const PaymentDetails = () => {
 
           {senderDetailRequirement && (
             <div className="mb-4">
-              <label className={`mb-2 block text-sm font-bold text-[var(--color-text)] ${isRTL ? 'text-right' : 'text-left'}`}>
+              <label htmlFor="payment-sender-detail" className={`mb-1.5 block text-sm font-black text-[var(--color-text)] ${isRTL ? 'text-right' : 'text-left'}`}>
                 {senderDetailRequirement.label}
                 <span className="text-rose-500"> *</span>
               </label>
-              <input
-                type="text"
-                value={formData[senderDetailRequirement.field] || ''}
-                onChange={(e) => handleInputChange(senderDetailRequirement.field, e.target.value)}
-                placeholder={senderDetailRequirement.placeholder}
-                className={`${inputBaseClassName} ${isRTL ? 'text-right' : 'text-left'}`}
-                disabled={isSubmitting}
-                required
-              />
+              <div className="relative">
+                <input
+                  id="payment-sender-detail"
+                  type="text"
+                  value={formData[senderDetailRequirement.field] || ''}
+                  onChange={(e) => handleInputChange(senderDetailRequirement.field, e.target.value)}
+                  placeholder={senderDetailRequirement.placeholder}
+                  className={`${paymentFieldInputClassName} ${isRTL ? 'pl-[4.25rem] text-right' : 'pr-[4.25rem] text-left'}`}
+                  disabled={isSubmitting}
+                  required
+                />
+                <span className={`pointer-events-none absolute inset-y-0 flex w-14 items-center justify-center bg-rose-500 text-white ${isRTL ? 'left-0 rounded-l-[1rem]' : 'right-0 rounded-r-[1rem]'}`}>
+                  <WalletCards className="h-5 w-5" />
+                </span>
+              </div>
             </div>
           )}
 
           <div>
-            <label className={`mb-2 block text-sm font-bold text-[var(--color-text)] ${isRTL ? 'text-right' : 'text-left'}`}>
+            <label htmlFor="payment-notes" className={`mb-1.5 block text-sm font-black text-[var(--color-text)] ${isRTL ? 'text-right' : 'text-left'}`}>
               {t('payments.notesOptional')}
             </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              placeholder={t('payments.notesPlaceholder')}
-              rows={3}
-              className={`${textareaClassName} ${isRTL ? 'text-right' : 'text-left'}`}
-              disabled={isSubmitting}
-            />
+            <div className="relative">
+              <textarea
+                id="payment-notes"
+                value={formData.notes}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
+                placeholder={t('payments.notesPlaceholder')}
+                rows={3}
+                className={`min-h-[112px] w-full resize-none rounded-[1.15rem] border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-bold text-white placeholder:text-slate-400 shadow-[0_12px_24px_-18px_rgba(0,0,0,0.9)] outline-none transition-colors focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color:rgb(var(--color-primary-rgb)/0.24)] disabled:cursor-not-allowed disabled:opacity-55 ${isRTL ? 'pl-[4.25rem] text-right' : 'pr-[4.25rem] text-left'}`}
+                disabled={isSubmitting}
+              />
+              <span className={`pointer-events-none absolute bottom-0 top-0 flex w-14 items-center justify-center bg-slate-600 text-white ${isRTL ? 'left-0 rounded-l-[1rem]' : 'right-0 rounded-r-[1rem]'}`}>
+                <PenLine className="h-5 w-5" />
+              </span>
+            </div>
           </div>
           </section>
 
