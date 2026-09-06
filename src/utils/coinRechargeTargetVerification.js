@@ -1,4 +1,5 @@
 const COIN_RECHARGE_PROVIDER_CODE = 'coin-recharge';
+const COIN_RECHARGE_DYNAMIC_PRODUCT_ID = 'coin-recharge-dynamic';
 const COIN_RECHARGE_TARGET_TYPE = 'coin_recharge_target';
 
 export const normalizeCoinRechargeTargetUid = (value) => String(value ?? '').trim();
@@ -16,9 +17,14 @@ export const isCoinRechargeTargetField = (field = {}, product = {}) => {
   const key = String(field?.key || field?.name || field?.id || '').trim();
   if (key !== 'target_uid') return false;
   const providerCode = String(product?.providerCode || product?.supplierCode || '').trim().toLowerCase();
+  const externalProductId = String(
+    product?.externalProductId || product?.providerProduct?.externalProductId || ''
+  ).trim();
   const verification = field?.verification || {};
   const type = String(verification?.type || field?.verificationType || '').trim().toLowerCase();
-  return providerCode === COIN_RECHARGE_PROVIDER_CODE || type === COIN_RECHARGE_TARGET_TYPE;
+  return providerCode === COIN_RECHARGE_PROVIDER_CODE
+    || externalProductId === COIN_RECHARGE_DYNAMIC_PRODUCT_ID
+    || type === COIN_RECHARGE_TARGET_TYPE;
 };
 
 export const getCoinRechargeTargetField = (fields = [], product = {}) => (
