@@ -3,12 +3,55 @@ import assert from 'node:assert/strict';
 import {
   getXenaTargetErrorMessage,
   getXenaTargetField,
+  isXenaTargetField,
   isXenaVerificationSatisfied,
   makeXenaVerificationRequestBody,
   normalizeXenaTargetUid,
   normalizeXenaVerifiedUser,
   validateXenaTargetUid,
 } from './xenaTargetVerification.js';
+
+test('detects target_uid on a dynamic Xena product by external product ID', () => {
+  assert.equal(isXenaTargetField(
+    { key: 'target_uid' },
+    { externalProductId: 'xena-dynamic-recharge' }
+  ), true);
+});
+
+test('detects target_uid on a dynamic Xena product by nested provider product ID', () => {
+  assert.equal(isXenaTargetField(
+    { key: 'target_uid' },
+    { providerProduct: { externalProductId: 'xena-dynamic-recharge' } }
+  ), true);
+});
+
+test('continues to detect target_uid by Xena provider code', () => {
+  assert.equal(isXenaTargetField(
+    { key: 'target_uid' },
+    { providerCode: 'xena-recharge' }
+  ), true);
+});
+
+test('continues to detect target_uid by Xena verification metadata', () => {
+  assert.equal(isXenaTargetField(
+    { key: 'target_uid', verification: { required: true, type: 'xena_target' } },
+    {}
+  ), true);
+});
+
+test('does not detect a non-target field on a Xena product', () => {
+  assert.equal(isXenaTargetField(
+    { key: 'player_id' },
+    { externalProductId: 'xena-dynamic-recharge', providerCode: 'xena-recharge' }
+  ), false);
+});
+
+test('does not detect an unrelated normal field and product', () => {
+  assert.equal(isXenaTargetField(
+    { key: 'account_id' },
+    { externalProductId: 'normal-recharge' }
+  ), false);
+});
 
 test('detects Xena target field from public product verification metadata', () => {
   const product = { providerCode: 'xena-recharge' };

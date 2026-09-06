@@ -1,4 +1,5 @@
 const XENA_PROVIDER_CODE = 'xena-recharge';
+const XENA_DYNAMIC_PRODUCT_ID = 'xena-dynamic-recharge';
 const XENA_TARGET_FIELD_KEY = 'target_uid';
 const XENA_TARGET_TYPE = 'xena_target';
 
@@ -117,11 +118,15 @@ export const isXenaTargetField = (field = {}, product = {}) => {
   if (key !== XENA_TARGET_FIELD_KEY) return false;
 
   const providerCode = String(product?.providerCode || product?.supplierCode || '').trim().toLowerCase();
+  const externalProductId = String(product?.externalProductId || '').trim();
+  const providerProductExternalProductId = String(product?.providerProduct?.externalProductId || '').trim();
   const verification = field?.verification || {};
   const verificationType = String(verification?.type || field?.verificationType || '').trim().toLowerCase();
 
   return Boolean(
     providerCode === XENA_PROVIDER_CODE
+    || externalProductId === XENA_DYNAMIC_PRODUCT_ID
+    || providerProductExternalProductId === XENA_DYNAMIC_PRODUCT_ID
     || field?.verifiable === true
     || verification?.required === true
     || verificationType === XENA_TARGET_TYPE
