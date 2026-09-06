@@ -51,6 +51,15 @@ import {
   normalizeXenaVerifiedUser,
   validateXenaTargetUid,
 } from '../../utils/xenaTargetVerification';
+import {
+  getCoinRechargeTargetField,
+  isCoinRechargeTargetField,
+  isCoinRechargeVerificationSatisfied,
+  createCoinRechargeVerificationSnapshot,
+  normalizeCoinRechargeTargetUid,
+  normalizeCoinRechargeVerifiedUser,
+  validateCoinRechargeTargetUid,
+} from '../../utils/coinRechargeTargetVerification';
 
 const getCopy = (language = 'ar') => {
   if (language === 'en') {
@@ -291,7 +300,11 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     errorCode: '',
     errorMessage: '',
   });
+  const [coinRechargeVerification, setCoinRechargeVerification] = useState({
+    status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '',
+  });
   const xenaVerifySeqRef = useRef(0);
+  const coinRechargeVerifySeqRef = useRef(0);
   const fieldValuesRef = useRef({});
   const orderFieldsContainerRef = useRef(null);
 
@@ -306,7 +319,14 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
   );
 
   const xenaTargetField = useMemo(
-    () => getXenaTargetField(orderFields, product),
+    () => {
+      const field = getXenaTargetField(orderFields, product);
+      return field && isCoinRechargeTargetField(field, product) ? null : field;
+    },
+    [orderFields, product]
+  );
+  const coinRechargeTargetField = useMemo(
+    () => getCoinRechargeTargetField(orderFields, product),
     [orderFields, product]
   );
 
@@ -365,6 +385,8 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setTopupAmount('');
     xenaVerifySeqRef.current += 1;
     setXenaVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
+    coinRechargeVerifySeqRef.current += 1;
+    setCoinRechargeVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
   }, [purchaseResetKey]);
 
   useEffect(() => {
@@ -377,6 +399,8 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     setSuccessfulOrderId(null);
     setSuccessMeta({ amount: '', identifier: '', orderNumber: '' });
     setXenaVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
+    coinRechargeVerifySeqRef.current += 1;
+    setCoinRechargeVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
   }, [isOpen]);
 
   useEffect(() => {
@@ -481,12 +505,24 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
       verification: xenaVerification,
     })
   );
+  const coinRechargeTargetValue = coinRechargeTargetField ? (fieldValues[coinRechargeTargetField.key] || '') : '';
+  const coinRechargeTargetValidation = coinRechargeTargetField
+    ? validateCoinRechargeTargetUid(coinRechargeTargetValue, language)
+    : { valid: true, targetUid: '', message: '' };
+  const coinRechargeVerificationRequired = Boolean(coinRechargeTargetField);
+  const coinRechargeVerificationPending = coinRechargeVerification.status === 'pending';
+  const coinRechargeVerificationReady = !coinRechargeVerificationRequired || (
+    coinRechargeTargetValidation.valid
+    && !coinRechargeVerificationPending
+    && isCoinRechargeVerificationSatisfied({ fieldValue: coinRechargeTargetValue, verification: coinRechargeVerification })
+  );
   const canSubmit = (
     productState.isPurchasable
     && isApproved
     && hasValidAmount
     && selectedQuantityIsValid
     && xenaVerificationReady
+    && coinRechargeVerificationReady
     && !isPreparing
     && !isSubmitting
     && statusCard.tone !== 'success'
@@ -550,6 +586,12 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
     if (shouldClearXenaVerification) {
       xenaVerifySeqRef.current += 1;
       setXenaVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
+    }
+    const shouldClearCoinRechargeVerification = coinRechargeTargetField?.key === fieldKey
+      && normalizeCoinRechargeTargetUid(nextValue) !== coinRechargeVerification.targetUid;
+    if (shouldClearCoinRechargeVerification) {
+      coinRechargeVerifySeqRef.current += 1;
+      setCoinRechargeVerification({ status: 'idle', targetUid: '', user: null, errorCode: '', errorMessage: '' });
     }
 
     setFieldValues((prev) => ({
@@ -634,6 +676,30 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
         ...prev,
         [xenaTargetField.key]: message,
       }));
+    }
+  };
+
+  const handleVerifyCoinRechargeTarget = async () => {
+    if (!coinRechargeTargetField || coinRechargeVerification.status === 'pending') return;
+    const validation = validateCoinRechargeTargetUid(fieldValues[coinRechargeTargetField.key], language);
+    if (!validation.valid) {
+      setFieldErrors((prev) => ({ ...prev, [coinRechargeTargetField.key]: validation.message }));
+      setCoinRechargeVerification({ status: 'error', targetUid: validation.targetUid, user: null, errorCode: 'INVALID_COIN_RECHARGE_TARGET_UID', errorMessage: validation.message });
+      return;
+    }
+    const requestSeq = coinRechargeVerifySeqRef.current + 1;
+    coinRechargeVerifySeqRef.current = requestSeq;
+    const requestedUid = validation.targetUid;
+    setCoinRechargeVerification({ status: 'pending', targetUid: requestedUid, user: null, errorCode: '', errorMessage: '' });
+    try {
+      const result = await apiClient.products.verifyTarget(resolveProductId(product), { targetUid: requestedUid });
+      if (coinRechargeVerifySeqRef.current !== requestSeq || normalizeCoinRechargeTargetUid(fieldValuesRef.current[coinRechargeTargetField.key]) !== requestedUid) return;
+      setCoinRechargeVerification({ status: 'success', targetUid: requestedUid, user: normalizeCoinRechargeVerifiedUser(result, requestedUid), errorCode: '', errorMessage: '' });
+    } catch (error) {
+      if (coinRechargeVerifySeqRef.current !== requestSeq || normalizeCoinRechargeTargetUid(fieldValuesRef.current[coinRechargeTargetField.key]) !== requestedUid) return;
+      const message = language === 'en' ? 'Unable to verify this user ID. Check it and try again.' : 'تعذر التحقق من معرّف المستخدم. راجعه ثم حاول مرة أخرى.';
+      setCoinRechargeVerification({ status: 'error', targetUid: requestedUid, user: null, errorCode: String(error?.code || 'COIN_RECHARGE_VERIFICATION_UNAVAILABLE'), errorMessage: message });
+      setFieldErrors((prev) => ({ ...prev, [coinRechargeTargetField.key]: message }));
     }
   };
 
@@ -747,6 +813,12 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
         return;
       }
     }
+    if (coinRechargeVerificationRequired) {
+      if (!coinRechargeTargetValidation.valid || !coinRechargeVerificationReady) {
+        setFieldErrors((prev) => ({ ...prev, [coinRechargeTargetField.key]: coinRechargeTargetValidation.message || (language === 'en' ? 'Verify the user ID before buying.' : 'يرجى التحقق من معرّف المستخدم قبل الشراء.') }));
+        return;
+      }
+    }
 
     if (!selectedQuantityIsValid) {
       setQuantityError(copy.invalidQuantity);
@@ -850,6 +922,11 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
             user: normalizeXenaVerifiedUser(xenaVerification, xenaVerification.targetUid),
           }
         : null;
+      const coinRechargeVerificationSnapshot = createCoinRechargeVerificationSnapshot({
+        required: coinRechargeVerificationRequired,
+        ready: coinRechargeVerificationReady,
+        verification: coinRechargeVerification,
+      });
 
       const createResult = await addOrder({
         id: `ord-${Date.now()}`,
@@ -871,9 +948,10 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
           values: normalizedFields,
           fieldsSnapshot,
           quantitySnapshot: freshQuantityMeta,
-          verificationSnapshot: xenaVerificationSnapshot,
+          verificationSnapshot: xenaVerificationSnapshot || coinRechargeVerificationSnapshot,
         },
         xenaVerificationSnapshot,
+        coinRechargeVerificationSnapshot,
         quantitySnapshot: freshQuantityMeta,
         status: 'pending',
         createdAt: new Date().toISOString(),
@@ -1070,7 +1148,8 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                           const fieldType = resolveFieldType(field);
                           const options = resolveSelectOptions(field);
                           const fallbackAsInput = fieldType === 'select' && options.length === 0;
-                          const isXenaField = isXenaTargetField(field, product);
+                          const isCoinRechargeField = isCoinRechargeTargetField(field, product);
+                          const isXenaField = !isCoinRechargeField && isXenaTargetField(field, product);
 
                           if (fieldType === 'select' && !fallbackAsInput) {
                             return (
@@ -1154,6 +1233,43 @@ const ProductPurchaseSheet = ({ product, isOpen, onClose }) => {
                                     {xenaVerification.errorMessage}
                                   </p>
                                 ) : null}
+                              </div>
+                            );
+                          }
+
+                          if (isCoinRechargeField) {
+                            const safeUser = coinRechargeVerification.user || {};
+                            const showVerified = coinRechargeVerificationReady && coinRechargeVerification.status === 'success';
+                            const verifyDisabled = isSubmitting || statusCard.tone === 'success' || coinRechargeVerificationPending || !coinRechargeTargetValidation.valid;
+                            return (
+                              <div key={field.key} className="space-y-2">
+                                <Input
+                                  label={`${label}${isFieldRequired(field) ? ' *' : ''}`}
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  value={fieldValues[field.key] || ''}
+                                  onChange={(event) => handleFieldChange(field.key, event.target.value)}
+                                  error={fieldErrors[field.key]}
+                                  placeholder={field.placeholder || copy.placeholder(label)}
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  disabled={isSubmitting || statusCard.tone === 'success'}
+                                  className="h-9 rounded-md border-[color:rgb(var(--color-border-rgb)/0.9)] bg-[color:rgb(var(--color-card-rgb)/0.92)] text-xs text-[var(--color-text)] placeholder:text-[var(--color-muted)] focus:border-[color:rgb(var(--color-primary-rgb)/0.55)] focus:bg-[rgb(var(--color-card-rgb))] sm:h-10 sm:rounded-lg sm:text-[13px]"
+                                />
+                                <Button type="button" variant="outline" onClick={handleVerifyCoinRechargeTarget} disabled={verifyDisabled} className="h-9 w-full rounded-md border-[color:rgb(var(--color-primary-rgb)/0.42)] bg-[color:rgb(var(--color-card-rgb)/0.72)] text-xs font-bold text-[color:rgb(var(--color-primary-rgb)/0.98)] hover:bg-[color:rgb(var(--color-primary-rgb)/0.08)] sm:h-10 sm:rounded-lg">
+                                  {coinRechargeVerificationPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : showVerified ? <CheckCircle2 className="h-4 w-4" /> : null}
+                                  {coinRechargeVerificationPending ? (language === 'en' ? 'Verifying...' : 'جاري التحقق...') : (language === 'en' ? 'Verify user ID' : 'تحقق من معرّف المستخدم')}
+                                </Button>
+                                {showVerified ? (
+                                  <div className="rounded-lg border border-[color:rgb(var(--color-success-rgb)/0.36)] bg-[color:rgb(var(--color-success-rgb)/0.11)] px-2.5 py-2 text-[11px] font-semibold text-[color:rgb(var(--color-success-rgb)/0.98)] sm:text-xs">
+                                    <p>{language === 'en' ? 'User ID verified' : 'تم التحقق من معرّف المستخدم'}</p>
+                                    <div className="mt-1 flex items-center gap-2 font-medium text-[var(--color-text-secondary)]" dir="ltr">
+                                      {safeUser.avatar ? <img src={safeUser.avatar} alt="" className="h-6 w-6 rounded-full object-cover" /> : null}
+                                      <span>{[safeUser.nickName, safeUser.userId || coinRechargeVerification.targetUid].filter(Boolean).join(' · ')}</span>
+                                    </div>
+                                  </div>
+                                ) : coinRechargeVerification.status === 'error' && coinRechargeVerification.errorMessage ? <p className="text-xs font-semibold text-[color:rgb(var(--color-error-rgb)/0.96)]">{coinRechargeVerification.errorMessage}</p> : null}
                               </div>
                             );
                           }

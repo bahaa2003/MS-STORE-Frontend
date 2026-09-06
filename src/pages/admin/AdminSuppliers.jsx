@@ -26,6 +26,7 @@ import { formatDateTime, formatNumber } from '../../utils/intl';
 import { useLanguage } from '../../context/LanguageContext';
 import XenaBotLoginModal from '../../components/admin/XenaBotLoginModal';
 import XenaBotPricingModal from '../../components/admin/XenaBotPricingModal';
+import CoinRechargePricingModal from '../../components/admin/CoinRechargePricingModal';
 
 const defaultForm = {
   supplierName: '',
@@ -72,10 +73,12 @@ const glowSelectClass = 'h-10 rounded-lg border border-[color:rgb(var(--color-bo
 const compactActionBtnClass = 'h-8 rounded-lg px-2.5 text-[11px] gap-1';
 const supplierTypeLabels = { api: 'API', manual: 'يدوي', hybrid: 'مختلط' };
 const XENA_PROVIDER_CODE = 'xena-recharge';
+const COIN_RECHARGE_PROVIDER_CODE = 'coin-recharge';
 
 const isXenaSupplier = (supplier = {}) => String(
   supplier.supplierCode || supplier.code || supplier.providerCode || supplier.slug || ''
 ).trim().toLowerCase() === XENA_PROVIDER_CODE;
+const isCoinRechargeSupplier = (supplier = {}) => String(supplier.supplierCode || supplier.code || supplier.providerCode || supplier.slug || '').trim().toLowerCase() === COIN_RECHARGE_PROVIDER_CODE;
 
 const parseHeaders = (text) => String(text || '')
   .split('\n')
@@ -203,6 +206,8 @@ const AdminSuppliers = () => {
   const [xenaLoginSupplier, setXenaLoginSupplier] = useState(null);
   const [xenaPricingOpen, setXenaPricingOpen] = useState(false);
   const [xenaPricingSupplier, setXenaPricingSupplier] = useState(null);
+  const [coinRechargePricingOpen, setCoinRechargePricingOpen] = useState(false);
+  const [coinRechargePricingSupplier, setCoinRechargePricingSupplier] = useState(null);
 
   // ── Debug modal state ──────────────────────────────────────────────────────
   const [isDebugOpen, setIsDebugOpen] = useState(false);
@@ -283,6 +288,7 @@ const AdminSuppliers = () => {
     setXenaPricingSupplier(supplier);
     setXenaPricingOpen(true);
   };
+  const openCoinRechargePricing = (supplier) => { setCoinRechargePricingSupplier(supplier); setCoinRechargePricingOpen(true); };
 
   const openCreate = () => {
     setEditing(null);
@@ -593,6 +599,7 @@ const AdminSuppliers = () => {
                     </Button>
                   </>
                 ) : null}
+                {isCoinRechargeSupplier(row) ? <Button size="sm" className={compactActionBtnClass} variant="secondary" onClick={() => openCoinRechargePricing(row)}><CircleDollarSign className="h-3.5 w-3.5" />إعداد الشحن</Button> : null}
                 <Button size="sm" className={compactActionBtnClass} variant="outline" onClick={() => testConnection(row)} disabled={isTesting}>
                   <PlugZap className={`h-3.5 w-3.5 ${isTesting ? 'animate-pulse' : ''}`} />
                   اختبار الاتصال
@@ -670,6 +677,7 @@ const AdminSuppliers = () => {
                           </Button>
                         </>
                       ) : null}
+                      {isCoinRechargeSupplier(row) ? <Button size="sm" variant="secondary" onClick={() => openCoinRechargePricing(row)}><CircleDollarSign className="h-4 w-4" />إعداد الشحن</Button> : null}
                       <Button size="sm" variant="outline" onClick={() => testConnection(row)} disabled={isTesting}>
                         <PlugZap className={`h-4 w-4 ${isTesting ? 'animate-pulse' : ''}`} />
                         اختبار
@@ -1007,6 +1015,12 @@ const AdminSuppliers = () => {
         }}
         supplier={xenaPricingSupplier}
         suppliers={suppliers}
+        onSaved={load}
+      />
+      <CoinRechargePricingModal
+        isOpen={coinRechargePricingOpen}
+        onClose={() => { setCoinRechargePricingOpen(false); setCoinRechargePricingSupplier(null); }}
+        supplier={coinRechargePricingSupplier}
         onSaved={load}
       />
     </div>

@@ -102,7 +102,7 @@ export const resolveProductOrderFields = (product, language = 'ar') => {
       && (
         field?.verifiable === true
         || field?.verification?.required === true
-        || String(field?.verification?.type || field?.verificationType || '').trim().toLowerCase() === 'xena_target'
+        || ['xena_target', 'coin_recharge_target'].includes(String(field?.verification?.type || field?.verificationType || '').trim().toLowerCase())
       )
     ));
     if (!hasPlayerId && !hasVerifiableTarget) {

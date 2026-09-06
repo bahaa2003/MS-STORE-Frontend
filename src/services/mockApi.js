@@ -1185,6 +1185,16 @@ const mockApi = {
       return found.xenaProductConfig;
     },
 
+    updateCoinRechargeProductConfig: async (id, payload = {}) => {
+      await new Promise(resolve => setTimeout(resolve, DELAY));
+      const db = getSuppliersDb();
+      const found = (db.state.suppliers || []).find((s) => s.id === id);
+      if (!found) throw new Error('Supplier not found');
+      found.coinRechargeConfig = { product: { externalProductId: 'coin-recharge-dynamic', ...payload } };
+      saveDB('suppliers-storage', db);
+      return found.coinRechargeConfig.product;
+    },
+
     create: async (payload, actorContext) => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getSuppliersDb();

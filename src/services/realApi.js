@@ -2104,6 +2104,24 @@ const realApi = {
       return data?.config || data?.productConfig || data;
     },
 
+    /** Independent synthetic coin-recharge product configuration. */
+    updateCoinRechargeProductConfig: async (id, payload) => {
+      const res = await http.patch(`/admin/providers/${id}/coin-recharge/product-config`, {
+        name: payload?.name,
+        unitPrice: payload?.unitPrice,
+        minCoins: payload?.minCoins,
+        maxCoins: payload?.maxCoins,
+        isActive: payload?.isActive,
+      });
+      const data = unwrap(res);
+      return data?.product || data;
+    },
+
+    getCoinRechargeHistory: async (id, page = 1) => {
+      const res = await http.get(`/admin/providers/${id}/coin-recharge/history`, { params: { page } });
+      return unwrap(res);
+    },
+
     /**
      * POST /admin/providers → sendCreated(res, { provider }, ...)
      *
