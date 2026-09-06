@@ -874,7 +874,10 @@ const AdminSuppliers = () => {
                   const innerData = (typeof balObj === 'object' && balObj !== null) ? balObj : {};
                   const deepData = (typeof innerData?.data === 'object' && innerData.data !== null) ? innerData.data : {};
 
-                  const balance = deepData?.user_balance ?? innerData?.balance ?? innerData?.user_balance ?? innerData?.remains ?? innerData?.credits ?? raw?.user_balance ?? 'N/A';
+                  const normalizedBalance = (typeof raw?.balance === 'string' || typeof raw?.balance === 'number')
+                    ? raw.balance
+                    : undefined;
+                  const balance = normalizedBalance ?? deepData?.user_balance ?? innerData?.balance ?? innerData?.user_balance ?? innerData?.remains ?? innerData?.credits ?? raw?.user_balance ?? 'N/A';
                   const parsedBalance = Number(balance);
                   const formattedBalance = Number.isFinite(parsedBalance)
                     ? new Intl.NumberFormat('en-US', {
@@ -884,6 +887,8 @@ const AdminSuppliers = () => {
                       }).format(parsedBalance)
                     : balance ?? 'N/A';
                   const currency = deepData?.user_currency ?? innerData?.currency ?? innerData?.user_currency ?? raw?.currency ?? '';
+                  const unit = raw?.unit ?? deepData?.unit ?? innerData?.unit ?? '';
+                  const balanceUnit = currency || unit;
                   const email = deepData?.user_email ?? innerData?.email ?? innerData?.user_email ?? raw?.email ?? '';
                   const userId = deepData?.user_id ?? deepData?.userId ?? innerData?.user_id ?? innerData?.userId ?? innerData?.username ?? raw?.user_id ?? '';
                   const plan = deepData?.plan ?? innerData?.plan ?? innerData?.plan_name ?? raw?.plan ?? '';
@@ -891,7 +896,7 @@ const AdminSuppliers = () => {
 
                   const cards = [
                     { label: 'الرصيد الحالي', value: formattedBalance, highlight: true },
-                    { label: 'العملة', value: currency },
+                    { label: currency ? 'العملة' : 'الوحدة', value: balanceUnit },
                     { label: 'البريد الإلكتروني', value: email },
                     { label: 'معرف الحساب', value: userId },
                     ...(plan ? [{ label: 'الخطة', value: plan }] : []),
