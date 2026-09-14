@@ -967,6 +967,7 @@ const useAdminStore = create((set, get) => ({
         });
 
         if (typeof onSelfUpdate === 'function') onSelfUpdate(updatedUser);
+        return updatedUser;
       },
 
       resetUserPassword: async (userId, actor = null, password = '') => apiClient.users.resetPassword(userId, actor, password),

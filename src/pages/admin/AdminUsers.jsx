@@ -132,6 +132,7 @@ const AdminUsers = () => {
     updateUserCoins,
     updateUserCurrency,
     updateUserCreditLimit,
+    updateUserProfile,
     deleteUser,
     restoreUser,
     resetUserPassword,
@@ -479,6 +480,19 @@ const AdminUsers = () => {
       await loadUsers({ force: true });
     } catch (error) {
       addToast(error?.message || 'تعذر تحديث حد الدين.', 'error');
+    }
+  };
+
+  const handleApiAccessToggle = async () => {
+    if (!selectedUser || !canManageUsers) return;
+    const nextValue = !Boolean(selectedUser.isApiEnabled);
+    try {
+      const updated = await updateUserProfile(selectedUser.id, { isApiEnabled: nextValue }, actor);
+      syncSelectedUser(updated || { ...selectedUser, isApiEnabled: nextValue });
+      addToast(nextValue ? 'تم تفعيل وصول API للمستخدم.' : 'تم إيقاف وصول API للمستخدم.', 'success');
+      await loadUsers({ force: true });
+    } catch (error) {
+      addToast(error?.message || 'تعذر تحديث وصول API للمستخدم.', 'error');
     }
   };
 
@@ -1170,6 +1184,16 @@ const AdminUsers = () => {
                     حفظ
                   </Button>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[color:rgb(var(--color-surface-rgb)/0.68)] p-2.5">
+                <div>
+                  <p className="text-xs font-semibold text-[var(--color-text)]">وصول واجهة المطوّرين API</p>
+                  <p className="mt-0.5 text-[10px] text-[var(--color-text-secondary)]">{selectedUser?.isApiEnabled ? 'مفعّل لهذا المستخدم' : 'غير مفعّل لهذا المستخدم'}</p>
+                </div>
+                <Button variant={selectedUser?.isApiEnabled ? 'outline' : 'default'} className={compactButtonClassName} onClick={handleApiAccessToggle} disabled={!canManageUsers}>
+                  {selectedUser?.isApiEnabled ? 'إيقاف' : 'تفعيل'}
+                </Button>
               </div>
             </div>
 

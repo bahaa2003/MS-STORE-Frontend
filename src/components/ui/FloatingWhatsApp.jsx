@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Headset, Phone, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '../../store/useAuthStore';
 import { isAdminRole } from '../../utils/authRoles';
@@ -12,6 +13,7 @@ import {
 const FloatingWhatsApp = () => {
   const { i18n } = useTranslation();
   const { user } = useAuthStore();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
   const shouldHideForRole = isAdminRole(user?.role);
@@ -37,7 +39,7 @@ const FloatingWhatsApp = () => {
     };
   }, [isOpen]);
 
-  if (shouldHideForRole) return null;
+  if (shouldHideForRole || location.pathname === '/api-docs') return null;
 
   const supportNumber = normalizeWhatsAppNumber(getAdminWhatsAppNumber());
   const whatsappHref = buildWhatsAppLink({

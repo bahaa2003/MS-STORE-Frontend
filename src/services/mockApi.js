@@ -708,6 +708,9 @@ const mockApi = {
       return { twoFactorEnabled: false };
     },
 
+    generateApiToken: async () => ({ apiToken: `ms_b2b_${Math.random().toString(36).slice(2)}${Date.now()}`, isApiEnabled: true }),
+    updateApiSettings: async ({ whitelistIps = [], webhookUrl = null } = {}) => ({ whitelistIps, webhookUrl }),
+
     loginWithGoogle: async () => {
       await new Promise(resolve => setTimeout(resolve, DELAY));
       const db = getDB('admin-storage', { state: { users: mockUsers } });

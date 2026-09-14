@@ -56,6 +56,8 @@ const TargetOrders = lazy(() => import('./pages/TargetOrders'));
 const AddBalance = lazy(() => import('./pages/AddBalance'));
 const WalletTopupHistory = lazy(() => import('./pages/WalletTopupHistory'));
 const PaymentDetails = lazy(() => import('./pages/PaymentDetails'));
+const ApiDocs = lazy(() => import('./pages/ApiDocs'));
+const DeveloperApi = lazy(() => import('./pages/DeveloperApi'));
 
 const ADMIN_PANEL_ROLES = [...ADMIN_ROLES, ...SUPERVISOR_ROLES];
 
@@ -124,6 +126,7 @@ const AnimatedAppRoutes = () => {
           <Route path="/" element={renderSuspended(<PublicCatalog />)} />
           <Route path="/catalog" element={renderSuspended(<PublicCatalog />)} />
           <Route path="/about-us" element={renderSuspended(<AboutUsPage />)} />
+          <Route path="/api-docs" element={renderSuspended(<ApiDocs />)} />
           <Route path="/auth" element={renderSuspended(<Auth />)} />
           <Route path="/login" element={renderSuspended(<Auth />)} />
           <Route path="/created-by" element={<CreatedByRoute />} />
@@ -135,6 +138,7 @@ const AnimatedAppRoutes = () => {
           <Route path="/account-rejected" element={<Navigate to={ACCOUNT_REJECTED_ROUTE} replace />} />
 
           <Route element={renderSuspended(<Layout />)}>
+            <Route path="/developers/api" element={(<ProtectedRoute roles={['CUSTOMER', 'ADMIN', ...SUPERVISOR_ROLES]}>{renderSuspended(<DeveloperApi />)}</ProtectedRoute>)} />
             <Route
               path="/dashboard"
               element={(

@@ -483,6 +483,9 @@ const normaliseUser = (u) => {
     permissions: Array.isArray(u.permissions) ? u.permissions.map((item) => String(item || '').trim()).filter(Boolean) : [],
     twoFactorEnabled: Boolean(u.twoFactorEnabled ?? u.isTwoFactorEnabled),
     isTwoFactorEnabled: Boolean(u.isTwoFactorEnabled ?? u.twoFactorEnabled),
+    isApiEnabled: Boolean(u.isApiEnabled),
+    whitelistIps: Array.isArray(u.whitelistIps) ? u.whitelistIps : [],
+    webhookUrl: u.webhookUrl || null,
   };
 };
 
@@ -1572,7 +1575,7 @@ const realApi = {
       }
       // Token captured from callback redirect — fetch profile
       setStoredAuthTokens(token, null);
-      const res = await http.get('/users/me');
+      const res = await http.get('/me');
       const user = normaliseUser(unwrap(res));
       return { user, token };
     },
@@ -1615,6 +1618,9 @@ const realApi = {
       const res = await http.get('/users/me');
       return normaliseUser(unwrap(res));
     },
+
+    generateApiToken: async () => unwrap(await http.post('/me/api-token')),
+    updateApiSettings: async (payload) => unwrap(await http.patch('/me/api-settings', payload)),
 
     refreshSession: async () => {
       const refreshToken = getStoredRefreshToken();
@@ -2460,6 +2466,7 @@ const realApi = {
       if (updates.coins !== undefined) body.coins = Number(updates.coins);
       if (updates.balance !== undefined) body.balance = Number(updates.balance);
       if (updates.currentBalance !== undefined) body.currentBalance = Number(updates.currentBalance);
+      if (updates.isApiEnabled !== undefined) body.isApiEnabled = Boolean(updates.isApiEnabled);
 
       const isSelf = actorContext?.id === userId;
       const url = isSelf ? '/users/me' : `/admin/users/${userId}`;

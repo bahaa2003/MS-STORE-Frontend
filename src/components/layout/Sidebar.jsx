@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   Check,
   Coins,
+  Code2,
   Copy,
   CreditCard,
   Home,
@@ -155,6 +156,7 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
     { icon: User, label: t('sidebar.myAccount', { defaultValue: dir === 'rtl' ? 'حسابي' : 'My Account' }), path: '/account', roles: ['admin', 'customer', ...SUPERVISOR_ROLES] },
     { icon: ShieldCheck, label: t('sidebar.accountProtection', { defaultValue: dir === 'rtl' ? 'حماية الحساب' : 'Account Security' }), path: '/account-security', roles: ['admin', 'customer', ...SUPERVISOR_ROLES] },
     { icon: Wallet, label: t('sidebar.wallet'), path: '/wallet', roles: ['customer'] },
+    { icon: Code2, label: dir === 'rtl' ? 'واجهة المطورين (API)' : 'Developer API', path: '/developers/api', roles: ['customer', 'admin', ...SUPERVISOR_ROLES], visible: (currentUser) => currentUser?.isApiEnabled === true },
     {
       icon: ShoppingBag,
       label: dir === 'rtl' ? 'طلباتي' : 'My Orders',
@@ -198,7 +200,7 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
   ];
 
   const filteredNavItems = navItems.filter((item) => (
-    hasRequiredRole(user?.role || 'customer', item.roles) && hasPermission(user, item.permission)
+    hasRequiredRole(user?.role || 'customer', item.roles) && hasPermission(user, item.permission) && (!item.visible || item.visible(user))
   ));
   const showWalletCard = String(user?.role || '').toLowerCase() === 'customer' && isExpanded;
   const isAdmin = String(user?.role || '').toLowerCase() === 'admin';

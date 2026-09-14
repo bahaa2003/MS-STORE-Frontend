@@ -4,10 +4,11 @@ import useAuthStore from '../../store/useAuthStore';
 const loadLayout = () => import('../layout/Layout');
 const loadAuth = () => import('../../pages/Auth');
 const loadAdminDashboard = () => import('../../pages/AdminDashboard');
+const loadDeveloperApi = () => import('../../pages/DeveloperApi');
 
 const warmupByRole = {
   guest: [loadAuth],
-  customer: [loadLayout],
+  customer: [loadLayout, loadDeveloperApi],
   manager: [loadLayout, loadAdminDashboard],
   admin: [loadLayout, loadAdminDashboard],
 };
